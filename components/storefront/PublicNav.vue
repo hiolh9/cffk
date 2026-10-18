@@ -1,18 +1,25 @@
 <template>
-  <nav class="flex shrink-0 items-center gap-1" :aria-label="messages.nav.main">
-    <template v-if="user">
-      <Button size="sm" variant="ghost" as-child><a href="/account/order"><ClipboardListIcon data-icon="inline-start" />{{ messages.nav.myOrders }}</a></Button>
-    </template>
-    <template v-else>
-      <a class="pr-2" href="/order">{{ messages.nav.orderLookup }}</a>
-    </template>
+  <nav class="flex shrink-0 items-center gap-0.5 sm:gap-1" :aria-label="messages.nav.main">
+    <!-- Orders: icon-only on mobile, icon + label from sm up -->
+    <Button
+      size="sm"
+      variant="ghost"
+      class="px-2 shadow-none sm:px-3"
+      as-child
+    >
+      <a :href="user ? '/account/order' : '/order'" :aria-label="user ? messages.nav.myOrders : messages.nav.orderLookup" :title="user ? messages.nav.myOrders : messages.nav.orderLookup">
+        <ClipboardListIcon class="size-4" />
+        <span class="hidden sm:inline">{{ user ? messages.nav.myOrders : messages.nav.orderLookup }}</span>
+      </a>
+    </Button>
+
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
-        <Button type="button" variant="ghost" size="icon" :aria-label="messages.preferences.language" :title="messages.preferences.language">
+        <Button type="button" variant="ghost" size="icon" class="size-9 shadow-none" :aria-label="messages.preferences.language" :title="messages.preferences.language">
           <LanguagesIcon />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" :side-offset="8" class="w-36">
+      <DropdownMenuContent align="end" :side-offset="8" class="w-36 shadow-none">
         <DropdownMenuLabel>{{ messages.preferences.language }}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
@@ -22,10 +29,12 @@
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+
     <Button
       type="button"
       variant="ghost"
       size="icon"
+      class="size-9 shadow-none"
       :aria-label="theme === 'light' ? messages.preferences.dark : messages.preferences.light"
       :title="theme === 'light' ? messages.preferences.dark : messages.preferences.light"
       @click="setTheme(theme === 'light' ? 'dark' : 'light')"
@@ -33,18 +42,19 @@
       <SunIcon v-if="theme === 'light'" />
       <MoonIcon v-else />
     </Button>
+
     <template v-if="!user">
-      <Button size="sm" as-child><a href="/login">{{ messages.nav.signIn }}</a></Button>
+      <Button size="sm" class="ml-1 shadow-none" as-child><a href="/login">{{ messages.nav.signIn }}</a></Button>
     </template>
     <template v-else>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button type="button" variant="ghost" size="icon" class="rounded-full" :aria-label="t(messages.nav.accountMenu, { name: currentUserName })">
-            <Avatar class="size-8"><AvatarFallback>{{ userInitials }}</AvatarFallback></Avatar>
+          <Button type="button" variant="ghost" size="icon" class="size-9 rounded-full shadow-none" :aria-label="t(messages.nav.accountMenu, { name: currentUserName })">
+            <Avatar class="size-8"><AvatarFallback class="bg-foreground text-xs font-semibold text-background">{{ userInitials }}</AvatarFallback></Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" :side-offset="8" class="w-48">
-          <DropdownMenuLabel>{{ currentUserName }}</DropdownMenuLabel>
+        <DropdownMenuContent align="end" :side-offset="8" class="w-52 shadow-none">
+          <DropdownMenuLabel class="truncate">{{ currentUserName }}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuItem as-child><a href="/account"><UserRoundCogIcon data-icon="inline-start" />{{ messages.nav.accountSettings }}</a></DropdownMenuItem>
