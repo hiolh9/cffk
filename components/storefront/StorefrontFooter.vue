@@ -1,21 +1,22 @@
 <template>
-  <footer>
-    <div class="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-      <p class="whitespace-pre-wrap">{{ site.footerText }}</p>
+  <footer v-if="site.footerText || supportContacts.length" class="border-t bg-muted/40">
+    <div class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <p class="min-w-0 whitespace-pre-wrap break-words">{{ site.footerText }}</p>
       <DropdownMenu v-if="supportContacts.length > 1">
         <DropdownMenuTrigger as-child>
-          <Button type="button" variant="outline" size="sm">
+          <Button type="button" variant="outline" size="sm" class="h-10 w-full shrink-0 bg-background shadow-none sm:h-9 sm:w-auto">
             <HeadphonesIcon data-icon="inline-start" />
             {{ messages.storefront.contactSupport }}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" class="min-w-44">
+        <DropdownMenuContent align="end" class="min-w-44 shadow-none">
           <DropdownMenuItem v-for="contact in supportContacts" :key="`${contact.label}-${contact.href}`" as-child>
             <a :href="contact.href" target="_blank" rel="noopener noreferrer">{{ contact.label }}</a>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <a v-else-if="supportContacts[0]" :href="supportContacts[0].href" class="hover:text-foreground hover:underline" target="_blank" rel="noopener noreferrer">
+      <a v-else-if="supportContacts[0]" :href="supportContacts[0].href" class="inline-flex shrink-0 items-center gap-2 font-medium text-foreground hover:underline" target="_blank" rel="noopener noreferrer">
+        <HeadphonesIcon class="size-4" />
         {{ supportContacts[0].label }}
       </a>
     </div>
