@@ -1,10 +1,11 @@
 <template>
-  <main class="flex min-h-screen flex-col bg-muted/30">
-    <header class="fixed inset-x-0 top-0 z-50 border-b bg-background/95 backdrop-blur">
-      <div class="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-5">
-        <a href="/" class="flex min-w-0 items-center gap-2 font-semibold">
-          <img :src="brandLogoUrl" :alt="`${site.name} Logo`" class="size-9 shrink-0 rounded-md object-contain" />
-          <span class="truncate">{{ site.name }}</span>
+  <main class="flex min-h-screen flex-col bg-background text-foreground">
+    <!-- Header -->
+    <header class="fixed inset-x-0 top-0 z-50 border-b bg-background">
+      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
+        <a href="/" class="flex min-w-0 items-center gap-2.5 font-semibold">
+          <img :src="brandLogoUrl" :alt="`${site.name} Logo`" class="size-8 shrink-0 rounded object-contain sm:size-9" />
+          <span class="truncate text-base">{{ site.name }}</span>
         </a>
         <div class="flex shrink-0 items-center gap-2">
           <PublicNav />
@@ -12,69 +13,113 @@
       </div>
     </header>
 
-    <section class="border-b bg-background pt-16">
-      <div class="mx-auto grid max-w-6xl gap-5 px-5 py-8 sm:grid-cols-[minmax(0,1fr)_22rem] sm:items-center">
-        <div v-if="site.notice" class="flex min-w-0 items-center gap-3 text-sm leading-6 text-muted-foreground">
-          <InfoIcon class="size-4 shrink-0 text-foreground" />
-          <div class="min-w-0 max-w-[28.8rem] overflow-hidden whitespace-nowrap">
-            <p v-if="!shouldMarqueeNotice" class="m-0 truncate" :title="site.notice">{{ site.notice }}</p>
-            <template v-else>
-              <p class="sr-only">{{ site.notice }}</p>
-              <div aria-hidden="true" class="notice-marquee-track inline-flex w-max animate-notice-marquee">
-                <span class="shrink-0 pr-12">{{ site.notice }}</span>
-                <span class="shrink-0 pr-12">{{ site.notice }}</span>
-              </div>
-            </template>
-          </div>
+    <!-- Notice bar -->
+    <div v-if="site.notice" class="border-b bg-muted pt-14 sm:pt-16">
+      <div class="mx-auto flex max-w-6xl items-center gap-2.5 px-4 py-2 text-xs text-muted-foreground sm:px-6 sm:text-sm">
+        <InfoIcon class="size-4 shrink-0 text-foreground" />
+        <div class="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+          <p v-if="!shouldMarqueeNotice" class="m-0 truncate" :title="site.notice">{{ site.notice }}</p>
+          <template v-else>
+            <p class="sr-only">{{ site.notice }}</p>
+            <div aria-hidden="true" class="notice-marquee-track inline-flex w-max animate-notice-marquee">
+              <span class="shrink-0 pr-12">{{ site.notice }}</span>
+              <span class="shrink-0 pr-12">{{ site.notice }}</span>
+            </div>
+          </template>
         </div>
-        <p v-else class="text-sm text-muted-foreground">{{ site.subtitle || messages.storefront.fallbackSubtitle }}</p>
-        <div class="relative">
-          <SearchIcon class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="query" class="pl-9" :placeholder="messages.storefront.searchProducts" :aria-label="messages.storefront.searchProducts" />
+      </div>
+    </div>
+
+    <!-- Hero / search -->
+    <section :class="site.notice ? '' : 'pt-14 sm:pt-16'" class="border-b bg-background">
+      <div class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:px-6 sm:py-8">
+        <div class="min-w-0">
+          <h1 class="truncate text-2xl font-bold tracking-tight sm:text-3xl">{{ site.name }}</h1>
+          <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">{{ site.subtitle || messages.storefront.fallbackSubtitle }}</p>
+        </div>
+        <div class="relative w-full sm:max-w-sm">
+          <SearchIcon class="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            v-model="query"
+            type="search"
+            enterkeyhint="search"
+            class="h-11 rounded-md border-transparent bg-muted pl-10 shadow-none focus-visible:bg-background"
+            :placeholder="messages.storefront.searchProducts"
+            :aria-label="messages.storefront.searchProducts"
+          />
         </div>
       </div>
     </section>
 
-    <section class="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:py-12">
-      <div class="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 class="text-xl font-semibold tracking-normal">{{ messages.storefront.products }}</h2>
-          <p class="mt-1 text-sm text-muted-foreground">{{ query ? t(messages.storefront.relatedProducts, { count: visibleProducts.length }) : messages.storefront.fallbackSubtitle }}</p>
-        </div>
-        <div v-if="data.categories.length" class="flex max-w-full gap-2 overflow-x-auto pb-1" :aria-label="messages.storefront.categories">
-          <Button size="sm" :variant="selectedCategory === null ? 'default' : 'outline'" @click="selectedCategory = null">{{ messages.storefront.all }}</Button>
-          <Button
-            v-for="category in data.categories"
-            :key="category.id"
-            size="sm"
-            :variant="selectedCategory === category.id ? 'default' : 'outline'"
-            @click="selectedCategory = category.id"
-          >
-            {{ category.name }}
-          </Button>
-        </div>
+    <!-- Category bar (sticky) -->
+    <nav
+      v-if="data.categories.length"
+      :aria-label="messages.storefront.categories"
+      class="sticky top-14 z-40 border-b bg-background sm:top-16"
+    >
+      <div class="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button
+          type="button"
+          :class="chipClass(selectedCategory === null)"
+          :aria-pressed="selectedCategory === null"
+          @click="selectedCategory = null"
+        >
+          {{ messages.storefront.all }}
+        </button>
+        <button
+          v-for="category in data.categories"
+          :key="category.id"
+          type="button"
+          :class="chipClass(selectedCategory === category.id)"
+          :aria-pressed="selectedCategory === category.id"
+          @click="selectedCategory = category.id"
+        >
+          {{ category.name }}
+        </button>
+      </div>
+    </nav>
+
+    <!-- Products -->
+    <section class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
+      <div class="flex items-baseline justify-between gap-3">
+        <h2 class="text-lg font-semibold tracking-tight sm:text-xl">{{ messages.storefront.products }}</h2>
+        <p v-if="query" class="truncate text-xs text-muted-foreground sm:text-sm">
+          {{ t(messages.storefront.relatedProducts, { count: visibleProducts.length }) }}
+        </p>
       </div>
 
-      <div v-if="visibleProducts.length" class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <article v-for="product in visibleProducts" :key="product.id" class="group overflow-hidden rounded-lg border bg-card transition-shadow hover:shadow-lg">
-          <a :href="`/product/${product.slug}`" class="block">
-            <div class="relative aspect-4/3 overflow-hidden bg-muted">
-              <img :src="product.coverImage || defaultProductImage" :alt="product.name" class="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
-              <Badge variant="secondary" class="absolute left-2 top-2 bg-background/90 text-xs backdrop-blur">{{ product.categoryName || messages.storefront.products }}</Badge>
+      <div v-if="visibleProducts.length" class="mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <article
+          v-for="product in visibleProducts"
+          :key="product.id"
+          class="group flex flex-col overflow-hidden rounded-md border bg-card transition-colors hover:border-foreground/40"
+        >
+          <a :href="`/product/${product.slug}`" class="flex h-full flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <div class="relative aspect-square overflow-hidden bg-muted">
+              <img
+                :src="product.coverImage || defaultProductImage"
+                :alt="product.name"
+                loading="lazy"
+                :class="product.availableStock === 0 ? 'opacity-50 grayscale' : ''"
+                class="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+              <Badge variant="secondary" class="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded bg-background px-1.5 py-0.5 text-[11px] font-medium shadow-none">
+                {{ product.categoryName || messages.storefront.products }}
+              </Badge>
             </div>
-            <div class="flex min-h-28 flex-col p-3">
-              <h3 class="line-clamp-2 text-sm font-semibold tracking-normal">{{ product.name }}</h3>
-              <p v-if="product.subtitle" class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ product.subtitle }}</p>
-              <div class="mt-auto flex items-end justify-between gap-2 pt-3">
+            <div class="flex flex-1 flex-col gap-1 p-3">
+              <h3 class="line-clamp-2 text-sm font-medium leading-snug">{{ product.name }}</h3>
+              <p v-if="product.subtitle" class="line-clamp-1 text-xs text-muted-foreground">{{ product.subtitle }}</p>
+              <div class="mt-auto flex flex-col gap-0.5 pt-3">
+                <span class="text-lg font-bold tabular-nums leading-none">¥{{ product.price }}</span>
                 <span :class="stockClass(product)" class="text-xs">{{ stockLabel(product) }}</span>
-                <span class="shrink-0 text-lg font-semibold tabular-nums">¥{{ product.price }}</span>
               </div>
             </div>
           </a>
         </article>
       </div>
 
-      <div v-else class="mt-6 border border-dashed bg-background px-6 py-16 text-center">
+      <div v-else class="mt-6 rounded-md border border-dashed bg-muted/40 px-6 py-16 text-center">
         <PackageOpenIcon class="mx-auto size-8 text-muted-foreground" />
         <h3 class="mt-4 text-base font-semibold">{{ messages.storefront.noProducts }}</h3>
         <p class="mt-2 text-sm text-muted-foreground">{{ messages.storefront.noProductsDescription }}</p>
@@ -95,7 +140,6 @@ import { usePageContext } from "vike-vue/usePageContext";
 import PublicNav from "@/components/storefront/PublicNav.vue";
 import StorefrontFooter from "@/components/storefront/StorefrontFooter.vue";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Data } from "./+data.server";
 import { useStorefrontPreferences } from "@/lib/storefront-preferences";
@@ -126,6 +170,12 @@ const visibleProducts = computed(() => {
   );
 });
 
+function chipClass(active: boolean) {
+  return [
+    "shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+    active ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground",
+  ];
+}
 function stockLabel(product: Product) {
   if (product.availableStock === null) return messages.value.storefront.stockAvailable;
   return product.availableStock > 0
