@@ -2,8 +2,10 @@ import {
   acgCredentialsSchema,
   dujiaoNextCredentialsSchema,
   moogoldCredentialsSchema,
+  normalizeLegacyProtocolVersion,
   type SupplierProvider,
 } from "../schema";
+import { loadSupplierCredentials } from "../credentials";
 import { AcgAdapter } from "./acg";
 import { AcgV311Adapter } from "./acg-v3.1.1";
 import { DujiaoNextAdapter } from "./dujiao-next";
@@ -40,4 +42,25 @@ export function createSupplierAdapter(input: {
   if (input.protocolVersion !== "dujiao_next_v1") throw new Error("supplier_protocol_version_invalid");
   const credentials = dujiaoNextCredentialsSchema.parse(input.credentials);
   return new DujiaoNextAdapter({ ...input, ...credentials });
+}
+
+/** Build adapter from a DB account row (handles encrypted credentials at rest). */
+export async function createSupplierAdapterFromAccount(account: {
+  provider: SupplierProvider;
+  protocolVersion: string;
+  baseUrl: string;
+  credentialsJson: string;
+  currency: string;
+  currencyDecimals: number;
+}, options?: { fetcher?: typeof fetch; now?: () => number }) {
+  return createSupplierAdapter({
+    provider: account.provider,
+    protocolVersion: normalizeLegacyProtocolVersion(account.provider, account.protocolVersion),
+    baseUrl: account.baseUrl,
+    credentials: await loadSupplierCredentials(account.credentialsJson),
+    currency: account.currency,
+    currencyDecimals: account.currencyDecimals,
+    fetcher: options?.fetcher,
+    now: options?.now,
+  });
 }

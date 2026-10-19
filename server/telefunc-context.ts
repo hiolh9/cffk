@@ -3,6 +3,7 @@ import { createDrizzleDb } from "@/database/drizzle";
 import { appError } from "@/lib/app-error";
 import { eq } from "drizzle-orm";
 import { user } from "@/database/drizzle/schema";
+import { assertAdminIpAllowed } from "@/server/security/admin-ip";
 
 export type TelefuncContext = {
   env?: Record<string, unknown> & { DB?: D1Database };
@@ -33,13 +34,11 @@ export function assertAdminAccess(user: { id: string } | null | undefined, isAdm
 export function requireAdmin() {
   const result = requireUser();
   const adminUser = assertAdminAccess(result.user, result.context.isAdmin);
+  assertAdminIpAllowed(result.context.clientIp);
   return { ...result, user: adminUser, adminUserId: adminUser.id };
 }
 
-/**
- * Admin gate that also requires two-factor authentication.
- * Security settings page should keep using requireAdmin() so admins can enable 2FA.
- */
+/** Admin gate that also requires two-factor authentication. */
 export async function requireAdminSecure() {
   const result = requireAdmin();
   const [row] = await result.db
