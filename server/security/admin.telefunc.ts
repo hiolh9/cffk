@@ -8,6 +8,7 @@ import { env } from "@/server/env";
 import { getTurnstileConfig } from "@/lib/turnstile-config";
 
 async function internalOnGetSecurityStatus() {
+  // Intentionally requireAdmin (not Secure) so admins can open this page before enabling 2FA.
   const { db, adminUserId } = requireAdmin();
   const [admin] = await db.select({ email: user.email, twoFactorEnabled: user.twoFactorEnabled }).from(user).where(eq(user.id, adminUserId)).limit(1);
   if (!admin) appError("ADMIN_NOT_FOUND");
@@ -16,6 +17,11 @@ async function internalOnGetSecurityStatus() {
   return {
     email: admin.email,
     twoFactorEnabled: admin.twoFactorEnabled,
+    policy: {
+      adminTwoFactorRequired: true,
+      authRateLimitEnabled: true,
+      securityHeadersEnabled: true,
+    },
     turnstile: {
       siteKey: turnstile.siteKey,
       enabled: turnstile.enabled,

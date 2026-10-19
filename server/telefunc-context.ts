@@ -1,6 +1,8 @@
 import { getContext } from "telefunc";
 import { createDrizzleDb } from "@/database/drizzle";
 import { appError } from "@/lib/app-error";
+import { eq } from "drizzle-orm";
+import { user } from "@/database/drizzle/schema";
 
 export type TelefuncContext = {
   env?: Record<string, unknown> & { DB?: D1Database };
@@ -27,8 +29,26 @@ export function assertAdminAccess(user: { id: string } | null | undefined, isAdm
   return user;
 }
 
+/** Basic admin gate (root only). Prefer requireAdminSecure for sensitive mutations. */
 export function requireAdmin() {
   const result = requireUser();
-  const user = assertAdminAccess(result.user, result.context.isAdmin);
-  return { ...result, user, adminUserId: user.id };
+  const adminUser = assertAdminAccess(result.user, result.context.isAdmin);
+  return { ...result, user: adminUser, adminUserId: adminUser.id };
+}
+
+/**
+ * Admin gate that also requires two-factor authentication.
+ * Security settings page should keep using requireAdmin() so admins can enable 2FA.
+ */
+export async function requireAdminSecure() {
+  const result = requireAdmin();
+  const [row] = await result.db
+    .select({ twoFactorEnabled: user.twoFactorEnabled })
+    .from(user)
+    .where(eq(user.id, result.adminUserId))
+    .limit(1);
+  if (!row?.twoFactorEnabled) {
+    appError("ADMIN_2FA_REQUIRED");
+  }
+  return result;
 }
