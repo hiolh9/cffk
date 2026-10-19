@@ -1,8 +1,5 @@
 import { sql } from "drizzle-orm";
-import { PUSH_MAX_ATTEMPTS } from "@/lib/push-utils";
 import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import { auditLog, invoiceSequence, accountingArchive } from "./schema-accounting";
-export { auditLog, invoiceSequence, accountingArchive };
 
 export const createdAt = integer("createdAt", { mode: "timestamp_ms" }).notNull();
 export const updatedAt = integer("updatedAt", { mode: "timestamp_ms" }).notNull();
