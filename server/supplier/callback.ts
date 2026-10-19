@@ -4,6 +4,7 @@ import { createDrizzleDb } from "@/database/drizzle";
 import { supplierAccount, supplierOrder } from "@/database/drizzle/schema";
 import { completeSupplierOrderFromCallback } from "./process";
 import { signDujiaoNextRequest } from "./providers/signatures";
+import { loadSupplierCredentials } from "./credentials";
 
 const MAX_CALLBACK_BYTES = 1024 * 1024;
 const MAX_TIMESTAMP_SKEW_SECONDS = 60;
@@ -31,7 +32,7 @@ export async function handleDujiaoSupplierCallback(database: D1Database, account
   const [account] = await db.select().from(supplierAccount).where(and(eq(supplierAccount.id, accountId), eq(supplierAccount.provider, "dujiao_next"), eq(supplierAccount.protocolVersion, "dujiao_next_v1"))).limit(1);
   if (!account) return response(false, "authentication_failed");
   let credentials: { apiKey?: string; apiSecret?: string };
-  try { credentials = JSON.parse(account.credentialsJson) as { apiKey?: string; apiSecret?: string }; } catch { return response(false, "authentication_failed"); }
+  try { credentials = (await loadSupplierCredentials(account.credentialsJson)) as { apiKey?: string; apiSecret?: string }; } catch { return response(false, "authentication_failed"); }
   if (credentials.apiKey !== apiKey || !credentials.apiSecret) return response(false, "authentication_failed");
   const expected = signDujiaoNextRequest({ method: "POST", path: CALLBACK_SIGNING_PATH, timestamp: timestampHeader, rawBody, apiSecret: credentials.apiSecret });
   if (!constantTimeEqual(signature.toLowerCase(), expected.toLowerCase())) return response(false, "authentication_failed");
