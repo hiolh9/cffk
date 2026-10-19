@@ -29,6 +29,7 @@ import { computed, onMounted, provide, ref } from "vue";
 import { usePageContext } from "vike-vue/usePageContext";
 import { SITE_TIMEZONE_KEY } from "@/lib/site-timezone";
 import { onGetSiteSettings } from "@/server/site/admin.telefunc";
+import { onGetSecurityStatus } from "@/server/security/admin.telefunc";
 import { runTelefunc } from "@/lib/telefunc-client";
 
 const pageContext = usePageContext();
@@ -40,6 +41,16 @@ provide(SITE_TIMEZONE_KEY, timezone);
 onMounted(() => {
   if (isLoginPage.value) return;
   void runTelefunc(() => onGetSiteSettings(), { notifyError: false }).then((settings) => { timezone.value = settings.timezone; }).catch(() => undefined);
+  const path = pageContext.urlPathname.replace(/\/$/, "");
+  const securityPath = `${basePath.value}/system/security`;
+  if (path === securityPath) return;
+  void runTelefunc(() => onGetSecurityStatus(), { notifyError: false })
+    .then((status) => {
+      if (status.policy?.adminTwoFactorRequired && !status.twoFactorEnabled) {
+        window.location.href = securityPath;
+      }
+    })
+    .catch(() => undefined);
 });
 
 </script>
