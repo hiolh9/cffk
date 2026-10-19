@@ -41,6 +41,7 @@ export const paymentAttempt = sqliteTable(
     status: text("status").notNull(),
     amount: integer("amount").notNull(),
     externalId: text("externalId"),
+    attemptCount: integer("attemptCount").notNull().default(0),
     rawJson: text("rawJson"),
     createdAt,
     updatedAt,
@@ -54,7 +55,7 @@ export const automaticDeliveryJob = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     orderId: integer("orderId").notNull().references(() => order.id, { onDelete: "cascade" }),
     status: text("status").notNull().default("PENDING"),
-    attempts: integer("attempts").notNull().default(0),
+    attemptCount: integer("attemptCount").notNull().default(0),
     lastError: text("lastError"),
     createdAt,
     updatedAt,
@@ -86,12 +87,17 @@ export const paymentProvider = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     code: text("code").notNull(),
     name: text("name").notNull(),
-    enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
-    configJson: text("configJson"),
+    provider: text("provider").notNull(),
+    isEnabled: integer("isEnabled", { mode: "boolean" }).notNull().default(false),
+    sort: integer("sort").notNull().default(0),
+    configJson: text("configJson").notNull(),
     createdAt,
     updatedAt,
   },
-  (table) => [uniqueIndex("paymentProvider_code_unique").on(table.code)],
+  (table) => [
+    uniqueIndex("paymentProvider_code_unique").on(table.code),
+    index("paymentProvider_enabled_sort_idx").on(table.isEnabled, table.sort),
+  ],
 );
 
 export const paymentLog = sqliteTable(
@@ -111,13 +117,18 @@ export const pushChannelConfig = sqliteTable(
   "pushChannelConfig",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    channel: text("channel").notNull(),
-    enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
-    configJson: text("configJson"),
+    channel: text("channel", { enum: ["EMAIL", "WECHAT", "TELEGRAM"] }).notNull(),
+    provider: text("provider").notNull(),
+    name: text("name").notNull(),
+    isEnabled: integer("isEnabled", { mode: "boolean" }).notNull().default(false),
+    configJson: text("configJson").notNull(),
     createdAt,
     updatedAt,
   },
-  (table) => [uniqueIndex("pushChannelConfig_channel_unique").on(table.channel)],
+  (table) => [
+    index("pushChannelConfig_channel_provider_idx").on(table.channel, table.provider),
+    index("pushChannelConfig_channel_enabled_idx").on(table.channel, table.isEnabled),
+  ],
 );
 
 export const orderRequestRateLimit = sqliteTable("orderRequestRateLimit", {
@@ -135,6 +146,7 @@ export const guestOrderRecoveryChallenge = sqliteTable(
     email: text("email").notNull(),
     codeHash: text("codeHash").notNull(),
     expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
+    attemptCount: integer("attemptCount").notNull().default(0),
     createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [index("guestOrderRecoveryChallenge_email_idx").on(table.email)],
@@ -157,43 +169,55 @@ export const pushPolicy = sqliteTable(
   "pushPolicy",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    scene: text("scene").notNull(),
-    channel: text("channel").notNull(),
-    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    messageType: text("messageType", { enum: ["NORMAL", "ADMIN"] }).notNull(),
+    scene: text("scene", { enum: ["ORDER_PAID", "DELIVERY_SUCCESS", "DELIVERY_FAILED", "PAYMENT_EXCEPTION"] }).notNull(),
+    channelsJson: text("channelsJson").notNull().default("[]"),
+    isEnabled: integer("isEnabled", { mode: "boolean" }).notNull().default(true),
     createdAt,
     updatedAt,
   },
-  (table) => [uniqueIndex("pushPolicy_scene_channel_unique").on(table.scene, table.channel)],
+  (table) => [uniqueIndex("pushPolicy_messageType_scene_unique").on(table.messageType, table.scene)],
 );
 
 export const pushLog = sqliteTable(
   "pushLog",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    scene: text("scene").notNull(),
-    channel: text("channel").notNull(),
-    status: text("status").notNull(),
+    orderId: integer("orderId").references(() => order.id, { onDelete: "set null" }),
+    channelConfigId: integer("channelConfigId").references(() => pushChannelConfig.id, { onDelete: "set null" }),
+    idempotencyKey: text("idempotencyKey"),
+    messageType: text("messageType", { enum: ["NORMAL", "ADMIN"] }).notNull().default("NORMAL"),
+    channel: text("channel", { enum: ["EMAIL", "WECHAT", "TELEGRAM"] }).notNull(),
+    provider: text("provider").notNull(),
+    scene: text("scene", {
+      enum: ["TEST", "EMAIL_VERIFICATION", "PASSWORD_RESET", "GUEST_ORDER_RECOVERY", "ORDER_PAID", "DELIVERY_SUCCESS", "DELIVERY_FAILED", "PAYMENT_EXCEPTION"],
+    }).notNull(),
     recipient: text("recipient"),
+    status: text("status").notNull(),
+    attemptCount: integer("attemptCount").notNull().default(0),
     error: text("error"),
+    payloadJson: text("payloadJson"),
     createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("pushLog_createdAt_idx").on(table.createdAt)],
+  (table) => [index("pushLog_createdAt_idx").on(table.createdAt), index("pushLog_orderId_idx").on(table.orderId)],
 );
 
 export const pushRetry = sqliteTable(
   "pushRetry",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    scene: text("scene").notNull(),
-    channel: text("channel").notNull(),
+    pushLogId: integer("pushLogId").notNull().references(() => pushLog.id, { onDelete: "cascade" }),
     payloadJson: text("payloadJson").notNull(),
-    attempts: integer("attempts").notNull().default(0),
+    status: text("status", { enum: ["PENDING", "PROCESSING", "EXHAUSTED"] }).notNull().default("PENDING"),
+    attemptCount: integer("attemptCount").notNull().default(0),
     maxAttempts: integer("maxAttempts").notNull().default(PUSH_MAX_ATTEMPTS),
-    nextRetryAt: integer("nextRetryAt", { mode: "timestamp_ms" }),
-    status: text("status").notNull().default("PENDING"),
+    nextAttemptAt: integer("nextAttemptAt", { mode: "timestamp_ms" }).notNull(),
     lastError: text("lastError"),
     createdAt,
     updatedAt,
   },
-  (table) => [index("pushRetry_status_next_idx").on(table.status, table.nextRetryAt)],
+  (table) => [
+    index("pushRetry_status_nextAttemptAt_idx").on(table.status, table.nextAttemptAt),
+    uniqueIndex("pushRetry_pushLogId_unique").on(table.pushLogId),
+  ],
 );
