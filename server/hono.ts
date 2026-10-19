@@ -9,11 +9,16 @@ import { Hono, type Context } from "hono";
 import type { PaymentProviderKind } from "./payment/registry";
 import { PaymentLogService } from "./payment/log-service";
 import { getTurnstileConfig } from "@/lib/turnstile-config";
+import { applySecurityHeaders } from "./security/headers";
 import { env } from "./env";
 import { handleDujiaoSupplierCallback } from "./supplier/callback";
 
 function getApp() {
   const app = new Hono<{ Bindings: Record<string, unknown> & { DB: D1Database } }>();
+  app.use("*", async (context, next) => {
+    await next();
+    applySecurityHeaders(context.res.headers);
+  });
   app.onError(async (error, context) => {
     await reportUnexpectedRequestError("hono", error, context.req.raw);
     if (context.req.path.startsWith("/api/payments/")) return context.text("failure", 500);
