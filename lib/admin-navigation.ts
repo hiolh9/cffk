@@ -75,7 +75,7 @@ export const adminPages = {
     title: "供应商账号",
     path: "/suppliers/accounts",
     pageTitle: "供应商账号",
-    description: "管理 ACG 和独角数卡 Next 上游账号、余额与连接状态。",
+    description: "管理上游账号、余额与连接状态（含 MooGold）。",
   },
   supplierProducts: {
     title: "供应商商品",
@@ -94,6 +94,12 @@ export const adminPages = {
     path: "/orders",
     pageTitle: "订单管理",
     description: "查看订单、关闭未支付订单，并处理人工、物流及自动发货恢复。",
+  },
+  accounting: {
+    title: "账本对账",
+    path: "/accounting",
+    pageTitle: "账本对账",
+    description: "Gross/Fee/Net/COGS 账本、CSV 导出、银行直转手动开单与审计。",
   },
   users: {
     title: "用户管理",
@@ -119,53 +125,47 @@ export const adminPages = {
     pageTitle: "电子邮件",
     description: emailDescription,
   },
-  mailPostOffice: {
-    title: "通道配置",
-    path: "/push/email/post-office",
-    pageTitle: "邮件通道配置",
-    description: "配置邮件 Provider，并发送测试邮件。",
-  },
   mailTemplates: {
-    title: "消息模板",
+    title: "邮件模板",
     path: "/push/templates",
-    pageTitle: "消息模板",
-    description: "管理各消息场景的标题、正文和可用变量。",
+    pageTitle: "邮件模板",
+    description: emailDescription,
+  },
+  mailPostOffice: {
+    title: "邮局",
+    path: "/push/email/post",
+    pageTitle: "邮局",
+    description: emailDescription,
   },
   wecom: {
     title: "微信三方",
     path: "/push/wecom",
-    pageTitle: "微信三方通知配置",
-    description: "配置微信三方通知渠道。",
+    pageTitle: "微信三方",
+    description: "配置微信推送渠道。",
   },
   telegram: {
     title: "Telegram",
     path: "/push/telegram",
-    pageTitle: "Telegram 通知配置",
-    description: "配置 Telegram Bot 通知渠道。",
+    pageTitle: "Telegram",
+    description: "配置 Telegram 推送渠道。",
   },
   payments: {
     title: "支付配置",
     path: "/system/payments",
     pageTitle: "支付配置",
-    description: "管理支付渠道和支付日志。",
-  },
-  paymentLogs: {
-    title: "支付日志",
-    path: "/system/payments/payment-logs",
-    pageTitle: "支付日志",
-    description: "查看已脱敏的支付事件与验证结果。",
+    description: "配置支付渠道。",
   },
   media: {
-    title: "媒体存储",
+    title: "媒体库",
     path: "/system/media",
-    pageTitle: "媒体存储配置",
-    description: "配置 S3 兼容存储与保存在 D1 的访问凭据。",
+    pageTitle: "媒体库",
+    description: "管理图片与文件。",
   },
   settings: {
     title: "站点配置",
     path: "/system/settings",
     pageTitle: "站点配置",
-    description: "管理公开商城、站点资源和默认 SEO 配置。"
+    description: "站点名称、公告与页脚。",
   },
   security: {
     title: "安全配置",
@@ -173,7 +173,6 @@ export const adminPages = {
     pageTitle: "安全配置",
     description: "管理站点安全配置。",
   },
-
   tasks: {
     title: "定时任务",
     path: "/system/tasks",
@@ -189,6 +188,7 @@ export const adminNavigation = {
     items: [adminPages.categories, adminPages.products, adminPages.cards, adminPages.discounts],
   },
   orders: adminPages.orders,
+  accounting: adminPages.accounting,
   suppliers: {
     title: "供应商管理",
     items: [adminPages.supplierAccounts, adminPages.supplierProducts, adminPages.supplierOrders],
@@ -209,7 +209,6 @@ export const adminNavigation = {
     title: "系统配置",
     items: [adminPages.payments, adminPages.media, adminPages.settings, adminPages.security, adminPages.tasks],
   },
-
 } as const satisfies Record<string, AdminPageMeta | AdminNavigationGroup>;
 
 const navigationGroups: readonly AdminNavigationGroup[] = [
@@ -244,7 +243,7 @@ export function getAdminBreadcrumb(pathname: string, basePath: string) {
     }
   }
 
-  const standaloneItems = [adminNavigation.dashboard, adminNavigation.orders, adminNavigation.users, adminPages.account];
+  const standaloneItems = [adminNavigation.dashboard, adminNavigation.orders, adminNavigation.accounting, adminNavigation.users, adminPages.account];
   const standalone = standaloneItems.find((item) => isAdminNavigationItemActive(pathname, basePath, item));
   if (standalone) return { titles: [standalone.title] };
 
