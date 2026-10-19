@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
-import { accountingArchive } from "@/database/drizzle/schema";
+import { accountingArchive } from "@/database/drizzle/schema-accounting";
 import { ledgerToCsv, listLedgerRows } from "./ledger";
 
 /** Archive previous calendar month ledger to R2 when binding exists. */
