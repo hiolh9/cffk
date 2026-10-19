@@ -11,34 +11,20 @@ import { eq, sql } from "drizzle-orm";
 import { schema } from "../database/drizzle/schema";
 import { getDrizzleDb } from "../database/drizzle";
 import { hasRoot } from "./admin";
+import { checkSecurityRateLimit } from "./security/rate-limit";
 
-// On Cloudflare the D1 binding is request-scoped (fresh instance per request); elsewhere it's memoized.
 function getAuth(runtime: RuntimeAdapter, publicOrigin?: string) {
   return betterAuth(getAuthConfig(runtime, publicOrigin));
 }
 
-// Note: You can directly define a server middleware instead of defining a Universal Middleware. (You can remove @universal-middleware/* — Vike's scaffolder uses it only to simplify its internal logic, see https://github.com/vikejs/vike/discussions/3116)
-/**
- * Add the Better Auth user to the context.
- * @link {@see https://better-auth.com/docs/concepts/session-management}
- */
 export async function getRequestSession(request: Request, runtime: RuntimeAdapter) {
   const publicOrigin = await resolveAuthOrigin(request, runtime);
   const authRequest = rewriteRequestOrigin(request, publicOrigin);
   return getAuth(runtime, publicOrigin).api.getSession({ headers: authRequest.headers });
 }
 
-export const betterAuthSessionMiddleware: UniversalMiddleware = enhance(
-  // The context we add here is automatically merged into pageContext
+export const betterAuthSessionMiddleware = enhance(
   async (request, context, runtime) => {
-    if (!request.headers.get("cookie")) {
-      return {
-        ...context,
-        user: null,
-        isAdmin: false,
-      };
-    }
-
     try {
       const data = await getRequestSession(request, runtime);
       const userId = data?.user?.id;
@@ -56,7 +42,6 @@ export const betterAuthSessionMiddleware: UniversalMiddleware = enhance(
       const isDisabled = Boolean(account?.disabledAt);
       return {
         ...context,
-        // Disabled accounts are treated as signed out, including existing sessions.
         user: isDisabled ? null : data?.user ?? null,
         isAdmin: !isDisabled && account?.rootUserId === userId,
       };
@@ -75,17 +60,32 @@ export const betterAuthSessionMiddleware: UniversalMiddleware = enhance(
   },
 );
 
-// Note: You can directly define a server middleware instead of defining a Universal Middleware. (You can remove @universal-middleware/* — Vike's scaffolder uses it only to simplify its internal logic, see https://github.com/vikejs/vike/discussions/3116)
-/**
- * Better Auth route
- * @link {@see https://better-auth.com/docs/installation}
- **/
 export const betterAuthHandler = enhance(
   async (request, _context, runtime) => {
     const publicOrigin = await resolveAuthOrigin(request, runtime);
     const authRequest = rewriteRequestOrigin(request, publicOrigin);
     const authPath = new URL(authRequest.url).pathname;
     const isEmailSignUp = authRequest.method === "POST" && authPath.endsWith("/sign-up/email");
+
+    const clientIp = request.headers.get("CF-Connecting-IP");
+    const db = (runtime as { env?: { DB?: D1Database } }).env?.DB;
+    const authPathLower = authPath.toLowerCase();
+    if (db && authRequest.method === "POST") {
+      let rateAction: "AUTH_SIGN_IN" | "AUTH_SIGN_UP" | "AUTH_PASSWORD_RESET" | "AUTH_2FA" | null = null;
+      if (authPathLower.endsWith("/sign-in/email") || authPathLower.includes("/sign-in/")) rateAction = "AUTH_SIGN_IN";
+      else if (authPathLower.endsWith("/sign-up/email") || authPathLower.includes("/sign-up/")) rateAction = "AUTH_SIGN_UP";
+      else if (authPathLower.includes("forget-password") || authPathLower.includes("reset-password") || authPathLower.includes("request-password")) rateAction = "AUTH_PASSWORD_RESET";
+      else if (authPathLower.includes("two-factor") || authPathLower.includes("2fa")) rateAction = "AUTH_2FA";
+      if (rateAction) {
+        const check = await checkSecurityRateLimit(db, { action: rateAction, clientIp });
+        if (!check.allowed) {
+          return withAuthNoStore(Response.json(
+            { code: "RATE_LIMITED", message: "Too many attempts. Please try again later." },
+            { status: 429, headers: { "Retry-After": String(check.retryAfterSec) } },
+          ));
+        }
+      }
+    }
 
     if (isEmailSignUp && !(await hasRoot(runtime))) {
       return withAuthNoStore(Response.json(
