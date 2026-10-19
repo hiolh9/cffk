@@ -7,6 +7,7 @@ import { enforceSecurityRateLimit } from "@/server/security/rate-limit";
 import { appError } from "@/lib/app-error";
 import { productSku, productV2, supplierAccount, supplierBinding, supplierOrder } from "@/database/drizzle/schema";
 import { createSupplierAdapter } from "./providers/factory";
+import { loadSupplierCredentials, sealCredentials, credentialsConfigured } from "./credentials";
 import { normalizeLegacyProtocolVersion, protocolVersionForProvider, supplierAccountInputSchema, supplierAccountEditSchema, supplierAccountIdSchema, supplierAccountEnabledSchema, supplierListQuerySchema } from "./schema";
 
 function normalizedOrigin(baseUrl: string) {
@@ -14,9 +15,7 @@ function normalizedOrigin(baseUrl: string) {
 }
 
 function publicAccount(record: typeof supplierAccount.$inferSelect) {
-  let credentialsConfigured = false;
-  try { credentialsConfigured = Object.keys(JSON.parse(record.credentialsJson) as object).length > 0; } catch { /* Legacy malformed credentials are shown as unavailable. */ }
-  return { ...record, credentialsJson: undefined, credentialsConfigured };
+  return { ...record, credentialsJson: undefined, credentialsConfigured: credentialsConfigured(record.credentialsJson) };
 }
 
 export const onListSupplierAccounts = telefuncAction(async (input: unknown = {}) => {
@@ -42,13 +41,11 @@ export const onSaveSupplierAccount = telefuncAction(async (input: unknown) => {
     const [existing] = await db.select({ id: supplierAccount.id, credentialsRevision: supplierAccount.credentialsRevision }).from(supplierAccount).where(eq(supplierAccount.id, edit.data.id)).limit(1);
     if (!existing) appError("SUPPLIER_ACCOUNT_NOT_FOUND");
     const origin = normalizedOrigin(edit.data.baseUrl);
-    {
-      const credentials = edit.data.credentials;
-      const [updated] = await db.update(supplierAccount).set({ name: edit.data.name, baseUrl: edit.data.baseUrl, normalizedApiOrigin: origin, currency: edit.data.currency, currencyDecimals: edit.data.currencyDecimals, ...(credentials ? { credentialsJson: JSON.stringify(credentials), credentialsRevision: existing.credentialsRevision + 1 } : {}), updatedAt: new Date() }).where(eq(supplierAccount.id, edit.data.id)).returning();
-      if (!updated) appError("SUPPLIER_ACCOUNT_NOT_FOUND");
-      await writeAuditLog(database, { actorUserId: adminUserId, action: credentials ? "SUPPLIER_ACCOUNT_CREDENTIALS_UPDATED" : "SUPPLIER_ACCOUNT_UPDATED", entityType: "supplierAccount", entityId: updated.id, note: updated.provider });
-      return publicAccount(updated);
-    }
+    const credentials = edit.data.credentials;
+    const [updated] = await db.update(supplierAccount).set({ name: edit.data.name, baseUrl: edit.data.baseUrl, normalizedApiOrigin: origin, currency: edit.data.currency, currencyDecimals: edit.data.currencyDecimals, ...(credentials ? { credentialsJson: await sealCredentials(credentials), credentialsRevision: existing.credentialsRevision + 1 } : {}), updatedAt: new Date() }).where(eq(supplierAccount.id, edit.data.id)).returning();
+    if (!updated) appError("SUPPLIER_ACCOUNT_NOT_FOUND");
+    await writeAuditLog(database, { actorUserId: adminUserId, action: credentials ? "SUPPLIER_ACCOUNT_CREDENTIALS_UPDATED" : "SUPPLIER_ACCOUNT_UPDATED", entityType: "supplierAccount", entityId: updated.id, note: updated.provider });
+    return publicAccount(updated);
   }
   const data = supplierAccountInputSchema.safeParse(input);
   if (!data.success) appError("SUPPLIER_ACCOUNT_INPUT_INVALID");
@@ -56,7 +53,7 @@ export const onSaveSupplierAccount = telefuncAction(async (input: unknown) => {
   const protocolVersion = protocolVersionForProvider(data.data.provider);
   if (data.data.credentials === undefined) appError("SUPPLIER_ACCOUNT_INPUT_INVALID");
   const now = new Date();
-  const result = await db.insert(supplierAccount).values({ id: crypto.randomUUID(), provider: data.data.provider, baseUrl: data.data.baseUrl, normalizedApiOrigin: origin, protocolVersion, name: data.data.name, currency: data.data.currency, currencyDecimals: data.data.currencyDecimals, credentialsJson: JSON.stringify(data.data.credentials), reserveBalanceMinor: data.data.reserveBalanceMinor, lowBalanceMinor: data.data.lowBalanceMinor, maxOrderCostMinor: data.data.maxOrderCostMinor, enabled: data.data.enabled, createdAt: now, updatedAt: now }).returning();
+  const result = await db.insert(supplierAccount).values({ id: crypto.randomUUID(), provider: data.data.provider, baseUrl: data.data.baseUrl, normalizedApiOrigin: origin, protocolVersion, name: data.data.name, currency: data.data.currency, currencyDecimals: data.data.currencyDecimals, credentialsJson: await sealCredentials(data.data.credentials), reserveBalanceMinor: data.data.reserveBalanceMinor, lowBalanceMinor: data.data.lowBalanceMinor, maxOrderCostMinor: data.data.maxOrderCostMinor, enabled: data.data.enabled, createdAt: now, updatedAt: now }).returning();
   const created = result[0];
   if (!created) appError("SUPPLIER_ACCOUNT_INPUT_INVALID");
   await writeAuditLog(database, { actorUserId: adminUserId, action: "SUPPLIER_ACCOUNT_CREATED", entityType: "supplierAccount", entityId: created.id, note: created.provider });
@@ -100,7 +97,7 @@ export const onTestSupplierAccount = telefuncAction(async (input: unknown) => {
   if (!parsed.success) appError("SUPPLIER_ACCOUNT_INPUT_INVALID");
   const [account] = await db.select().from(supplierAccount).where(eq(supplierAccount.id, parsed.data.id)).limit(1);
   if (!account) appError("SUPPLIER_ACCOUNT_NOT_FOUND");
-  const adapter = createSupplierAdapter({ provider: account.provider, protocolVersion: normalizeLegacyProtocolVersion(account.provider, account.protocolVersion), baseUrl: account.baseUrl, credentials: JSON.parse(account.credentialsJson), currency: account.currency, currencyDecimals: account.currencyDecimals });
+  const adapter = createSupplierAdapter({ provider: account.provider, protocolVersion: normalizeLegacyProtocolVersion(account.provider, account.protocolVersion), baseUrl: account.baseUrl, credentials: await loadSupplierCredentials(account.credentialsJson), currency: account.currency, currencyDecimals: account.currencyDecimals });
   const result = await adapter.testConnection();
   await db.update(supplierAccount).set({ balanceMinor: result.balance.amountMinor, balanceSyncedAt: new Date(), healthStatus: "healthy", consecutiveFailures: 0, lastErrorCode: null, lastErrorAt: null, updatedAt: new Date() }).where(eq(supplierAccount.id, account.id));
   await writeAuditLog(database, { actorUserId: adminUserId, action: "SUPPLIER_TEST_CONNECTION", entityType: "supplierAccount", entityId: account.id, note: account.provider });
