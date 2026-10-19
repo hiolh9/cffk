@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
-import { order, productSku, productV2, auditLog } from "@/database/drizzle/schema";
+import { order, productSku, productV2 } from "@/database/drizzle/schema";
+import { auditLog } from "@/database/drizzle/schema-accounting";
 import { appError } from "@/lib/app-error";
 import { telefuncAction } from "@/server/telefunc-action";
 import { requireAdmin } from "@/server/telefunc-context";
@@ -42,19 +43,23 @@ export const onExportAccountingCsv = telefuncAction(async (input?: {
   const start = input?.startDate ? new Date(input.startDate) : undefined;
   const end = input?.endDate ? new Date(input.endDate) : undefined;
   const { rows } = await listLedgerRows(database, {
-    start,
-    end,
+    start: start && !Number.isNaN(start.getTime()) ? start : undefined,
+    end: end && !Number.isNaN(end.getTime()) ? end : undefined,
     query: input?.query,
     page: 1,
-    pageSize: 10_000,
+    pageSize: 50_000,
   });
   return { csv: ledgerToCsv(rows), rowCount: rows.length };
 });
 
-export const onListAuditLogs = telefuncAction(async (input?: { page?: number; pageSize?: number; entityType?: string }) => {
+export const onListAuditLog = telefuncAction(async (input?: {
+  entityType?: string;
+  page?: number;
+  pageSize?: number;
+}) => {
   const { db } = requireAdmin();
   const page = Math.max(1, input?.page ?? 1);
-  const pageSize = Math.min(100, Math.max(10, input?.pageSize ?? 20));
+  const pageSize = Math.min(100, Math.max(10, input?.pageSize ?? 30));
   const conditions = [];
   if (input?.entityType) conditions.push(eq(auditLog.entityType, input.entityType));
   const where = conditions.length ? and(...conditions) : undefined;
@@ -68,51 +73,41 @@ export const onListAuditLogs = telefuncAction(async (input?: { page?: number; pa
   return { items, page, pageSize };
 });
 
-/** Manual bank-transfer order: fee=0, PAID, then fulfill (supplier API when SKU is SUPPLIER). */
 export const onCreateManualBankOrder = telefuncAction(async (input: {
   productSkuId: number;
   quantity: number;
-  customerEmail: string;
-  contactValue?: string;
-  note?: string;
-  grossAmount?: number;
+  contactEmail: string;
+  amountCents?: number;
+  buyerNote?: string;
 }) => {
   const { database, db, user, runtime } = requireAdmin();
-  if (!input || !Number.isInteger(input.productSkuId) || input.productSkuId <= 0) appError("PRODUCT_SKU_INVALID");
-  const quantity = Math.floor(input.quantity);
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) appError("QUANTITY_INVALID");
-  const email = String(input.customerEmail ?? "").trim().toLowerCase();
+  if (!input?.productSkuId || !input?.quantity || input.quantity < 1) appError("ORDER_INPUT_INVALID");
+  const email = input.contactEmail?.trim().toLowerCase();
   if (!email || !email.includes("@")) appError("EMAIL_INVALID");
 
   const [sku] = await db
     .select({
       id: productSku.id,
+      productId: productSku.productId,
       name: productSku.name,
       price: productSku.price,
-      status: productSku.status,
-      fulfillmentSource: productSku.fulfillmentSource,
       deliveryType: productSku.deliveryType,
+      fulfillmentSource: productSku.fulfillmentSource,
       fixedDeliveryContent: productSku.fixedDeliveryContent,
-      productId: productSku.productId,
       productName: productV2.name,
-      productStatus: productV2.status,
     })
     .from(productSku)
     .innerJoin(productV2, eq(productV2.id, productSku.productId))
     .where(eq(productSku.id, input.productSkuId))
     .limit(1);
-  if (!sku || sku.status !== "ACTIVE" || sku.productStatus !== "ACTIVE") appError("PRODUCT_NOT_AVAILABLE");
+  if (!sku) appError("PRODUCT_SKU_NOT_FOUND");
 
   const unitPrice = sku.price;
-  const grossCents =
-    input.grossAmount !== undefined && Number.isFinite(input.grossAmount)
-      ? Math.round(input.grossAmount * 100)
-      : unitPrice * quantity;
-  if (grossCents < 0) appError("AMOUNT_INVALID");
-
+  const quantity = input.quantity;
+  const amount = input.amountCents ?? unitPrice * quantity;
+  const orderNo = await generateOrderNo(database);
+  const invoiceNo = await allocateInvoiceNo(database);
   const now = new Date();
-  const orderNo = generateOrderNo();
-  const invoiceNo = await allocateInvoiceNo(database, now);
 
   const [created] = await db
     .insert(order)
@@ -126,17 +121,16 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
       productSkuNameSnapshot: sku.name,
       unitPrice,
       quantity,
-      amount: grossCents,
-      originalAmount: grossCents,
+      amount,
       contactType: "EMAIL",
-      contactValue: input.contactValue?.trim() || email,
+      contactValue: email,
       contactEmailNormalized: email,
-      buyerNote: input.note?.trim() || "MANUAL_BANK_TRANSFER",
-      paymentProvider: "DIRECT_TRANSFER",
-      paymentChannel: "BANK",
+      buyerNote: input.buyerNote ?? null,
+      paymentProvider: "MANUAL_BANK",
+      paymentChannel: "DIRECT_TRANSFER",
       paymentMethodKind: "DIRECT_TRANSFER",
       paymentFeeCents: 0,
-      fulfillmentSourceSnapshot: sku.fulfillmentSource,
+      fulfillmentSourceSnapshot: sku.fulfillmentSource ?? "LOCAL",
       deliveryTypeSnapshot: sku.deliveryType,
       fixedDeliveryContentSnapshot: sku.fixedDeliveryContent,
       status: "PAID",
@@ -146,52 +140,34 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
       createdAt: now,
       updatedAt: now,
     })
-    .returning({ id: order.id, orderNo: order.orderNo, invoiceNo: order.invoiceNo });
+    .returning();
 
   if (!created) appError("ORDER_CREATE_FAILED");
 
   await writeAuditLog(database, {
     actorUserId: user.id,
-    actorEmail: null,
     action: "MANUAL_BANK_ORDER_CREATED",
     entityType: "order",
     entityId: String(created.id),
-    after: created,
-    note: "Fee forced to 0; bank direct transfer",
+    after: { orderNo, invoiceNo, amount, email },
   });
 
-  if (sku.fulfillmentSource === "SUPPLIER") {
-    const supplierTask = await createSupplierOrder(database, created.id);
-    if (supplierTask?.id) {
-      await processSupplierOrder(database, supplierTask.id, runtime);
+  try {
+    if ((sku.fulfillmentSource ?? "LOCAL") === "SUPPLIER") {
+      const supplierTask = await createSupplierOrder(database, created.id);
+      if (supplierTask?.id) await processSupplierOrder(database, supplierTask.id, runtime);
+    } else {
+      await deliverPaidOrder(database, created.id, runtime);
     }
-  } else {
-    await deliverPaidOrder(database, created.id);
+  } catch (cause) {
+    console.error("manual bank fulfill", cause);
   }
 
   try {
-    await notifyOrderEmailEvents(database, runtime);
+    await notifyOrderEmailEvents(database, created.id, "PAID");
   } catch {
-    /* email optional */
+    /* non-fatal */
   }
 
-  const [final] = await db.select().from(order).where(eq(order.id, created.id)).limit(1);
-  await writeAuditLog(database, {
-    actorUserId: user.id,
-    actorEmail: null,
-    action: "MANUAL_BANK_ORDER_FULFILLED",
-    entityType: "order",
-    entityId: String(created.id),
-    after: { status: final?.status, deliveryStatus: final?.deliveryStatus },
-  });
-
-  return {
-    id: created.id,
-    orderNo: created.orderNo,
-    invoiceNo: created.invoiceNo,
-    status: final?.status ?? "PAID",
-    deliveryStatus: final?.deliveryStatus ?? "NOT_DELIVERED",
-    feeAmountCents: 0,
-    grossAmountCents: grossCents,
-  };
+  return { orderId: created.id, orderNo: created.orderNo, invoiceNo: created.invoiceNo };
 });
