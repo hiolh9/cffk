@@ -1,11 +1,13 @@
 import {
   acgCredentialsSchema,
   dujiaoNextCredentialsSchema,
+  moogoldCredentialsSchema,
   type SupplierProvider,
 } from "../schema";
 import { AcgAdapter } from "./acg";
 import { AcgV311Adapter } from "./acg-v3.1.1";
 import { DujiaoNextAdapter } from "./dujiao-next";
+import { MoogoldAdapter } from "./moogold";
 import type { SupplierAdapter } from "./types";
 
 export function createSupplierAdapter(input: {
@@ -23,6 +25,17 @@ export function createSupplierAdapter(input: {
     if (input.protocolVersion === "acg_v3.1.2_plus") return new AcgAdapter({ ...input, ...credentials });
     if (input.protocolVersion === "acg_v3.1.1") return new AcgV311Adapter({ ...input, ...credentials });
     throw new Error("supplier_protocol_version_invalid");
+  }
+  if (input.provider === "moogold") {
+    if (input.protocolVersion !== "moogold_v1") throw new Error("supplier_protocol_version_invalid");
+    const credentials = moogoldCredentialsSchema.parse(input.credentials);
+    return new MoogoldAdapter({
+      ...input,
+      baseUrl: input.baseUrl || "https://moogold.com",
+      partnerId: credentials.partnerId,
+      secretKey: credentials.secretKey,
+      categoryIds: credentials.categoryIds,
+    });
   }
   if (input.protocolVersion !== "dujiao_next_v1") throw new Error("supplier_protocol_version_invalid");
   const credentials = dujiaoNextCredentialsSchema.parse(input.credentials);
