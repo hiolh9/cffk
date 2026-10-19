@@ -24,9 +24,8 @@ export const orderDelivery = sqliteTable(
   "orderDelivery",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    orderId: integer("orderId").notNull().references(() => order.id, { onDelete: "cascade" }),
+    orderId: integer("orderId").notNull().references(() => order.id),
     content: text("content").notNull(),
-    deliveredAt: integer("deliveredAt", { mode: "timestamp_ms" }).notNull(),
     createdAt,
   },
   (table) => [index("orderDelivery_orderId_idx").on(table.orderId)],
@@ -38,15 +37,13 @@ export const paymentAttempt = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     orderId: integer("orderId").notNull().references(() => order.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
-    status: text("status").notNull(),
-    amount: integer("amount").notNull(),
-    externalId: text("externalId"),
-    attemptCount: integer("attemptCount").notNull().default(0),
-    rawJson: text("rawJson"),
+    channel: text("channel"),
+    paymentOrderNo: text("paymentOrderNo"),
+    status: text("status", { enum: ["CREATING", "PENDING", "PAID", "FAILED"] }).notNull().default("CREATING"),
     createdAt,
     updatedAt,
   },
-  (table) => [index("paymentAttempt_orderId_idx").on(table.orderId)],
+  (table) => [index("paymentAttempt_orderId_createdAt_idx").on(table.orderId, table.createdAt)],
 );
 
 export const automaticDeliveryJob = sqliteTable(
@@ -190,16 +187,35 @@ export const pushLog = sqliteTable(
     channel: text("channel", { enum: ["EMAIL", "WECHAT", "TELEGRAM"] }).notNull(),
     provider: text("provider").notNull(),
     scene: text("scene", {
-      enum: ["TEST", "EMAIL_VERIFICATION", "PASSWORD_RESET", "GUEST_ORDER_RECOVERY", "ORDER_PAID", "DELIVERY_SUCCESS", "DELIVERY_FAILED", "PAYMENT_EXCEPTION"],
+      enum: [
+        "TEST",
+        "EMAIL_VERIFICATION",
+        "PASSWORD_RESET",
+        "GUEST_ORDER_RECOVERY",
+        "ORDER_PAID",
+        "DELIVERY_SUCCESS",
+        "DELIVERY_FAILED",
+        "PAYMENT_EXCEPTION",
+      ],
     }).notNull(),
-    recipient: text("recipient"),
-    status: text("status").notNull(),
+    recipient: text("recipient").notNull(),
+    subject: text("subject"),
+    status: text("status", {
+      enum: ["PENDING", "PROCESSING", "SUCCESS", "FAILED", "SKIPPED", "EXHAUSTED"],
+    }).notNull(),
     attemptCount: integer("attemptCount").notNull().default(0),
+    messageId: text("messageId"),
     error: text("error"),
-    payloadJson: text("payloadJson"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    triggeredBy: text("triggeredBy"),
+    createdAt,
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }),
   },
-  (table) => [index("pushLog_createdAt_idx").on(table.createdAt), index("pushLog_orderId_idx").on(table.orderId)],
+  (table) => [
+    uniqueIndex("pushLog_idempotencyKey_unique").on(table.idempotencyKey),
+    index("pushLog_channel_createdAt_idx").on(table.channel, table.createdAt),
+    index("pushLog_status_createdAt_idx").on(table.status, table.createdAt),
+    index("pushLog_orderId_idx").on(table.orderId),
+  ],
 );
 
 export const pushRetry = sqliteTable(
