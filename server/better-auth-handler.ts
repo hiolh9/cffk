@@ -13,6 +13,7 @@ import { getDrizzleDb } from "../database/drizzle";
 import { hasRoot } from "./admin";
 import { checkSecurityRateLimit } from "./security/rate-limit";
 import { clearLoginFailures, getLoginLockStatus, recordLoginFailure } from "./security/login-lockout";
+import { grantStepUp } from "./security/step-up";
 
 function getAuth(runtime: RuntimeAdapter, publicOrigin?: string) {
   return betterAuth(getAuthConfig(runtime, publicOrigin));
@@ -153,6 +154,14 @@ export const betterAuthHandler = enhance(
         }
       } else if (authResponse.ok || authResponse.status === 200) {
         await clearLoginFailures(db, { email: signInEmail, clientIp });
+        if (signInEmail) {
+          const [signedIn] = await getDrizzleDb(runtime)
+            .select({ id: schema.user.id })
+            .from(schema.user)
+            .where(sql`lower(${schema.user.email}) = ${signInEmail}`)
+            .limit(1);
+          if (signedIn?.id) await grantStepUp(db, signedIn.id);
+        }
       }
     }
     return withAuthNoStore(authResponse);
