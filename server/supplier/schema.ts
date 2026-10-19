@@ -1,16 +1,18 @@
 import { z } from "zod";
 
-export const supplierProviderSchema = z.enum(["acg", "dujiao_next"]);
+export const supplierProviderSchema = z.enum(["acg", "dujiao_next", "moogold"]);
 export type SupplierProvider = z.infer<typeof supplierProviderSchema>;
 
 export const acgProtocolVersionSchema = z.enum(["acg_v3.1.2_plus", "acg_v3.1.1"]);
 export type AcgProtocolVersion = z.infer<typeof acgProtocolVersionSchema>;
 export const dujiaoNextProtocolVersion = "dujiao_next_v1" as const;
-export const supplierProtocolVersionSchema = z.union([acgProtocolVersionSchema, z.literal(dujiaoNextProtocolVersion)]);
+export const moogoldProtocolVersion = "moogold_v1" as const;
+export const supplierProtocolVersionSchema = z.union([acgProtocolVersionSchema, z.literal(dujiaoNextProtocolVersion), z.literal(moogoldProtocolVersion)]);
 
 export function protocolVersionForProvider(provider: SupplierProvider, protocolVersion: string) {
   if (provider === "acg" && acgProtocolVersionSchema.safeParse(protocolVersion).success) return protocolVersion as AcgProtocolVersion;
   if (provider === "dujiao_next" && protocolVersion === dujiaoNextProtocolVersion) return dujiaoNextProtocolVersion;
+  if (provider === "moogold" && protocolVersion === moogoldProtocolVersion) return moogoldProtocolVersion;
   throw new Error("supplier_protocol_version_invalid");
 }
 
@@ -58,7 +60,7 @@ export const supplierAccountEditSchema = z.object({
   baseUrl: baseUrlSchema,
   currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
   currencyDecimals: z.number().int().min(0).max(8),
-  credentials: z.union([z.object({ apiId: z.string().trim().min(1).max(256), appKey: z.string().min(1).max(1024) }).strict(), z.object({ apiKey: z.string().trim().min(1).max(512), apiSecret: z.string().min(1).max(1024) }).strict()]).optional(),
+  credentials: z.union([z.object({ apiId: z.string().trim().min(1).max(256), appKey: z.string().min(1).max(1024) }).strict(), z.object({ apiKey: z.string().trim().min(1).max(512), apiSecret: z.string().min(1).max(1024) }).strict(), z.object({ partnerId: z.string().trim().min(1).max(256), secretKey: z.string().min(1).max(1024), categoryIds: z.array(z.number().int().positive()).max(50).optional() }).strict()]).optional(),
 }).strict();
 
 export const supplierAccountInputSchema = z.object({
@@ -98,9 +100,16 @@ export const dujiaoNextCredentialsSchema = z.object({
   apiSecret: z.string().min(1).max(1024),
 });
 
+export const moogoldCredentialsSchema = z.object({
+  partnerId: z.string().trim().min(1).max(256),
+  secretKey: z.string().min(1).max(1024),
+  categoryIds: z.array(z.number().int().positive()).max(50).optional(),
+});
+
 export const supplierCredentialsSchema = z.discriminatedUnion("provider", [
   z.object({ provider: z.literal("acg"), credentials: acgCredentialsSchema }),
   z.object({ provider: z.literal("dujiao_next"), credentials: dujiaoNextCredentialsSchema }),
+  z.object({ provider: z.literal("moogold"), credentials: moogoldCredentialsSchema }),
 ]);
 
 export const supplierPurchaseResultSchema = z.discriminatedUnion("status", [
