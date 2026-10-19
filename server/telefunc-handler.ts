@@ -1,15 +1,14 @@
 import { enhance, type UniversalHandler } from "@universal-middleware/core";
-import { telefunc, config } from "telefunc";
-import { reportUnexpectedRequestError } from "./error-handling";
+import { onBug, serve } from "telefunc";
+import { reportUnexpectedRequestError, reportUnexpectedServerError } from "./error-handling";
 import { checkSecurityRateLimit } from "./security/rate-limit";
 
-const { telefuncConfig, serve } = await (async () => {
-  config.disableNamingConvention = true;
-  return { telefuncConfig: config, serve: telefunc };
-})();
+onBug((cause) => {
+  reportUnexpectedServerError("telefunc", cause);
+});
 
-void telefuncConfig;
-
+// Note: Vike's Universal Middleware provides the page and auth context before
+// this handler runs, so Telefunc must remain in the same Vike request chain.
 export const telefuncHandler: UniversalHandler = enhance(
   async (request, context, runtime) => {
     try {
@@ -29,11 +28,14 @@ export const telefuncHandler: UniversalHandler = enhance(
           });
         }
       }
+
       const httpResponse = await serve({
         request,
         context: {
           ...(context as object),
           ...(runtime as { runtime: "workerd"; env?: { DB: D1Database } }),
+          // Cloudflare writes this header at the edge. Do not trust arbitrary
+          // forwarding headers for abuse-prevention identity.
           clientIp: request.headers.get("CF-Connecting-IP"),
         },
       });
