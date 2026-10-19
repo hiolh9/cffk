@@ -4,6 +4,7 @@ import { requireAdminSecure } from "@/server/telefunc-context";
 import { assertSafeSupplierBaseUrl } from "./url-guard";
 import { writeAuditLog } from "@/server/accounting/audit";
 import { enforceSecurityRateLimit } from "@/server/security/rate-limit";
+import { assertStepUp } from "@/server/security/step-up";
 import { appError } from "@/lib/app-error";
 import { productSku, productV2, supplierAccount, supplierBinding, supplierOrder } from "@/database/drizzle/schema";
 import { createSupplierAdapter } from "./providers/factory";
@@ -42,6 +43,7 @@ export const onSaveSupplierAccount = telefuncAction(async (input: unknown) => {
     if (!existing) appError("SUPPLIER_ACCOUNT_NOT_FOUND");
     const origin = normalizedOrigin(edit.data.baseUrl);
     const credentials = edit.data.credentials;
+    if (credentials) await assertStepUp(database, adminUserId);
     const [updated] = await db.update(supplierAccount).set({ name: edit.data.name, baseUrl: edit.data.baseUrl, normalizedApiOrigin: origin, currency: edit.data.currency, currencyDecimals: edit.data.currencyDecimals, ...(credentials ? { credentialsJson: await sealCredentials(credentials), credentialsRevision: existing.credentialsRevision + 1 } : {}), updatedAt: new Date() }).where(eq(supplierAccount.id, edit.data.id)).returning();
     if (!updated) appError("SUPPLIER_ACCOUNT_NOT_FOUND");
     await writeAuditLog(database, { actorUserId: adminUserId, action: credentials ? "SUPPLIER_ACCOUNT_CREDENTIALS_UPDATED" : "SUPPLIER_ACCOUNT_UPDATED", entityType: "supplierAccount", entityId: updated.id, note: updated.provider });
@@ -52,6 +54,7 @@ export const onSaveSupplierAccount = telefuncAction(async (input: unknown) => {
   const origin = normalizedOrigin(data.data.baseUrl);
   const protocolVersion = protocolVersionForProvider(data.data.provider);
   if (data.data.credentials === undefined) appError("SUPPLIER_ACCOUNT_INPUT_INVALID");
+  await assertStepUp(database, adminUserId);
   const now = new Date();
   const result = await db.insert(supplierAccount).values({ id: crypto.randomUUID(), provider: data.data.provider, baseUrl: data.data.baseUrl, normalizedApiOrigin: origin, protocolVersion, name: data.data.name, currency: data.data.currency, currencyDecimals: data.data.currencyDecimals, credentialsJson: await sealCredentials(data.data.credentials), reserveBalanceMinor: data.data.reserveBalanceMinor, lowBalanceMinor: data.data.lowBalanceMinor, maxOrderCostMinor: data.data.maxOrderCostMinor, enabled: data.data.enabled, createdAt: now, updatedAt: now }).returning();
   const created = result[0];
@@ -72,6 +75,7 @@ export const onSetSupplierAccountEnabled = telefuncAction(async (input: unknown)
 
 export const onDeleteSupplierAccount = telefuncAction(async (input: unknown) => {
   const { database, db, adminUserId } = await requireAdminSecure();
+  await assertStepUp(database, adminUserId);
   const parsed = supplierAccountIdSchema.safeParse(input);
   if (!parsed.success) appError("SUPPLIER_ACCOUNT_INPUT_INVALID");
   const [account] = await db.select().from(supplierAccount).where(eq(supplierAccount.id, parsed.data.id)).limit(1);
