@@ -49,7 +49,6 @@ export function getAuthConfig(runtime?: RuntimeAdapter, publicOrigin?: string, o
         console.error(`Better Auth ${scene.toLowerCase()} email delivery did not succeed`);
       }
     } catch {
-      // Do not let uncertain callback error semantics leave setup or sign-up users orphaned.
       console.error(`Better Auth ${scene.toLowerCase()} email delivery failed`);
     }
   };
@@ -65,6 +64,8 @@ export function getAuthConfig(runtime?: RuntimeAdapter, publicOrigin?: string, o
       },
     }),
     session: {
+      expiresIn: 60 * 60 * 8,
+      updateAge: 60 * 30,
       cookieCache: {
         enabled: true,
         maxAge: 60,
