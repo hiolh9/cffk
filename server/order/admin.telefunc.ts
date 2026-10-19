@@ -101,8 +101,38 @@ async function internalOnRetryAutomaticDelivery(input: { orderId: number }) {
   return { ok: true };
 }
 
+async function internalOnRecordManualDelivery(input: { orderId: number; content: string; failed?: boolean }) {
+  const { database, runtime, db } = await requireAdminSecure();
+  if (!input || !Number.isInteger(input.orderId) || input.orderId <= 0) appError("ORDER_ID_INVALID");
+  const content = String(input.content ?? "").trim();
+  if (!content || content.length > 10000) appError("DELIVERY_CONTENT_INVALID");
+  const [record] = await db.select().from(order).where(eq(order.id, input.orderId)).limit(1);
+  if (!record) appError("ORDER_NOT_FOUND");
+  if (record.paymentStatus !== "PAID") appError("ORDER_NOT_PAID");
+  await db.insert(orderDelivery).values({
+    orderId: record.id,
+    deliveryType: "MANUAL",
+    attemptToken: `manual-${record.id}-${Date.now()}`,
+    contentSnapshot: content,
+    errorCode: input.failed ? "MANUAL_FAILED" : null,
+    status: input.failed ? "FAILED" : "SUCCESS",
+    createdAt: new Date(),
+  });
+  if (!input.failed) {
+    await db.update(order).set({
+      status: "DELIVERED",
+      deliveryStatus: "DELIVERED",
+      deliveredAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(order.id, record.id));
+  }
+  await notifyOrderEmailEvents(database, runtime);
+  return { ok: true };
+}
+
 export const onGetAdminOrders = telefuncAction(internalOnGetAdminOrders);
 export const onGetAdminOrderDetail = telefuncAction(internalOnGetAdminOrderDetail);
 export const onCloseAdminOrder = telefuncAction(internalOnCloseAdminOrder);
 export const onReplenishAdminOrder = telefuncAction(internalOnReplenishAdminOrder);
 export const onRetryAutomaticDelivery = telefuncAction(internalOnRetryAutomaticDelivery);
+export const onRecordManualDelivery = telefuncAction(internalOnRecordManualDelivery);
