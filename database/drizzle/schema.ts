@@ -1,4 +1,4 @@
-export * from "./schema-accounting";
+export { auditLog, invoiceSequence, accountingArchive } from "./schema-accounting";
 export * from "./schema-tables-a";
 export * from "./schema-tables-b1";
 export * from "./schema-tables-b2";

@@ -1,5 +1,5 @@
 import { createDrizzleDb } from "@/database/drizzle";
-import { auditLog } from "@/database/drizzle/schema";
+import { auditLog } from "@/database/drizzle/schema-accounting";
 
 export async function writeAuditLog(
   database: D1Database,

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
-import { invoiceSequence } from "@/database/drizzle/schema";
+import { invoiceSequence } from "@/database/drizzle/schema-accounting";
 
 /** Fixed width for the sequential part: INV-2026-000001 … INV-2026-999999 */
 const INVOICE_SEQ_DIGITS = 6;
