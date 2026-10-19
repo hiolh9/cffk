@@ -12,6 +12,7 @@ import { schema } from "../database/drizzle/schema";
 import { getDrizzleDb } from "../database/drizzle";
 import { hasRoot } from "./admin";
 import { checkSecurityRateLimit } from "./security/rate-limit";
+import { clearLoginFailures, getLoginLockStatus, recordLoginFailure } from "./security/login-lockout";
 
 function getAuth(runtime: RuntimeAdapter, publicOrigin?: string) {
   return betterAuth(getAuthConfig(runtime, publicOrigin));
@@ -123,7 +124,38 @@ export const betterAuthHandler = enhance(
       }
     }
 
-    return withAuthNoStore(await getAuth(runtime, publicOrigin).handler(authRequest));
+    const isSignIn = authRequest.method === "POST" && (authPathLower.endsWith("/sign-in/email") || authPathLower.includes("/sign-in/"));
+    let signInEmail = "";
+    if (isSignIn) {
+      const body = await authRequest.clone().json().catch(() => null) as { email?: unknown } | null;
+      signInEmail = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+      if (db && (signInEmail || clientIp)) {
+        const lock = await getLoginLockStatus(db, { email: signInEmail, clientIp });
+        if (lock.locked) {
+          return withAuthNoStore(Response.json(
+            { code: "LOGIN_LOCKED", message: "Too many failed attempts. Try again later." },
+            { status: 429, headers: { "Retry-After": String(lock.retryAfterSec) } },
+          ));
+        }
+      }
+    }
+
+    const authResponse = await getAuth(runtime, publicOrigin).handler(authRequest);
+    if (db && isSignIn) {
+      if (authResponse.status >= 400) {
+        await recordLoginFailure(db, { email: signInEmail, clientIp });
+        const lock = await getLoginLockStatus(db, { email: signInEmail, clientIp });
+        if (lock.locked) {
+          return withAuthNoStore(Response.json(
+            { code: "LOGIN_LOCKED", message: "Too many failed attempts. Try again later." },
+            { status: 429, headers: { "Retry-After": String(lock.retryAfterSec) } },
+          ));
+        }
+      } else if (authResponse.ok || authResponse.status === 200) {
+        await clearLoginFailures(db, { email: signInEmail, clientIp });
+      }
+    }
+    return withAuthNoStore(authResponse);
   },
   {
     name: "my-app:better-auth-handler",
