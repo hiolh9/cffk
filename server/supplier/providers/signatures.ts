@@ -60,7 +60,9 @@ export function providerRequestNumber(
 	const digest = createHash("sha256")
 		.update(`${provider}\n${supplierOrderId}\n${accountId}`)
 		.digest("hex");
-	return provider === "acg" ? digest.slice(0, 24) : `gm_${digest.slice(0, 40)}`;
+	if (provider === "acg") return digest.slice(0, 24);
+	if (provider === "moogold") return `mg_${digest.slice(0, 40)}`;
+	return `gm_${digest.slice(0, 40)}`;
 }
 
 function md5(value: string): string {
