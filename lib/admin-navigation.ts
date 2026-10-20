@@ -132,10 +132,10 @@ export const adminPages = {
     description: emailDescription,
   },
   mailPostOffice: {
-    title: "邮局",
-    path: "/push/email/post",
-    pageTitle: "邮局",
-    description: emailDescription,
+    title: "通道配置",
+    path: "/push/email/post-office",
+    pageTitle: "邮件通道配置",
+    description: "配置邮件 Provider，并发送测试邮件。",
   },
   wecom: {
     title: "微信三方",
