@@ -5,7 +5,7 @@
       <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
         <a href="/" class="flex min-w-0 items-center gap-2.5 font-semibold">
           <img :src="brandLogoUrl" :alt="`${site.name} Logo`" class="size-8 shrink-0 rounded object-contain sm:size-9" />
-          <span class="truncate text-base">{{ site.name }}</span>
+          <span class="truncate text-base" style="font-weight:800;">{{ site.name }}</span>
         </a>
         <div class="flex shrink-0 items-center gap-2">
           <PublicNav />
