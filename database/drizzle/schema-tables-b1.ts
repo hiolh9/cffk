@@ -24,8 +24,9 @@ export const orderDelivery = sqliteTable(
   "orderDelivery",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    orderId: integer("orderId").notNull().references(() => order.id),
+    orderId: integer("orderId").notNull().references(() => order.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
+    deliveredAt: integer("deliveredAt", { mode: "timestamp_ms" }),
     createdAt,
   },
   (table) => [index("orderDelivery_orderId_idx").on(table.orderId)],
@@ -51,25 +52,40 @@ export const automaticDeliveryJob = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     orderId: integer("orderId").notNull().references(() => order.id, { onDelete: "cascade" }),
-    status: text("status").notNull().default("PENDING"),
+    status: text("status", { enum: ["PENDING", "PROCESSING", "SUCCESS", "FAILED"] }).notNull().default("PENDING"),
+    leaseUntil: integer("leaseUntil", { mode: "timestamp_ms" }),
     attemptCount: integer("attemptCount").notNull().default(0),
     lastError: text("lastError"),
     createdAt,
     updatedAt,
   },
-  (table) => [index("automaticDeliveryJob_orderId_idx").on(table.orderId)],
+  (table) => [
+    uniqueIndex("automaticDeliveryJob_orderId_unique").on(table.orderId),
+    index("automaticDeliveryJob_status_id_idx").on(table.status, table.id),
+  ],
 );
 
 export const orderEvent = sqliteTable(
   "orderEvent",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    eventKey: text("eventKey").notNull(),
     orderId: integer("orderId").notNull().references(() => order.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    payloadJson: text("payloadJson"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    scene: text("scene", {
+      enum: ["ORDER_PAID", "DELIVERY_SUCCESS", "DELIVERY_FAILED", "PAYMENT_EXCEPTION"],
+    }).notNull(),
+    errorMessage: text("errorMessage"),
+    status: text("status", { enum: ["PENDING", "PROCESSING", "PROCESSED"] }).notNull().default("PENDING"),
+    attemptCount: integer("attemptCount").notNull().default(0),
+    availableAt: integer("availableAt", { mode: "timestamp_ms" }).notNull(),
+    leaseUntil: integer("leaseUntil", { mode: "timestamp_ms" }),
+    createdAt,
+    updatedAt,
   },
-  (table) => [index("orderEvent_orderId_idx").on(table.orderId)],
+  (table) => [
+    uniqueIndex("orderEvent_eventKey_unique").on(table.eventKey),
+    index("orderEvent_status_availableAt_idx").on(table.status, table.availableAt),
+  ],
 );
 
 export const transactionGuard = sqliteTable("transactionGuard", {
@@ -167,7 +183,9 @@ export const pushPolicy = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     messageType: text("messageType", { enum: ["NORMAL", "ADMIN"] }).notNull(),
-    scene: text("scene", { enum: ["ORDER_PAID", "DELIVERY_SUCCESS", "DELIVERY_FAILED", "PAYMENT_EXCEPTION"] }).notNull(),
+    scene: text("scene", {
+      enum: ["ORDER_PAID", "DELIVERY_SUCCESS", "DELIVERY_FAILED", "PAYMENT_EXCEPTION"],
+    }).notNull(),
     channelsJson: text("channelsJson").notNull().default("[]"),
     isEnabled: integer("isEnabled", { mode: "boolean" }).notNull().default(true),
     createdAt,
