@@ -153,7 +153,13 @@ export const adminPages = {
     title: "支付配置",
     path: "/system/payments",
     pageTitle: "支付配置",
-    description: "配置支付渠道。",
+    description: "管理支付渠道和支付日志。",
+  },
+  paymentLogs: {
+    title: "支付日志",
+    path: "/system/payments/payment-logs",
+    pageTitle: "支付日志",
+    description: "查看已脱敏的支付事件与验证结果。",
   },
   media: {
     title: "媒体库",
