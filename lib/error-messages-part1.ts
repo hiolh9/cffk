@@ -3,6 +3,7 @@ export const errorMessagesPart1: Record<string, string> = {
 
   AUTH_REQUIRED: "请先登录后再继续操作。",
   ADMIN_ACCESS_REQUIRED: "管理员身份已失效，请重新登录。",
+  ADMIN_2FA_REQUIRED: "此操作需要开启双因素认证（2FA）。请先在账户设置中启用 2FA 后再试。",
   DATABASE_UNAVAILABLE: "服务暂时不可用，请稍后重试。",
   ROOT_SETUP_NOT_FOUND: "初始化页面不存在。",
 
