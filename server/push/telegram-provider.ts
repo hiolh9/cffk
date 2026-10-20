@@ -91,5 +91,8 @@ export async function sendTelegramPush(
 }
 
 function escapeHtml(value: string) {
-  return value.replaceAll("&", "&").replaceAll("<", "<").replaceAll(">", ">");
+  return value
+    .replaceAll("&", "\u0026amp;")
+    .replaceAll("<", "\u0026lt;")
+    .replaceAll(">", "\u0026gt;");
 }
