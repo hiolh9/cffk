@@ -1,3 +1,6 @@
+/** Display currency for the storefront and admin (amounts stored as integer cents). */
+export const CURRENCY_SYMBOL = "RM";
+
 export function parseAmountToCents(value: string): number | null {
   if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
   const [whole, fraction = ""] = value.split(".");
@@ -5,9 +8,16 @@ export function parseAmountToCents(value: string): number | null {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
+/** Format integer cents as decimal string, e.g. 1250 -> "12.50". */
 export function formatCentsAsYuan(value: number): string {
   if (!Number.isSafeInteger(value) || value < 0) throw new TypeError("Amount must be a non-negative integer in cents");
   return (value / 100).toFixed(2);
+}
+
+/** Format for UI: "RM 12.50". Accepts cents (number) or already-decimal string. */
+export function formatMoney(value: number | string): string {
+  const amount = typeof value === "number" ? formatCentsAsYuan(value) : value;
+  return `${CURRENCY_SYMBOL} ${amount}`;
 }
 
 export function cacheQrPayment(payment: {
@@ -17,13 +27,24 @@ export function cacheQrPayment(payment: {
   if (typeof window === "undefined" || payment.payment?.mode !== "qr" || !payment.payment.qrCode) return;
   try {
     sessionStorage.setItem(`payment-qr:${payment.orderNo}`, payment.payment.qrCode);
-    if (Number.isSafeInteger(payment.payment.payableAmount) && (payment.payment.payableAmount ?? 0) > 0) sessionStorage.setItem(`payment-payable:${payment.orderNo}`, String(payment.payment.payableAmount));
+    if (Number.isSafeInteger(payment.payment.payableAmount) && (payment.payment.payableAmount ?? 0) > 0)
+      sessionStorage.setItem(`payment-payable:${payment.orderNo}`, String(payment.payment.payableAmount));
     else sessionStorage.removeItem(`payment-payable:${payment.orderNo}`);
-  } catch { /* Session storage is optional. */ }
+  } catch {
+    /* Session storage is optional. */
+  }
 }
 
 export function formatMinorAmount(value: string | null | undefined, decimals: number): string {
-  if (value === null || value === undefined || !/^(0|[1-9]\d*)$/.test(value) || !Number.isInteger(decimals) || decimals < 0 || decimals > 8) return "-";
+  if (
+    value === null ||
+    value === undefined ||
+    !/^(0|[1-9]\d*)$/.test(value) ||
+    !Number.isInteger(decimals) ||
+    decimals < 0 ||
+    decimals > 8
+  )
+    return "-";
   const digits = value.padStart(decimals + 1, "0");
   if (decimals === 0) return digits;
   const split = digits.length - decimals;
