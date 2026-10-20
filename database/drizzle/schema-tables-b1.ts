@@ -44,7 +44,10 @@ export const paymentAttempt = sqliteTable(
     createdAt,
     updatedAt,
   },
-  (table) => [index("paymentAttempt_orderId_createdAt_idx").on(table.orderId, table.createdAt)],
+  (table) => [
+    index("paymentAttempt_orderId_createdAt_idx").on(table.orderId, table.createdAt),
+    index("paymentAttempt_provider_paymentOrderNo_idx").on(table.provider, table.paymentOrderNo),
+  ],
 );
 
 export const automaticDeliveryJob = sqliteTable(
@@ -98,9 +101,8 @@ export const paymentProvider = sqliteTable(
   "paymentProvider",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    code: text("code").notNull(),
-    name: text("name").notNull(),
     provider: text("provider").notNull(),
+    name: text("name").notNull(),
     isEnabled: integer("isEnabled", { mode: "boolean" }).notNull().default(false),
     sort: integer("sort").notNull().default(0),
     configJson: text("configJson").notNull(),
@@ -108,7 +110,7 @@ export const paymentProvider = sqliteTable(
     updatedAt,
   },
   (table) => [
-    uniqueIndex("paymentProvider_code_unique").on(table.code),
+    uniqueIndex("paymentProvider_provider_unique").on(table.provider),
     index("paymentProvider_enabled_sort_idx").on(table.isEnabled, table.sort),
   ],
 );
@@ -119,11 +121,19 @@ export const paymentLog = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     orderId: integer("orderId").references(() => order.id, { onDelete: "set null" }),
     provider: text("provider").notNull(),
-    direction: text("direction").notNull(),
-    payloadJson: text("payloadJson"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    orderNo: text("orderNo"),
+    paymentOrderNo: text("paymentOrderNo"),
+    eventType: text("eventType").notNull(),
+    rawPayload: text("rawPayload").notNull(),
+    verifyStatus: text("verifyStatus", { enum: ["PENDING", "VERIFIED", "FAILED"] }).notNull().default("PENDING"),
+    message: text("message"),
+    createdAt,
   },
-  (table) => [index("paymentLog_orderId_idx").on(table.orderId)],
+  (table) => [
+    index("paymentLog_provider_createdAt_idx").on(table.provider, table.createdAt),
+    index("paymentLog_orderNo_idx").on(table.orderNo),
+    index("paymentLog_orderId_idx").on(table.orderId),
+  ],
 );
 
 export const pushChannelConfig = sqliteTable(
