@@ -114,7 +114,10 @@ export const category = sqliteTable(
     createdAt,
     updatedAt,
   },
-  (table) => [uniqueIndex("category_slug_unique").on(table.slug), index("category_status_sort_idx").on(table.status, table.sort)],
+  (table) => [
+    uniqueIndex("category_slug_unique").on(table.slug),
+    index("category_status_sort_idx").on(table.status, table.sort),
+  ],
 );
 
 export const productV2 = sqliteTable(
@@ -125,33 +128,46 @@ export const productV2 = sqliteTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     subtitle: text("subtitle"),
-    coverImage: text("coverImage"),
     description: text("description"),
+    coverImage: text("coverImage"),
+    status: text("status", { enum: ["DRAFT", "ACTIVE", "INACTIVE"] }).notNull().default("DRAFT"),
+    manualDeliveryHint: text("manualDeliveryHint"),
     sort: integer("sort").notNull().default(0),
-    status: text("status", { enum: ["ACTIVE", "DISABLED"] }).notNull().default("ACTIVE"),
+    purchaseNote: text("purchaseNote"),
     createdAt,
     updatedAt,
   },
-  (table) => [uniqueIndex("product_v2_slug_unique").on(table.slug), index("product_v2_category_status_sort_idx").on(table.categoryId, table.status, table.sort)],
+  (table) => [
+    uniqueIndex("product_v2_slug_unique").on(table.slug),
+    index("product_v2_categoryId_idx").on(table.categoryId),
+    index("product_v2_status_sort_idx").on(table.status, table.sort),
+  ],
 );
 
 export const productSku = sqliteTable(
-  "product_sku",
+  "productSku",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    productId: integer("productId").notNull().references(() => productV2.id, { onDelete: "cascade" }),
+    productId: integer("productId").notNull().references(() => productV2.id),
     name: text("name").notNull(),
     price: integer("price").notNull(),
-    stock: integer("stock").notNull().default(0),
-    deliveryType: text("deliveryType", { enum: ["CARD_AUTO", "FIXED_CARD", "MANUAL", "EXPRESS", "SUPPLIER"] }).notNull(),
+    status: text("status", { enum: ["ACTIVE", "INACTIVE"] }).notNull().default("ACTIVE"),
     fulfillmentSource: text("fulfillmentSource", { enum: ["LOCAL", "SUPPLIER"] }).notNull().default("LOCAL"),
+    deliveryType: text("deliveryType", {
+      enum: ["CARD_AUTO", "FIXED_CARD", "MANUAL", "EXPRESS", "SUPPLIER"],
+    }).notNull(),
     fixedDeliveryContent: text("fixedDeliveryContent"),
-    status: text("status", { enum: ["ACTIVE", "DISABLED"] }).notNull().default("ACTIVE"),
+    physicalStock: integer("physicalStock"),
+    minBuy: integer("minBuy").notNull().default(1),
+    maxBuy: integer("maxBuy").notNull().default(1),
     sort: integer("sort").notNull().default(0),
     createdAt,
     updatedAt,
   },
-  (table) => [index("product_sku_productId_idx").on(table.productId)],
+  (table) => [
+    uniqueIndex("productSku_product_name_unique").on(table.productId, table.name),
+    index("productSku_product_status_sort_idx").on(table.productId, table.status, table.sort),
+  ],
 );
 
 export const discountCode = sqliteTable(
@@ -159,13 +175,22 @@ export const discountCode = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     code: text("code").notNull(),
-    type: text("type").notNull(),
+    type: text("type", { enum: ["FIXED", "PERCENT"] }).notNull(),
     value: integer("value").notNull(),
-    status: text("status").notNull().default("ACTIVE"),
+    minAmount: integer("minAmount"),
+    maxUses: integer("maxUses"),
+    usedCount: integer("usedCount").notNull().default(0),
+    reservedCount: integer("reservedCount").notNull().default(0),
+    productIds: text("productIds"),
+    expiresAt: integer("expiresAt", { mode: "timestamp_ms" }),
+    isActive: integer("isActive", { mode: "boolean" }).notNull().default(true),
     createdAt,
     updatedAt,
   },
-  (table) => [uniqueIndex("discountCode_code_unique").on(table.code)],
+  (table) => [
+    uniqueIndex("discountCode_code_unique").on(table.code),
+    index("discountCode_active_idx").on(table.isActive),
+  ],
 );
 
 export const customerAddress = sqliteTable(
@@ -204,12 +229,16 @@ export const order = sqliteTable(
     paymentProvider: text("paymentProvider").notNull(),
     paymentChannel: text("paymentChannel"),
     fulfillmentSourceSnapshot: text("fulfillmentSourceSnapshot", { enum: ["LOCAL", "SUPPLIER"] }).notNull().default("LOCAL"),
-    deliveryTypeSnapshot: text("deliveryTypeSnapshot", { enum: ["CARD_AUTO", "FIXED_CARD", "MANUAL", "EXPRESS", "SUPPLIER"] }).notNull(),
+    deliveryTypeSnapshot: text("deliveryTypeSnapshot", {
+      enum: ["CARD_AUTO", "FIXED_CARD", "MANUAL", "EXPRESS", "SUPPLIER"],
+    }).notNull(),
     fixedDeliveryContentSnapshot: text("fixedDeliveryContentSnapshot"),
     physicalStockReserved: integer("physicalStockReserved", { mode: "boolean" }).notNull().default(false),
     status: text("status", { enum: ["PENDING", "PAID", "DELIVERED", "CLOSED", "FAILED"] }).notNull().default("PENDING"),
     paymentStatus: text("paymentStatus", { enum: ["UNPAID", "PAID", "FAILED"] }).notNull().default("UNPAID"),
-    deliveryStatus: text("deliveryStatus", { enum: ["NOT_DELIVERED", "DELIVERING", "DELIVERED", "FAILED"] }).notNull().default("NOT_DELIVERED"),
+    deliveryStatus: text("deliveryStatus", {
+      enum: ["NOT_DELIVERED", "DELIVERING", "DELIVERED", "FAILED"],
+    }).notNull().default("NOT_DELIVERED"),
     deliveryToken: text("deliveryToken"),
     deliveryLeaseUntil: integer("deliveryLeaseUntil", { mode: "timestamp_ms" }),
     discountCodeId: integer("discountCodeId").references(() => discountCode.id, { onDelete: "set null" }),
