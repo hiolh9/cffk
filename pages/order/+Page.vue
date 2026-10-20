@@ -99,7 +99,7 @@
             <CardContent class="flex min-h-0 flex-col gap-6 overflow-y-auto pt-6 text-sm">
               <dl class="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
                 <div><dt class="text-xs text-muted-foreground">数量</dt><dd class="mt-1 font-medium">{{ result.quantity }}</dd></div>
-                <div><dt class="text-xs text-muted-foreground">金额</dt><dd class="mt-1 font-medium">¥{{ result.amount }}</dd></div>
+                <div><dt class="text-xs text-muted-foreground">金额</dt><dd class="mt-1 font-medium">RM{{ result.amount }}</dd></div>
                 <div><dt class="text-xs text-muted-foreground">支付状态</dt><dd class="mt-1 font-medium">{{ paymentStatusLabel(result.paymentStatus) }}</dd></div>
                 <div><dt class="text-xs text-muted-foreground">发货状态</dt><dd class="mt-1 font-medium">{{ deliveryStatusLabel(result.deliveryStatus) }}</dd></div>
               </dl>
