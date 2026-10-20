@@ -20,7 +20,9 @@ export const supplierAccount = sqliteTable(
     reserveBalanceMinor: text("reserveBalanceMinor").notNull().default("0"),
     lowBalanceMinor: text("lowBalanceMinor").notNull().default("0"),
     maxOrderCostMinor: text("maxOrderCostMinor"),
-    healthStatus: text("healthStatus", { enum: ["unknown", "healthy", "degraded", "unavailable"] }).notNull().default("unknown"),
+    healthStatus: text("healthStatus", {
+      enum: ["unknown", "healthy", "degraded", "unavailable"],
+    }).notNull().default("unknown"),
     consecutiveFailures: integer("consecutiveFailures").notNull().default(0),
     cooldownUntil: integer("cooldownUntil", { mode: "timestamp_ms" }),
     lastSelectedAt: integer("lastSelectedAt", { mode: "timestamp_ms" }),
@@ -31,8 +33,20 @@ export const supplierAccount = sqliteTable(
     updatedAt,
   },
   (table) => [
-    uniqueIndex("supplierAccount_source_name_unique").on(table.provider, table.normalizedApiOrigin, table.protocolVersion, table.name),
-    index("supplierAccount_eligible_idx").on(table.provider, table.normalizedApiOrigin, table.enabled, table.healthStatus, table.cooldownUntil, table.lastSelectedAt),
+    uniqueIndex("supplierAccount_source_name_unique").on(
+      table.provider,
+      table.normalizedApiOrigin,
+      table.protocolVersion,
+      table.name,
+    ),
+    index("supplierAccount_eligible_idx").on(
+      table.provider,
+      table.normalizedApiOrigin,
+      table.enabled,
+      table.healthStatus,
+      table.cooldownUntil,
+      table.lastSelectedAt,
+    ),
     index("supplierAccount_updatedAt_idx").on(table.updatedAt),
   ],
 );
@@ -47,17 +61,39 @@ export const supplierBinding = sqliteTable(
     protocolVersion: text("protocolVersion").notNull(),
     upstreamProductId: text("upstreamProductId").notNull(),
     upstreamSkuId: text("upstreamSkuId").notNull(),
-    upstreamSkuName: text("upstreamSkuName"),
-    referenceCostMinor: text("referenceCostMinor").notNull().default("0"),
-    maxCostMinor: text("maxCostMinor").notNull().default("999999999"),
-    remoteStatus: text("remoteStatus").notNull().default("active"),
+    upstreamProductName: text("upstreamProductName").notNull(),
+    upstreamSkuName: text("upstreamSkuName").notNull(),
+    purchaseContextJson: text("purchaseContextJson"),
+    referenceCostMinor: text("referenceCostMinor").notNull(),
+    maxCostMinor: text("maxCostMinor").notNull(),
     stockQuantity: integer("stockQuantity").notNull().default(0),
+    remoteStatus: text("remoteStatus", {
+      enum: ["active", "inactive", "deleted", "unknown"],
+    }).notNull().default("unknown"),
+    lastSyncedAt: integer("lastSyncedAt", { mode: "timestamp_ms" }),
+    lastErrorCode: text("lastErrorCode"),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     createdAt,
     updatedAt,
   },
   (table) => [
-    uniqueIndex("supplierBinding_sku_source_unique").on(table.productSkuId, table.provider, table.normalizedApiOrigin, table.protocolVersion),
-    index("supplierBinding_source_idx").on(table.provider, table.normalizedApiOrigin),
+    uniqueIndex("supplierBinding_sku_enabled_unique").on(table.productSkuId).where(sql`${table.enabled} = 1`),
+    uniqueIndex("supplierBinding_source_sku_unique")
+      .on(
+        table.provider,
+        table.normalizedApiOrigin,
+        table.protocolVersion,
+        table.upstreamProductId,
+        table.upstreamSkuId,
+      )
+      .where(sql`${table.enabled} = 1`),
+    index("supplierBinding_sync_idx").on(
+      table.provider,
+      table.normalizedApiOrigin,
+      table.enabled,
+      table.remoteStatus,
+      table.lastSyncedAt,
+    ),
   ],
 );
 
@@ -98,7 +134,9 @@ export const supplierSyncSettings = sqliteTable("supplierSyncSettings", {
   intervalMs: integer("intervalMs").notNull().default(3600000),
   lastStartedAt: integer("lastStartedAt", { mode: "timestamp_ms" }),
   lastCompletedAt: integer("lastCompletedAt", { mode: "timestamp_ms" }),
-  lastStatus: text("lastStatus", { enum: ["idle", "running", "success", "failed"] }).notNull().default("idle"),
+  lastStatus: text("lastStatus", {
+    enum: ["idle", "running", "success", "failed"],
+  }).notNull().default("idle"),
   lastError: text("lastError"),
   createdAt,
   updatedAt,
@@ -109,7 +147,9 @@ export const scheduledTaskRun = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     task: text("task", { enum: ["MAINTENANCE"] }).notNull(),
-    status: text("status", { enum: ["RUNNING", "SUCCESS", "PARTIAL", "FAILED"] }).notNull(),
+    status: text("status", {
+      enum: ["RUNNING", "SUCCESS", "PARTIAL", "FAILED"],
+    }).notNull(),
     scannedOrderCount: integer("scannedOrderCount"),
     closedOrderCount: integer("closedOrderCount"),
     pushRetryAttempted: integer("pushRetryAttempted"),
@@ -147,5 +187,10 @@ export const media = sqliteTable(
     uploadedAt: integer("uploadedAt", { mode: "timestamp_ms" }).notNull(),
     updatedAt,
   },
-  (table) => [uniqueIndex("media_fileKey_unique").on(table.fileKey), index("media_mimeType_idx").on(table.mimeType), index("media_path_idx").on(table.path), index("media_uploadedAt_id_idx").on(table.uploadedAt, table.id)],
+  (table) => [
+    uniqueIndex("media_fileKey_unique").on(table.fileKey),
+    index("media_mimeType_idx").on(table.mimeType),
+    index("media_path_idx").on(table.path),
+    index("media_uploadedAt_id_idx").on(table.uploadedAt, table.id),
+  ],
 );
