@@ -28,7 +28,7 @@
           <Card class="gap-5 rounded-md py-5 shadow-none">
             <CardHeader class="gap-1 px-5">
               <CardDescription>{{ messages.productCheckout.currentPrice }}</CardDescription>
-              <CardTitle class="text-3xl font-bold tabular-nums text-orange-600">¥{{ selectedSku.price }}</CardTitle>
+              <CardTitle class="text-3xl font-bold tabular-nums text-orange-600">RM{{ selectedSku.price }}</CardTitle>
             </CardHeader>
             <form class="grid min-w-0 gap-5" novalidate @submit.prevent="submit">
               <CardContent class="grid min-w-0 gap-5 px-5">
@@ -36,7 +36,7 @@
                   <span>选择规格</span>
                   <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1" role="group" aria-label="选择规格">
                     <Button v-for="sku in data.skus" :key="sku.id" type="button" :variant="String(sku.id) === selectedSkuId ? 'default' : 'outline'" class="h-auto min-h-11 justify-start whitespace-normal rounded-md px-3 py-2 text-left text-sm leading-5 shadow-none" :aria-pressed="String(sku.id) === selectedSkuId" @click="selectedSkuId = String(sku.id)">
-                      {{ sku.name }} · ¥{{ sku.price }}
+                      {{ sku.name }} · RM{{ sku.price }}
                     </Button>
                   </div>
                 </div>
@@ -117,9 +117,9 @@
                 </div>
 
                 <div v-if="discountPreview" class="grid gap-1.5 rounded-md border bg-muted/40 p-3 text-sm">
-                  <div class="flex justify-between gap-4"><span class="text-muted-foreground">{{ messages.productCheckout.originalAmount }}</span><span class="tabular-nums">¥{{ discountPreview.originalAmount }}</span></div>
-                  <div class="flex justify-between gap-4"><span class="text-muted-foreground">{{ t(messages.productCheckout.appliedDiscount, { code: discountPreview.code }) }}</span><span class="tabular-nums text-destructive">-¥{{ discountPreview.discountAmount }}</span></div>
-                  <div class="flex justify-between gap-4 border-t pt-2 font-semibold"><span>{{ messages.productCheckout.amountDue }}</span><span class="tabular-nums">¥{{ discountPreview.finalAmount }}</span></div>
+                  <div class="flex justify-between gap-4"><span class="text-muted-foreground">{{ messages.productCheckout.originalAmount }}</span><span class="tabular-nums">RM{{ discountPreview.originalAmount }}</span></div>
+                  <div class="flex justify-between gap-4"><span class="text-muted-foreground">{{ t(messages.productCheckout.appliedDiscount, { code: discountPreview.code }) }}</span><span class="tabular-nums text-destructive">-RM{{ discountPreview.discountAmount }}</span></div>
+                  <div class="flex justify-between gap-4 border-t pt-2 font-semibold"><span>{{ messages.productCheckout.amountDue }}</span><span class="tabular-nums">RM{{ discountPreview.finalAmount }}</span></div>
                 </div>
 
                 <label class="grid gap-2 text-sm font-medium">{{ messages.productCheckout.buyerNote }}<Textarea v-model="buyerNote" rows="3" class="shadow-none" /></label>
