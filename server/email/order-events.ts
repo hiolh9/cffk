@@ -70,17 +70,16 @@ export async function processOrderEvents(
   limit = 50,
 ) {
   const db = createDrizzleDb(database);
-  // Pass epoch ms numbers so D1 never receives a raw Date object if column mode is mis-resolved.
-  const nowMs = now.getTime();
+  // drizzle integer({ mode: "timestamp_ms" }) expects Date; it maps via value.getTime().
   const candidates = await db
     .select()
     .from(orderEvent)
     .where(
       and(
-        lte(orderEvent.availableAt, nowMs),
+        lte(orderEvent.availableAt, now),
         or(
           eq(orderEvent.status, "PENDING"),
-          and(eq(orderEvent.status, "PROCESSING"), lte(orderEvent.leaseUntil, nowMs)),
+          and(eq(orderEvent.status, "PROCESSING"), lte(orderEvent.leaseUntil, now)),
         ),
       ),
     )
@@ -89,7 +88,7 @@ export async function processOrderEvents(
   let processed = 0;
   let failed = 0;
   for (const event of candidates) {
-    const leaseUntil = new Date(nowMs + EVENT_LEASE_MS);
+    const leaseUntil = new Date(now.getTime() + EVENT_LEASE_MS);
     const [claimed] = await db
       .update(orderEvent)
       .set({
@@ -104,7 +103,7 @@ export async function processOrderEvents(
           eq(orderEvent.attemptCount, event.attemptCount),
           or(
             eq(orderEvent.status, "PENDING"),
-            and(eq(orderEvent.status, "PROCESSING"), lte(orderEvent.leaseUntil, nowMs)),
+            and(eq(orderEvent.status, "PROCESSING"), lte(orderEvent.leaseUntil, now)),
           ),
         ),
       )
@@ -127,7 +126,7 @@ export async function processOrderEvents(
         .set({
           status: "PENDING",
           leaseUntil: null,
-          availableAt: new Date(nowMs + 60_000),
+          availableAt: new Date(now.getTime() + 60_000),
           updatedAt: new Date(),
         })
         .where(and(eq(orderEvent.id, event.id), eq(orderEvent.status, "PROCESSING")));
