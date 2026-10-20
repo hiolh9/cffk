@@ -169,9 +169,20 @@ export const emailTemplate = sqliteTable(
   "emailTemplate",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    scene: text("scene").notNull(),
-    subject: text("subject").notNull(),
-    bodyHtml: text("bodyHtml").notNull(),
+    scene: text("scene", {
+      enum: [
+        "TEST",
+        "EMAIL_VERIFICATION",
+        "PASSWORD_RESET",
+        "GUEST_ORDER_RECOVERY",
+        "ORDER_PAID",
+        "DELIVERY_SUCCESS",
+        "DELIVERY_FAILED",
+        "PAYMENT_EXCEPTION",
+      ],
+    }).notNull(),
+    name: text("name").notNull(),
+    templateJson: text("templateJson").notNull(),
     createdAt,
     updatedAt,
   },
