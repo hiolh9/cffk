@@ -208,6 +208,13 @@ export const customerAddress = sqliteTable(
   (table) => [index("customerAddress_userId_idx").on(table.userId)],
 );
 
+/**
+ * Order ledger fields (MYR cents unless noted):
+ * - Gross = originalAmount ?? amount (customer pays MYR)
+ * - Fee = paymentFeeCents (0 for DIRECT_TRANSFER)
+ * - Net = Gross - Fee
+ * - COGS split: local prepaid (MYR) vs cross-border (CNY + FX)
+ */
 export const order = sqliteTable(
   "order",
   {
@@ -251,6 +258,20 @@ export const order = sqliteTable(
     invoiceNo: text("invoiceNo"),
     paymentFeeCents: integer("paymentFeeCents").notNull().default(0),
     paymentMethodKind: text("paymentMethodKind", { enum: ["GATEWAY", "DIRECT_TRANSFER"] }).notNull().default("GATEWAY"),
+    /** LOCAL_PREPAID = MYR supplier prepaid; CROSS_BORDER = CNY (e.g. Taobao); LOCAL_STOCK = card/local inventory */
+    cogsSource: text("cogsSource", {
+      enum: ["LOCAL_PREPAID", "CROSS_BORDER", "LOCAL_STOCK"],
+    }),
+    /** Actual COGS in MYR sen (cents) for P&L */
+    cogsAmountMyrCents: integer("cogsAmountMyrCents").notNull().default(0),
+    /** Original purchase currency when different from MYR */
+    cogsOriginalCurrency: text("cogsOriginalCurrency", { enum: ["MYR", "CNY"] }),
+    /** Original cost in minor units of cogsOriginalCurrency (string for large ints) */
+    cogsOriginalAmountMinor: text("cogsOriginalAmountMinor"),
+    /** BNM or bank mid rate used for e-Invoice / conversion (e.g. "0.6523") */
+    exchangeRateUsed: text("exchangeRateUsed"),
+    /** Bank debit MYR sen minus BNM-converted MYR sen; positive = FX loss */
+    fxDifferenceCents: integer("fxDifferenceCents").notNull().default(0),
     createdAt,
     updatedAt,
   },
@@ -262,5 +283,6 @@ export const order = sqliteTable(
     index("order_status_createdAt_idx").on(table.status, table.createdAt),
     index("order_paymentStatus_createdAt_idx").on(table.paymentStatus, table.createdAt),
     index("order_deliveryStatus_createdAt_idx").on(table.deliveryStatus, table.createdAt),
+    index("order_cogsSource_idx").on(table.cogsSource),
   ],
 );
