@@ -2,6 +2,13 @@ import { normalizeSiteTimezone } from "@/lib/site-timezone";
 
 const URL_PROTOCOLS = new Set(["http:", "https:"]);
 
+/** Integer >= 0; invalid values fall back to default. Cap at 100 million sen (RM 1M). */
+function clampLimit(value: unknown, fallback: number) {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.min(Math.floor(n), 100_000_000);
+}
+
 function optionalText(value: unknown, field: string, maxLength: number) {
   if (value === undefined || value === null) return null;
   const normalized = String(value).trim();
@@ -36,10 +43,11 @@ export type SiteSettingsInput = {
   headCode?: string | null;
   footerCode?: string | null;
   registrationEnabled?: boolean;
-  /** false = reject all new storefront orders */
   checkoutEnabled?: boolean;
-  /** false = pause supplier API + local auto-delivery cron */
   autoFulfillEnabled?: boolean;
+  maxOrderAmountCents?: number;
+  maxDailyUserAmountCents?: number;
+  maxDailyUserOrders?: number;
   timezone: string;
 };
 
@@ -70,6 +78,9 @@ export function validateSiteSettingsInput(input: SiteSettingsInput) {
     registrationEnabled: input.registrationEnabled === true,
     checkoutEnabled: input.checkoutEnabled !== false,
     autoFulfillEnabled: input.autoFulfillEnabled !== false,
+    maxOrderAmountCents: clampLimit(input.maxOrderAmountCents, 50_000),
+    maxDailyUserAmountCents: clampLimit(input.maxDailyUserAmountCents, 200_000),
+    maxDailyUserOrders: clampLimit(input.maxDailyUserOrders, 50),
     timezone,
   };
 }

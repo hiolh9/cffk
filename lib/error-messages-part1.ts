@@ -1,21 +1,22 @@
 // Auto-split part 1 of error messages
 export const errorMessagesPart1: Record<string, string> = {
-
   AUTH_REQUIRED: "请先登录后再继续操作。",
   ACCOUNT_DISABLED: "账号已被停用，无法下单。如有疑问请联系客服。",
   CHECKOUT_DISABLED: "下单功能已暂停，请稍后再试或联系客服。",
+  EMAIL_NOT_VERIFIED: "请先完成邮箱验证后再下单。",
+  ORDER_AMOUNT_LIMIT: "单笔订单金额超过站点上限，请减少数量或联系客服。",
+  ORDER_DAILY_AMOUNT_LIMIT: "今日累计下单金额已达上限，请明日再试或联系客服。",
+  ORDER_DAILY_COUNT_LIMIT: "今日下单次数已达上限，请明日再试或联系客服。",
   AUTO_FULFILL_PAUSED: "自动发货已暂停，订单将暂缓处理。",
   RATE_LIMITED: "操作过于频繁，请稍后再试。",
   ADMIN_ACCESS_REQUIRED: "管理员身份已失效，请重新登录。",
   ADMIN_2FA_REQUIRED: "此操作需要开启双因素认证（2FA）。请先在账户设置中启用 2FA 后再试。",
   DATABASE_UNAVAILABLE: "服务暂时不可用，请稍后重试。",
   ROOT_SETUP_NOT_FOUND: "初始化页面不存在。",
-
   ROOT_SETUP_USERNAME_INVALID: "用户名格式无效。",
   ROOT_SETUP_NAME_INVALID: "昵称格式无效。",
   ROOT_SETUP_EMAIL_INVALID: "邮箱格式无效。",
   ROOT_SETUP_PASSWORD_INVALID: "密码需为 8 至 128 位字符。",
-
   SITE_NAME_REQUIRED: "站点名称不能为空。",
   SITE_NAME_TOO_LONG: "站点名称不能超过 120 个字符。",
   SITE_URL_INVALID: "站点 URL 格式无效。",
@@ -24,10 +25,8 @@ export const errorMessagesPart1: Record<string, string> = {
   SITE_TIMEZONE_INVALID: "时区无效。",
   SITE_SETTINGS_NOT_FOUND: "站点设置不存在。",
   REGISTRATION_SMTP_REQUIRED: "开放注册前请先配置可用的 SMTP 邮件渠道。",
-
   ORDER_NOT_FOUND: "订单不存在。",
   SUPPLIER_ORDER_CREATE_FAILED: "供应商订单创建失败，请稍后重试。",
-
   OTP_RATE_LIMITED: "验证码发送过于频繁，请稍后再试。",
   EMAIL_CLOUDFLARE_RATE_LIMITED: "Cloudflare Email Sending 已限流，系统将稍后重试。",
   EMAIL_CLOUDFLARE_RECIPIENT_SUPPRESSED: "Cloudflare 已抑制该收件人地址，邮件未发送。",
