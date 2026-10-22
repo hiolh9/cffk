@@ -1,11 +1,37 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
-import { order, pushChannelConfig, supplierAccount, supplierOrder } from "@/database/drizzle/schema";
+import { order, pushChannelConfig, siteSetting, supplierAccount, supplierOrder } from "@/database/drizzle/schema";
 import { parseTelegramProviderConfig, sendTelegramPush } from "@/server/push/telegram-provider";
 import { reportUnexpectedServerError } from "@/server/error-handling";
 
 const ALERT_COOLDOWN_MS = 60 * 60_000;
 const lastSent = new Map<string, number>();
+
+function nonNegInt(value: unknown, fallback: number) {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.floor(n);
+}
+
+async function loadAlertThresholds(database: D1Database) {
+  try {
+    const db = createDrizzleDb(database);
+    const [row] = await db
+      .select({
+        alertPaidOrderBurst: siteSetting.alertPaidOrderBurst,
+        alertSupplierFailBurst: siteSetting.alertSupplierFailBurst,
+      })
+      .from(siteSetting)
+      .where(eq(siteSetting.id, 1))
+      .limit(1);
+    return {
+      paidBurst: nonNegInt(row?.alertPaidOrderBurst, 20),
+      supplierFailBurst: nonNegInt(row?.alertSupplierFailBurst, 5),
+    };
+  } catch {
+    return { paidBurst: 20, supplierFailBurst: 5 };
+  }
+}
 
 async function trySendAdminTelegram(database: D1Database, title: string, content: string, key: string) {
   const now = Date.now();
@@ -34,6 +60,7 @@ async function trySendAdminTelegram(database: D1Database, title: string, content
 export async function runOpsHealthAlerts(database: D1Database, now = new Date()) {
   const db = createDrizzleDb(database);
   const since = new Date(now.getTime() - 15 * 60_000);
+  const thresholds = await loadAlertThresholds(database);
 
   const [failAgg] = await db
     .select({ failed: sql<number>`count(*)` })
@@ -43,27 +70,26 @@ export async function runOpsHealthAlerts(database: D1Database, now = new Date())
   const failed = Number(failAgg?.failed ?? 0);
   const results: { key: string; sent: boolean; reason?: string }[] = [];
 
-  if (failed >= 5) {
+  if (thresholds.supplierFailBurst > 0 && failed >= thresholds.supplierFailBurst) {
     const r = await trySendAdminTelegram(
       database,
       "供应商代充异常",
-      `最近 15 分钟内有 ${failed} 笔供应商订单失败。请检查供应商账户、余额与 API。必要时在站点设置中关闭「自动代充」。`,
+      `最近 15 分钟内有 ${failed} 笔供应商订单失败（阈值 ${thresholds.supplierFailBurst}）。请检查供应商账户、余额与 API。必要时在站点设置中关闭「自动代充」。`,
       "supplier-fail-burst",
     );
     results.push({ key: "supplier-fail-burst", ...r });
   }
 
-  // Paid-order burst: possible card testing or promo abuse after gateway pass.
   const [paidAgg] = await db
     .select({ paid: sql<number>`count(*)` })
     .from(order)
     .where(and(eq(order.paymentStatus, "PAID"), gte(order.paidAt, since)));
   const paid = Number(paidAgg?.paid ?? 0);
-  if (paid >= 20) {
+  if (thresholds.paidBurst > 0 && paid >= thresholds.paidBurst) {
     const r = await trySendAdminTelegram(
       database,
       "支付成功订单激增",
-      `最近 15 分钟有 ${paid} 笔订单标记为已支付。请核对网关账单与库存/代充预存款，必要时暂停下单或自动代充。`,
+      `最近 15 分钟有 ${paid} 笔订单标记为已支付（阈值 ${thresholds.paidBurst}）。请核对网关账单与库存/代充预存款，必要时暂停下单或自动代充。`,
       "paid-order-burst",
     );
     results.push({ key: "paid-order-burst", ...r });

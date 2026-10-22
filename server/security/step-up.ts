@@ -1,10 +1,13 @@
 /**
- * Short-lived step-up confirmation for sensitive admin mutations
- * (credential changes, account deletion, manual mark-paid, etc.).
- * Granted automatically on successful login; valid ~10 minutes.
+ * Short-lived step-up confirmation for sensitive admin mutations.
+ * TTL is soft-coded via siteSetting.stepUpMinutes (default 10).
  */
 
-const STEP_UP_TTL_MS = 10 * 60_000;
+import { eq } from "drizzle-orm";
+import { createDrizzleDb } from "@/database/drizzle";
+import { siteSetting } from "@/database/drizzle/schema";
+
+const FALLBACK_TTL_MS = 10 * 60_000;
 
 function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -15,9 +18,26 @@ async function stepUpKey(userId: string) {
   return bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", payload)));
 }
 
+async function resolveTtlMs(database: D1Database) {
+  try {
+    const db = createDrizzleDb(database);
+    const [row] = await db
+      .select({ stepUpMinutes: siteSetting.stepUpMinutes })
+      .from(siteSetting)
+      .where(eq(siteSetting.id, 1))
+      .limit(1);
+    const minutes = Number(row?.stepUpMinutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) return FALLBACK_TTL_MS;
+    return Math.min(Math.floor(minutes), 120) * 60_000;
+  } catch {
+    return FALLBACK_TTL_MS;
+  }
+}
+
 export async function grantStepUp(database: D1Database, userId: string, now = Date.now()) {
   const keyHash = await stepUpKey(userId);
-  const expiresAt = now + STEP_UP_TTL_MS;
+  const ttl = await resolveTtlMs(database);
+  const expiresAt = now + ttl;
   await database
     .prepare(
       `
@@ -31,6 +51,7 @@ export async function grantStepUp(database: D1Database, userId: string, now = Da
     )
     .bind(keyHash, expiresAt, now, now)
     .run();
+  return { validMinutes: Math.round(ttl / 60_000) };
 }
 
 export async function hasValidStepUp(database: D1Database, userId: string, now = Date.now()) {
@@ -50,4 +71,9 @@ export async function assertStepUp(database: D1Database, userId: string) {
   }
 }
 
-export const STEP_UP_TTL_MINUTES = STEP_UP_TTL_MS / 60_000;
+/** Fallback for UI before settings load. */
+export const STEP_UP_TTL_MINUTES = FALLBACK_TTL_MS / 60_000;
+
+export async function getStepUpMinutes(database: D1Database) {
+  return Math.round((await resolveTtlMs(database)) / 60_000);
+}

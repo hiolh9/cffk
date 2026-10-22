@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { createDrizzleDb } from "@/database/drizzle";
+import { siteSetting } from "@/database/drizzle/schema";
 import { appError } from "@/lib/app-error";
 
 export type SecurityRateAction =
@@ -7,25 +10,69 @@ export type SecurityRateAction =
   | "AUTH_2FA"
   | "TELEFUNC"
   | "ADMIN_TELEFUNC"
-  /** Checkout: per IP (any user) */
   | "ORDER_CREATE_IP"
-  /** Checkout: per logged-in user + IP */
   | "ORDER_CREATE_USER"
-  /** Checkout: per device fingerprint + IP */
   | "ORDER_CREATE_DEVICE";
 
-const POLICY: Record<SecurityRateAction, { limit: number; windowMs: number }> = {
+const STATIC_POLICY: Record<
+  Exclude<SecurityRateAction, "ORDER_CREATE_IP" | "ORDER_CREATE_USER" | "ORDER_CREATE_DEVICE">,
+  { limit: number; windowMs: number }
+> = {
   AUTH_SIGN_IN: { limit: 12, windowMs: 15 * 60_000 },
   AUTH_SIGN_UP: { limit: 8, windowMs: 60 * 60_000 },
   AUTH_PASSWORD_RESET: { limit: 6, windowMs: 60 * 60_000 },
   AUTH_2FA: { limit: 20, windowMs: 15 * 60_000 },
   TELEFUNC: { limit: 180, windowMs: 60_000 },
   ADMIN_TELEFUNC: { limit: 240, windowMs: 60_000 },
-  // Storefront checkout abuse controls (tightened)
-  ORDER_CREATE_IP: { limit: 12, windowMs: 15 * 60_000 },
-  ORDER_CREATE_USER: { limit: 6, windowMs: 15 * 60_000 },
-  ORDER_CREATE_DEVICE: { limit: 8, windowMs: 15 * 60_000 },
 };
+
+const ORDER_DEFAULTS = {
+  ORDER_CREATE_IP: 12,
+  ORDER_CREATE_USER: 6,
+  ORDER_CREATE_DEVICE: 8,
+  windowMinutes: 15,
+};
+
+function nonNegInt(value: unknown, fallback: number) {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.floor(n);
+}
+
+async function resolvePolicy(
+  database: D1Database,
+  action: SecurityRateAction,
+): Promise<{ limit: number; windowMs: number }> {
+  if (action === "ORDER_CREATE_IP" || action === "ORDER_CREATE_USER" || action === "ORDER_CREATE_DEVICE") {
+    try {
+      const db = createDrizzleDb(database);
+      const [row] = await db
+        .select({
+          orderCreateIpLimit: siteSetting.orderCreateIpLimit,
+          orderCreateUserLimit: siteSetting.orderCreateUserLimit,
+          orderCreateDeviceLimit: siteSetting.orderCreateDeviceLimit,
+          orderCreateWindowMinutes: siteSetting.orderCreateWindowMinutes,
+        })
+        .from(siteSetting)
+        .where(eq(siteSetting.id, 1))
+        .limit(1);
+      const windowMs = Math.max(1, nonNegInt(row?.orderCreateWindowMinutes, ORDER_DEFAULTS.windowMinutes)) * 60_000;
+      const limit =
+        action === "ORDER_CREATE_IP"
+          ? nonNegInt(row?.orderCreateIpLimit, ORDER_DEFAULTS.ORDER_CREATE_IP)
+          : action === "ORDER_CREATE_USER"
+            ? nonNegInt(row?.orderCreateUserLimit, ORDER_DEFAULTS.ORDER_CREATE_USER)
+            : nonNegInt(row?.orderCreateDeviceLimit, ORDER_DEFAULTS.ORDER_CREATE_DEVICE);
+      return { limit, windowMs };
+    } catch {
+      return {
+        limit: ORDER_DEFAULTS[action],
+        windowMs: ORDER_DEFAULTS.windowMinutes * 60_000,
+      };
+    }
+  }
+  return STATIC_POLICY[action];
+}
 
 function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -50,7 +97,10 @@ export async function enforceSecurityRateLimit(
     now?: Date;
   },
 ) {
-  const policy = POLICY[input.action];
+  const policy = await resolvePolicy(database, input.action);
+  // 0 = disabled for checkout soft limits
+  if (policy.limit <= 0) return;
+
   const now = input.now?.getTime() ?? Date.now();
   const expiresAt = now + policy.windowMs;
   const identity = securityRateIdentity(input.clientIp, input.extra);
@@ -97,8 +147,8 @@ export async function checkSecurityRateLimit(
     return { allowed: true, retryAfterSec: 0 };
   } catch (cause) {
     if (cause instanceof Error && (cause.message === "RATE_LIMITED" || (cause as { code?: string }).code === "RATE_LIMITED")) {
-      const windowMs = POLICY[input.action].windowMs;
-      return { allowed: false, retryAfterSec: Math.ceil(windowMs / 1000) };
+      const policy = await resolvePolicy(database, input.action);
+      return { allowed: false, retryAfterSec: Math.ceil(policy.windowMs / 1000) };
     }
     throw cause;
   }
