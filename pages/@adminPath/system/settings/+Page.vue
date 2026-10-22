@@ -140,7 +140,7 @@
             <FieldSeparator />
 
             <FieldSet class="gap-4">
-              <FieldLegend>注册设置</FieldLegend>
+              <FieldLegend>注册与风控开关</FieldLegend>
               <VeeField v-slot="{ componentField }" name="registrationEnabled">
                 <Field orientation="horizontal">
                   <div class="flex-1">
@@ -148,6 +148,24 @@
                     <FieldDescription>关闭后，访客无法创建新账号。</FieldDescription>
                   </div>
                   <Switch id="registration-enabled" :model-value="componentField.modelValue" @update:model-value="componentField['onUpdate:modelValue']" />
+                </Field>
+              </VeeField>
+              <VeeField v-slot="{ componentField }" name="checkoutEnabled">
+                <Field orientation="horizontal">
+                  <div class="flex-1">
+                    <FieldLabel for="checkout-enabled">开放前台下单</FieldLabel>
+                    <FieldDescription>关闭后所有用户无法创建新订单（紧急止血，不影响已支付订单）。</FieldDescription>
+                  </div>
+                  <Switch id="checkout-enabled" :model-value="componentField.modelValue" @update:model-value="componentField['onUpdate:modelValue']" />
+                </Field>
+              </VeeField>
+              <VeeField v-slot="{ componentField }" name="autoFulfillEnabled">
+                <Field orientation="horizontal">
+                  <div class="flex-1">
+                    <FieldLabel for="auto-fulfill-enabled">自动代充 / 自动发货</FieldLabel>
+                    <FieldDescription>关闭后定时任务不再调用供应商 API、也不再自动发卡。已支付订单可稍后重新开启后处理。</FieldDescription>
+                  </div>
+                  <Switch id="auto-fulfill-enabled" :model-value="componentField.modelValue" @update:model-value="componentField['onUpdate:modelValue']" />
                 </Field>
               </VeeField>
             </FieldSet>
@@ -238,6 +256,8 @@ const formSchema = toTypedSchema(z.object({
   headCode: z.string().trim().max(20_000, "页头代码不能超过 20,000 个字符。"),
   footerCode: z.string().trim().max(20_000, "页脚代码不能超过 20,000 个字符。"),
   registrationEnabled: z.boolean(),
+  checkoutEnabled: z.boolean(),
+  autoFulfillEnabled: z.boolean(),
 }));
 
 type FormValues = {
@@ -253,6 +273,8 @@ type FormValues = {
   headCode: string;
   footerCode: string;
   registrationEnabled: boolean;
+  checkoutEnabled: boolean;
+  autoFulfillEnabled: boolean;
   timezone: string;
 };
 
@@ -271,6 +293,8 @@ const initialValues: FormValues = {
   headCode: "",
   footerCode: "",
   registrationEnabled: false,
+  checkoutEnabled: true,
+  autoFulfillEnabled: true,
   timezone: "Asia/Shanghai",
 };
 
@@ -307,6 +331,8 @@ function toFormValues(settings: Awaited<ReturnType<typeof onGetSiteSettings>>): 
     headCode: settings.headCode ?? "",
     footerCode: settings.footerCode ?? "",
     registrationEnabled: settings.registrationEnabled === true,
+    checkoutEnabled: settings.checkoutEnabled !== false,
+    autoFulfillEnabled: settings.autoFulfillEnabled !== false,
     timezone,
   };
 }
