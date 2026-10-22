@@ -32,7 +32,7 @@
       <div class="relative mx-auto flex max-w-6xl flex-col gap-5 px-4 py-8 sm:flex-row sm:items-end sm:justify-between sm:gap-8 sm:px-6 sm:py-12">
         <div class="min-w-0 max-w-xl">
           <p class="text-xs font-semibold uppercase tracking-wider text-brand">Digital top-up</p>
-          <h1 class="mt-1.5 text-2xl font-extrabold tracking-tight sm:text-4xl">{{ site.name }}</h1>
+          <h1 class="mt-1.5 text-2xl font-bold tracking-tight sm:text-4xl">{{ site.name }}</h1>
           <p class="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground sm:text-base">
             {{ site.subtitle || messages.storefront.fallbackSubtitle }}
           </p>
@@ -181,7 +181,7 @@ function chipClass(active: boolean) {
   return [
     "shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
     active
-      ? "brand-gradient text-white shadow-sm shadow-brand/20"
+      ? "bg-primary text-primary-foreground shadow-sm"
       : "bg-muted text-muted-foreground hover:bg-brand-soft hover:text-brand",
   ];
 }
