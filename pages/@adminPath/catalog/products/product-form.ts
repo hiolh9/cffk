@@ -18,6 +18,9 @@ export const productFormSchema = z.object({
   description: z.string().trim().min(1, "商品详情不能为空"),
   manualDeliveryHint: z.string(),
   purchaseNote: z.string(),
+  /** SEO stars 1–5; leave empty to omit AggregateRating */
+  ratingValue: z.string().trim().max(8),
+  reviewCount: z.number().int().min(0).max(1_000_000),
 
   status: z.enum(productStatuses),
   sort: z.number().int().min(0),
@@ -31,11 +34,11 @@ export function slugifyProductName(value: string) {
 }
 
 export function defaultProductForm(categoryId: number | null = null): ProductForm {
-  return { categoryId: categoryId ?? 0, name: "", slug: "", subtitle: "", coverImage: "", description: "", manualDeliveryHint: "", purchaseNote: "", status: "DRAFT", sort: 0 };
+  return { categoryId: categoryId ?? 0, name: "", slug: "", subtitle: "", coverImage: "", description: "", manualDeliveryHint: "", purchaseNote: "", ratingValue: "", reviewCount: 0, status: "DRAFT", sort: 0 };
 }
 
 export function productDetailToForm(item: ProductDetail["product"]): ProductForm {
-  return { id: item.id, categoryId: item.categoryId ?? 0, name: item.name, slug: item.slug, subtitle: item.subtitle ?? "", coverImage: item.coverImage ?? "", description: item.description ?? "", manualDeliveryHint: item.manualDeliveryHint ?? "", purchaseNote: item.purchaseNote ?? "", status: item.status, sort: item.sort };
+  return { id: item.id, categoryId: item.categoryId ?? 0, name: item.name, slug: item.slug, subtitle: item.subtitle ?? "", coverImage: item.coverImage ?? "", description: item.description ?? "", manualDeliveryHint: item.manualDeliveryHint ?? "", purchaseNote: item.purchaseNote ?? "", ratingValue: item.ratingValue ?? "", reviewCount: item.reviewCount ?? 0, status: item.status, sort: item.sort };
 }
 
 export type ProductDeliveryType = (typeof deliveryTypes)[number];
@@ -64,6 +67,8 @@ export function formToSaveInput(form: ProductForm, skus: ProductSkuDraftInput[],
     description: form.description,
     manualDeliveryHint: form.manualDeliveryHint,
     purchaseNote: form.purchaseNote,
+    ratingValue: form.ratingValue,
+    reviewCount: form.reviewCount,
     status: form.status,
     sort: form.sort,
     deliveryType,
