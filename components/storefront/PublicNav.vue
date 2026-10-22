@@ -1,13 +1,16 @@
 <template>
   <nav class="flex shrink-0 items-center gap-0.5 sm:gap-1" :aria-label="messages.nav.main">
-    <!-- Orders: icon-only on mobile, icon + label from sm up -->
     <Button
       size="sm"
       variant="ghost"
-      class="px-2 shadow-none sm:px-3"
+      class="px-2 text-muted-foreground shadow-none hover:text-foreground sm:px-3"
       as-child
     >
-      <a :href="user ? '/account/order' : '/order'" :aria-label="user ? messages.nav.myOrders : messages.nav.orderLookup" :title="user ? messages.nav.myOrders : messages.nav.orderLookup">
+      <a
+        :href="user ? '/account/order' : '/order'"
+        :aria-label="user ? messages.nav.myOrders : messages.nav.orderLookup"
+        :title="user ? messages.nav.myOrders : messages.nav.orderLookup"
+      >
         <ClipboardListIcon class="size-4" />
         <span class="hidden sm:inline">{{ user ? messages.nav.myOrders : messages.nav.orderLookup }}</span>
       </a>
@@ -15,11 +18,18 @@
 
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
-        <Button type="button" variant="ghost" size="icon" class="size-9 shadow-none" :aria-label="messages.preferences.language" :title="messages.preferences.language">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          class="size-9 text-muted-foreground shadow-none hover:text-foreground"
+          :aria-label="messages.preferences.language"
+          :title="messages.preferences.language"
+        >
           <LanguagesIcon />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" :side-offset="8" class="w-36 shadow-none">
+      <DropdownMenuContent align="end" :side-offset="8" class="w-36 shadow-md">
         <DropdownMenuLabel>{{ messages.preferences.language }}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
@@ -34,7 +44,7 @@
       type="button"
       variant="ghost"
       size="icon"
-      class="size-9 shadow-none"
+      class="size-9 text-muted-foreground shadow-none hover:text-foreground"
       :aria-label="theme === 'light' ? messages.preferences.dark : messages.preferences.light"
       :title="theme === 'light' ? messages.preferences.dark : messages.preferences.light"
       @click="setTheme(theme === 'light' ? 'dark' : 'light')"
@@ -44,21 +54,35 @@
     </Button>
 
     <template v-if="!user">
-      <Button size="sm" class="ml-1 shadow-none" as-child><a href="/login">{{ messages.nav.signIn }}</a></Button>
+      <Button size="sm" class="brand-gradient ml-1 border-0 text-white shadow-sm shadow-brand/20 hover:opacity-95" as-child>
+        <a href="/login">{{ messages.nav.signIn }}</a>
+      </Button>
     </template>
     <template v-else>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <Button type="button" variant="ghost" size="icon" class="size-9 rounded-full shadow-none" :aria-label="t(messages.nav.accountMenu, { name: currentUserName })">
-            <Avatar class="size-8"><AvatarFallback class="bg-foreground text-xs font-semibold text-background">{{ userInitials }}</AvatarFallback></Avatar>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="size-9 rounded-full shadow-none"
+            :aria-label="t(messages.nav.accountMenu, { name: currentUserName })"
+          >
+            <Avatar class="size-8 ring-2 ring-brand/25">
+              <AvatarFallback class="brand-gradient text-xs font-semibold text-white">{{ userInitials }}</AvatarFallback>
+            </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" :side-offset="8" class="w-52 shadow-none">
+        <DropdownMenuContent align="end" :side-offset="8" class="w-52 shadow-md">
           <DropdownMenuLabel class="truncate">{{ currentUserName }}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem as-child><a href="/account"><UserRoundCogIcon data-icon="inline-start" />{{ messages.nav.accountSettings }}</a></DropdownMenuItem>
-            <DropdownMenuItem :disabled="signingOut" @select="signOut"><LogOutIcon data-icon="inline-start" />{{ signingOut ? messages.nav.signingOut : messages.nav.signOut }}</DropdownMenuItem>
+            <DropdownMenuItem as-child>
+              <a href="/account"><UserRoundCogIcon data-icon="inline-start" />{{ messages.nav.accountSettings }}</a>
+            </DropdownMenuItem>
+            <DropdownMenuItem :disabled="signingOut" @select="signOut">
+              <LogOutIcon data-icon="inline-start" />{{ signingOut ? messages.nav.signingOut : messages.nav.signOut }}
+            </DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -74,7 +98,15 @@ import { usePageContext } from "vike-vue/usePageContext";
 import { toast } from "vue-sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
 import enUS from "@/lib/i18n/en-US";
 import zhCN from "@/lib/i18n/zh-CN";

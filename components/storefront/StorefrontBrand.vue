@@ -1,7 +1,9 @@
 <template>
-  <a href="/" class="flex min-w-0 items-center gap-2 font-semibold" aria-label="返回首页">
-    <img :src="brandLogoUrl" :alt="`${siteName} Logo`" class="size-9 shrink-0 rounded-md object-contain" />
-    <span class="truncate">{{ siteName }}</span>
+  <a href="/" class="group flex min-w-0 items-center gap-2.5 font-semibold" :aria-label="homeLabel">
+    <span class="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+      <img :src="brandLogoUrl" :alt="`${siteName} Logo`" class="size-full object-contain" />
+    </span>
+    <span class="brand-text-gradient truncate text-base font-extrabold tracking-tight sm:text-[1.05rem]">{{ siteName }}</span>
   </a>
 </template>
 
@@ -15,6 +17,7 @@ type Site = { name?: string | null; logo?: string | null };
 type PageContext = ReturnType<typeof usePageContext> & { site?: Site | null };
 
 const pageContext = usePageContext() as PageContext;
-const siteName = computed(() => pageContext.site?.name?.trim() || "CFFK-Shop");
+const siteName = computed(() => pageContext.site?.name?.trim() || "Sparkpay");
 const brandLogoUrl = computed(() => pageContext.site?.logo || logoUrl);
+const homeLabel = computed(() => siteName.value);
 </script>

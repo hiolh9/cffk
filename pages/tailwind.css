@@ -22,6 +22,8 @@
   --color-ring: var(--ring);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
   --color-login-payment: var(--login-payment);
   --color-login-payment-foreground: var(--login-payment-foreground);
   --color-login-payment-border: var(--login-payment-border);
@@ -43,25 +45,30 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Brand: linear-gradient(135deg, #003EAA 0%, #0088EE 60%, #00D0FF 100%) */
+  --brand: #0088ee;
+  --brand-deep: #003eaa;
+  --brand-bright: #00d0ff;
+  --brand-soft: color-mix(in srgb, #0088ee 12%, white);
+  --background: oklch(0.995 0.005 240);
+  --foreground: oklch(0.2 0.02 250);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0.02 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.2 0.02 250);
+  --primary: #0088ee;
+  --primary-foreground: #ffffff;
+  --secondary: oklch(0.96 0.015 240);
+  --secondary-foreground: oklch(0.28 0.05 250);
+  --muted: oklch(0.965 0.012 240);
+  --muted-foreground: oklch(0.5 0.03 250);
+  --accent: color-mix(in srgb, #0088ee 10%, white);
+  --accent-foreground: #003eaa;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.91 0.015 240);
+  --input: oklch(0.91 0.015 240);
+  --ring: #0088ee;
   --login-payment: oklch(0.98 0.025 84);
   --login-payment-foreground: oklch(0.42 0.1 65);
   --login-payment-border: oklch(0.84 0.1 84);
@@ -72,36 +79,40 @@
   --login-delivery-border: oklch(0.8 0.09 150);
   --login-delivery-icon: oklch(0.9 0.065 150);
   --login-delivery-icon-foreground: oklch(0.4 0.1 150);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.985 0.01 240);
+  --sidebar-foreground: oklch(0.2 0.02 250);
+  --sidebar-primary: #0088ee;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: color-mix(in srgb, #0088ee 10%, white);
+  --sidebar-accent-foreground: #003eaa;
+  --sidebar-border: oklch(0.91 0.015 240);
+  --sidebar-ring: #0088ee;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --brand: #3aa0ff;
+  --brand-deep: #0088ee;
+  --brand-bright: #5adfff;
+  --brand-soft: color-mix(in srgb, #3aa0ff 18%, black);
+  --background: oklch(0.16 0.02 250);
+  --foreground: oklch(0.97 0.01 240);
+  --card: oklch(0.2 0.025 250);
+  --card-foreground: oklch(0.97 0.01 240);
+  --popover: oklch(0.2 0.025 250);
+  --popover-foreground: oklch(0.97 0.01 240);
+  --primary: #3aa0ff;
+  --primary-foreground: #041528;
+  --secondary: oklch(0.26 0.03 250);
+  --secondary-foreground: oklch(0.97 0.01 240);
+  --muted: oklch(0.26 0.03 250);
+  --muted-foreground: oklch(0.72 0.03 240);
+  --accent: color-mix(in srgb, #3aa0ff 22%, black);
+  --accent-foreground: #b8e0ff;
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #3aa0ff;
   --login-payment: oklch(0.24 0.035 84);
   --login-payment-foreground: oklch(0.88 0.1 84);
   --login-payment-border: oklch(0.5 0.085 84);
@@ -112,14 +123,29 @@
   --login-delivery-border: oklch(0.46 0.08 150);
   --login-delivery-icon: oklch(0.29 0.055 150);
   --login-delivery-icon-foreground: oklch(0.8 0.12 150);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.985 0 0);
-  --sidebar-primary-foreground: oklch(0.205 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.18 0.025 250);
+  --sidebar-foreground: oklch(0.97 0.01 240);
+  --sidebar-primary: #3aa0ff;
+  --sidebar-primary-foreground: #041528;
+  --sidebar-accent: color-mix(in srgb, #3aa0ff 20%, black);
+  --sidebar-accent-foreground: #b8e0ff;
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: #3aa0ff;
+}
+
+.brand-gradient {
+  background-image: linear-gradient(135deg, #003eaa 0%, #0088ee 60%, #00d0ff 100%);
+}
+
+.brand-text-gradient {
+  background-image: linear-gradient(135deg, #003eaa 0%, #0088ee 55%, #00b8f0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dark .brand-text-gradient {
+  background-image: linear-gradient(135deg, #5ab0ff 0%, #3aa0ff 50%, #5adfff 100%);
 }
 
 .product-rich-content {
@@ -131,8 +157,8 @@
 .product-rich-content ul, .product-rich-content ol { margin: 0.75rem 0; padding-left: 1.5rem; }
 .product-rich-content ul { list-style: disc; }
 .product-rich-content ol { list-style: decimal; }
-.product-rich-content blockquote { margin: 1rem 0; border-left: 3px solid var(--border); background: color-mix(in oklab, var(--muted) 60%, transparent); padding: 0.75rem 1rem; }
-.product-rich-content a { color: var(--primary); text-decoration: underline; }
+.product-rich-content blockquote { margin: 1rem 0; border-left: 3px solid var(--brand); background: color-mix(in oklab, var(--muted) 60%, transparent); padding: 0.75rem 1rem; }
+.product-rich-content a { color: var(--brand); text-decoration: underline; }
 .product-rich-content img { max-width: 100%; border-radius: 0.5rem; border: 1px solid var(--border); }
 .product-rich-content hr { margin: 1.5rem 0; border-color: var(--border); }
 
@@ -142,6 +168,6 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
 }
