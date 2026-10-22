@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
-import { order, supplierAccount, supplierBinding, supplierOrder } from "@/database/drizzle/schema";
+import { order, siteSetting, supplierAccount, supplierBinding, supplierOrder } from "@/database/drizzle/schema";
 import { createSupplierAdapter } from "./providers/factory";
 import { loadSupplierCredentials } from "./credentials";
 import { enqueueOrderEvent } from "@/server/email/order-events";
@@ -8,7 +8,19 @@ import { normalizeLegacyProtocolVersion, supplierOrderStateSchema } from "./sche
 import { isSupplierAccountFailureCode } from "./error";
 
 const RETRY_DELAY_MS = 5 * 60 * 1000;
-const MAX_AUTOMATIC_ATTEMPTS = 5;
+const DEFAULT_MAX_AUTOMATIC_ATTEMPTS = 5;
+
+async function resolveMaxAttempts(database: D1Database) {
+  try {
+    const db = createDrizzleDb(database);
+    const [row] = await db.select({ supplierMaxAttempts: siteSetting.supplierMaxAttempts }).from(siteSetting).where(eq(siteSetting.id, 1)).limit(1);
+    const n = Number(row?.supplierMaxAttempts);
+    if (!Number.isFinite(n) || n < 1) return DEFAULT_MAX_AUTOMATIC_ATTEMPTS;
+    return Math.min(Math.floor(n), 50);
+  } catch {
+    return DEFAULT_MAX_AUTOMATIC_ATTEMPTS;
+  }
+}
 
 type Runtime = Record<string, unknown>;
 
@@ -81,7 +93,6 @@ export async function processSupplierOrder(database: D1Database, supplierOrderId
     return { status: task.state as "failed" | "refunded" };
   }
 
-  // Hard stop: never call upstream API if ops paused auto-fulfill.
   try {
     const { getOpsKillSwitches } = await import("@/server/ops/kill-switch");
     const switches = await getOpsKillSwitches(database);
@@ -89,10 +100,8 @@ export async function processSupplierOrder(database: D1Database, supplierOrderId
       return { status: "pending" as const, errorCode: "auto_fulfill_paused" };
     }
   } catch {
-    // If kill-switch read fails, continue with PAID check below rather than fail open to API.
   }
 
-  // Hard stop: linked storefront order must be PAID before any supplier debit.
   if (task.orderId != null) {
     const [paidOrder] = await db
       .select({ paymentStatus: order.paymentStatus, status: order.status })
@@ -104,7 +113,8 @@ export async function processSupplierOrder(database: D1Database, supplierOrderId
     }
   }
 
-  if ((task.attemptCount ?? 0) >= MAX_AUTOMATIC_ATTEMPTS) {
+  const maxAttempts = await resolveMaxAttempts(database);
+  if ((task.attemptCount ?? 0) >= maxAttempts) {
     return failTask(db, task.id, "supplier_max_attempts", true);
   }
 
@@ -177,7 +187,6 @@ export async function processSupplierOrder(database: D1Database, supplierOrderId
 }
 
 export async function processPendingSupplierOrders(database: D1Database, runtime: Runtime) {
-  // Global pause: skip the whole batch so pending tasks stay queued until re-enabled.
   try {
     const { getOpsKillSwitches } = await import("@/server/ops/kill-switch");
     const switches = await getOpsKillSwitches(database);
@@ -185,7 +194,6 @@ export async function processPendingSupplierOrders(database: D1Database, runtime
       return { processed: 0, failed: 0, paused: true as const };
     }
   } catch {
-    // Fall through: individual processSupplierOrder still re-checks PAID.
   }
 
   const db = createDrizzleDb(database);
