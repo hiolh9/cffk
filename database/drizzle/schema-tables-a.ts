@@ -97,6 +97,10 @@ export const siteSetting = sqliteTable("siteSetting", {
   headCode: text("headCode"),
   footerCode: text("footerCode"),
   registrationEnabled: integer("registrationEnabled", { mode: "boolean" }).notNull().default(false),
+  /** When false, storefront cannot create new paid/free orders. */
+  checkoutEnabled: integer("checkoutEnabled", { mode: "boolean" }).notNull().default(true),
+  /** When false, cron will not call supplier APIs or run local auto-delivery. */
+  autoFulfillEnabled: integer("autoFulfillEnabled", { mode: "boolean" }).notNull().default(true),
   timezone: text("timezone").notNull().default("Asia/Shanghai"),
   createdAt,
   updatedAt,
