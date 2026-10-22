@@ -29,7 +29,7 @@ export const errorMessagesPart1: Record<string, string> = {
 
   CATEGORY_NAME_REQUIRED: "分类名称不能为空。",
   CATEGORY_NAME_TOO_LONG: "分类名称不能超过 80 个字符。",
-  CATEGORY_SLUG_INVALID: "分类 Slug 无效。",
+  CATEGORY_SLUG_INVALID: "分类外链无效。",
   CATEGORY_DESCRIPTION_TOO_LONG: "分类描述不能超过 500 个字符。",
   CATEGORY_NOT_FOUND: "分类不存在。",
   CATEGORY_HAS_PRODUCTS: "分类下仍有商品，无法删除。",
@@ -84,4 +84,12 @@ export const errorMessagesPart1: Record<string, string> = {
 
   OTP_RATE_LIMITED: "验证码发送过于频繁，请稍后再试。",
   EMAIL_CLOUDFLARE_RATE_LIMITED: "Cloudflare Email Sending 已限流，系统将稍后重试。",
+  EMAIL_CLOUDFLARE_RECIPIENT_SUPPRESSED: "Cloudflare 已抑制该收件人地址，邮件未发送。",
+  EMAIL_CLOUDFLARE_CONTENT_TOO_LARGE: "邮件内容超过 Cloudflare Email Sending 限制。",
+  EMAIL_CLOUDFLARE_INVALID: "Cloudflare 邮件参数无效，请检查发件人、收件人和模板内容。",
+  EMAIL_CLOUDFLARE_FAILED: "Cloudflare Email Sending 暂时发送失败，系统将稍后重试。",
+  PUSH_CONFIG_UNAVAILABLE: "推送配置暂时不可用，请稍后重试。",
+  PUSH_POLICY_INVALID: "推送策略数据无效，请刷新后重试。",
+  PUSH_POLICY_CHANNEL_FORBIDDEN: "客户消息只能选择电子邮件渠道。",
+  PUSH_POLICY_CHANNEL_UNAVAILABLE: "所选推送渠道尚未接入。",
 };
