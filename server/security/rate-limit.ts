@@ -21,10 +21,10 @@ const POLICY: Record<SecurityRateAction, { limit: number; windowMs: number }> = 
   AUTH_2FA: { limit: 20, windowMs: 15 * 60_000 },
   TELEFUNC: { limit: 180, windowMs: 60_000 },
   ADMIN_TELEFUNC: { limit: 240, windowMs: 60_000 },
-  // Moderate defaults — tighten after Google login if abuse appears
-  ORDER_CREATE_IP: { limit: 20, windowMs: 15 * 60_000 },
-  ORDER_CREATE_USER: { limit: 10, windowMs: 15 * 60_000 },
-  ORDER_CREATE_DEVICE: { limit: 12, windowMs: 15 * 60_000 },
+  // Storefront checkout abuse controls (15-minute windows)
+  ORDER_CREATE_IP: { limit: 15, windowMs: 15 * 60_000 },
+  ORDER_CREATE_USER: { limit: 8, windowMs: 15 * 60_000 },
+  ORDER_CREATE_DEVICE: { limit: 10, windowMs: 15 * 60_000 },
 };
 
 function bytesToHex(bytes: Uint8Array) {
