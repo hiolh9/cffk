@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
-import { order, siteSetting, supplierAccount, supplierBinding, supplierOrder } from "@/database/drizzle/schema";
+import { order, supplierAccount, supplierBinding, supplierOrder } from "@/database/drizzle/schema";
 import { createSupplierAdapter } from "./providers/factory";
 import { loadSupplierCredentials } from "./credentials";
 import { enqueueOrderEvent } from "@/server/email/order-events";
@@ -80,6 +80,34 @@ export async function processSupplierOrder(database: D1Database, supplierOrderId
     if (task.state === "supplied") return { status: "supplied" as const };
     return { status: task.state as "failed" | "refunded" };
   }
+
+  // Hard stop: never call upstream API if ops paused auto-fulfill.
+  try {
+    const { getOpsKillSwitches } = await import("@/server/ops/kill-switch");
+    const switches = await getOpsKillSwitches(database);
+    if (!switches.autoFulfillEnabled) {
+      return { status: "pending" as const, errorCode: "auto_fulfill_paused" };
+    }
+  } catch {
+    // If kill-switch read fails, continue with PAID check below rather than fail open to API.
+  }
+
+  // Hard stop: linked storefront order must be PAID before any supplier debit.
+  if (task.orderId != null) {
+    const [paidOrder] = await db
+      .select({ paymentStatus: order.paymentStatus, status: order.status })
+      .from(order)
+      .where(eq(order.id, task.orderId))
+      .limit(1);
+    if (!paidOrder || paidOrder.paymentStatus !== "PAID") {
+      return failTask(db, task.id, "order_not_paid", true);
+    }
+  }
+
+  if ((task.attemptCount ?? 0) >= MAX_AUTOMATIC_ATTEMPTS) {
+    return failTask(db, task.id, "supplier_max_attempts", true);
+  }
+
   const [binding] = await db.select().from(supplierBinding).where(eq(supplierBinding.id, task.supplierBindingId)).limit(1);
   if (!binding) return failTask(db, task.id, "supplier_binding_missing", true);
   let account = task.selectedAccountId
@@ -149,6 +177,17 @@ export async function processSupplierOrder(database: D1Database, supplierOrderId
 }
 
 export async function processPendingSupplierOrders(database: D1Database, runtime: Runtime) {
+  // Global pause: skip the whole batch so pending tasks stay queued until re-enabled.
+  try {
+    const { getOpsKillSwitches } = await import("@/server/ops/kill-switch");
+    const switches = await getOpsKillSwitches(database);
+    if (!switches.autoFulfillEnabled) {
+      return { processed: 0, failed: 0, paused: true as const };
+    }
+  } catch {
+    // Fall through: individual processSupplierOrder still re-checks PAID.
+  }
+
   const db = createDrizzleDb(database);
   const now = new Date();
   const pending = await db.select({ id: supplierOrder.id }).from(supplierOrder).where(and(sql`${supplierOrder.state} in ('pending','processing','submitting','uncertain')`, or(isNull(supplierOrder.nextRetryAt), lte(supplierOrder.nextRetryAt, now)))).orderBy(asc(supplierOrder.id)).limit(20);

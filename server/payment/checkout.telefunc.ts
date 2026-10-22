@@ -26,7 +26,11 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
 
   await assertCheckoutAccount(database, user.id);
 
+  // Device id is required so ORDER_CREATE_DEVICE rate limits cannot be skipped.
   const deviceId = normalizeDeviceId(input.deviceId);
+  if (!deviceId) {
+    appError("DEVICE_ID_REQUIRED");
+  }
 
   await enforceSecurityRateLimit(database, {
     action: "ORDER_CREATE_IP",
@@ -37,13 +41,11 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
     clientIp: context.clientIp,
     extra: user.id,
   });
-  if (deviceId) {
-    await enforceSecurityRateLimit(database, {
-      action: "ORDER_CREATE_DEVICE",
-      clientIp: context.clientIp,
-      extra: deviceId,
-    });
-  }
+  await enforceSecurityRateLimit(database, {
+    action: "ORDER_CREATE_DEVICE",
+    clientIp: context.clientIp,
+    extra: deviceId,
+  });
 
   const { deviceId: _ignored, ...orderInput } = input;
   return requirePaymentFlowService().create(orderInput, user.id);

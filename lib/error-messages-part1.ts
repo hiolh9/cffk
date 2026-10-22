@@ -4,6 +4,8 @@ export const errorMessagesPart1: Record<string, string> = {
   ACCOUNT_DISABLED: "账号已被停用，无法下单。如有疑问请联系客服。",
   CHECKOUT_DISABLED: "下单功能已暂停，请稍后再试或联系客服。",
   EMAIL_NOT_VERIFIED: "请先完成邮箱验证后再下单。",
+  DEVICE_ID_REQUIRED: "无法识别设备，请刷新页面后重试。",
+  NEW_ACCOUNT_ORDER_LIMIT: "新注册账号 24 小时内单笔上限为 RM100，请稍后再试或联系客服。",
   ORDER_AMOUNT_LIMIT: "单笔订单金额超过站点上限，请减少数量或联系客服。",
   ORDER_DAILY_AMOUNT_LIMIT: "今日累计下单金额已达上限，请明日再试或联系客服。",
   ORDER_DAILY_COUNT_LIMIT: "今日下单次数已达上限，请明日再试或联系客服。",

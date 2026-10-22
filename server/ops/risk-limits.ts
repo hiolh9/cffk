@@ -16,6 +16,10 @@ const DEFAULTS: OpsRiskLimits = {
   maxDailyUserOrders: 50,
 };
 
+/** New accounts (< 24h) get a lower single-order ceiling to slow card-testing / burner accounts. */
+const NEW_ACCOUNT_WINDOW_MS = 24 * 60 * 60_000;
+const NEW_ACCOUNT_MAX_ORDER_CENTS = 10_000; // RM 100
+
 function nonNegInt(value: unknown, fallback: number) {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n) || n < 0) return fallback;
@@ -49,12 +53,26 @@ function startOfUtcDay(now = new Date()) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+function toMs(value: unknown): number | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 export async function enforceOrderRiskLimits(
   database: D1Database,
   input: { ownerUserId: string | null; amountCents: number; now?: Date },
 ) {
   const limits = await getOpsRiskLimits(database);
   const amount = Math.max(0, Math.floor(input.amountCents));
+  const now = input.now ?? new Date();
 
   if (limits.maxOrderAmountCents > 0 && amount > limits.maxOrderAmountCents) {
     appError("ORDER_AMOUNT_LIMIT");
@@ -63,7 +81,21 @@ export async function enforceOrderRiskLimits(
   if (!input.ownerUserId) return;
 
   const db = createDrizzleDb(database);
-  const since = startOfUtcDay(input.now);
+
+  // New-account ceiling: burner accounts cannot place large orders in the first 24h.
+  const [account] = await db
+    .select({ createdAt: user.createdAt })
+    .from(user)
+    .where(eq(user.id, input.ownerUserId))
+    .limit(1);
+  const createdMs = toMs(account?.createdAt);
+  if (createdMs != null && now.getTime() - createdMs < NEW_ACCOUNT_WINDOW_MS) {
+    if (amount > NEW_ACCOUNT_MAX_ORDER_CENTS) {
+      appError("NEW_ACCOUNT_ORDER_LIMIT");
+    }
+  }
+
+  const since = startOfUtcDay(now);
 
   const [agg] = await db
     .select({
