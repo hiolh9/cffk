@@ -3,23 +3,24 @@ import { createDrizzleDb } from "@/database/drizzle";
 import { order, siteSetting, user } from "@/database/drizzle/schema";
 import { appError } from "@/lib/app-error";
 
-/** Amounts are integer sen (MYR cents). 0 = unlimited. */
+/** Amounts are integer sen (MYR cents). 0 = unlimited for amount/count caps. */
 export type OpsRiskLimits = {
   maxOrderAmountCents: number;
   maxDailyUserAmountCents: number;
   maxDailyUserOrders: number;
+  newAccountWindowHours: number;
+  newAccountMaxOrderCents: number;
+  newAccountMaxOrders: number;
 };
 
 const DEFAULTS: OpsRiskLimits = {
   maxOrderAmountCents: 50_000,
   maxDailyUserAmountCents: 200_000,
   maxDailyUserOrders: 50,
+  newAccountWindowHours: 24,
+  newAccountMaxOrderCents: 10_000,
+  newAccountMaxOrders: 3,
 };
-
-/** New accounts (< 24h) get tighter ceilings to slow burner / card-test abuse. */
-const NEW_ACCOUNT_WINDOW_MS = 24 * 60 * 60_000;
-const NEW_ACCOUNT_MAX_ORDER_CENTS = 10_000; // RM 100
-const NEW_ACCOUNT_MAX_ORDERS = 3;
 
 function nonNegInt(value: unknown, fallback: number) {
   const n = typeof value === "number" ? value : Number(value);
@@ -35,6 +36,9 @@ export async function getOpsRiskLimits(database: D1Database): Promise<OpsRiskLim
         maxOrderAmountCents: siteSetting.maxOrderAmountCents,
         maxDailyUserAmountCents: siteSetting.maxDailyUserAmountCents,
         maxDailyUserOrders: siteSetting.maxDailyUserOrders,
+        newAccountWindowHours: siteSetting.newAccountWindowHours,
+        newAccountMaxOrderCents: siteSetting.newAccountMaxOrderCents,
+        newAccountMaxOrders: siteSetting.newAccountMaxOrders,
       })
       .from(siteSetting)
       .where(eq(siteSetting.id, 1))
@@ -44,6 +48,9 @@ export async function getOpsRiskLimits(database: D1Database): Promise<OpsRiskLim
       maxOrderAmountCents: nonNegInt(row.maxOrderAmountCents, DEFAULTS.maxOrderAmountCents),
       maxDailyUserAmountCents: nonNegInt(row.maxDailyUserAmountCents, DEFAULTS.maxDailyUserAmountCents),
       maxDailyUserOrders: nonNegInt(row.maxDailyUserOrders, DEFAULTS.maxDailyUserOrders),
+      newAccountWindowHours: nonNegInt(row.newAccountWindowHours, DEFAULTS.newAccountWindowHours),
+      newAccountMaxOrderCents: nonNegInt(row.newAccountMaxOrderCents, DEFAULTS.newAccountMaxOrderCents),
+      newAccountMaxOrders: nonNegInt(row.newAccountMaxOrders, DEFAULTS.newAccountMaxOrders),
     };
   } catch {
     return { ...DEFAULTS };
@@ -89,14 +96,15 @@ export async function enforceOrderRiskLimits(
     .where(eq(user.id, input.ownerUserId))
     .limit(1);
   const createdMs = toMs(account?.createdAt);
-  const isNewAccount = createdMs != null && now.getTime() - createdMs < NEW_ACCOUNT_WINDOW_MS;
+  const windowMs = Math.max(0, limits.newAccountWindowHours) * 60 * 60_000;
+  const isNewAccount = windowMs > 0 && createdMs != null && now.getTime() - createdMs < windowMs;
 
-  if (isNewAccount && amount > NEW_ACCOUNT_MAX_ORDER_CENTS) {
+  if (isNewAccount && limits.newAccountMaxOrderCents > 0 && amount > limits.newAccountMaxOrderCents) {
     appError("NEW_ACCOUNT_ORDER_LIMIT");
   }
 
-  if (isNewAccount) {
-    const sinceReg = new Date(createdMs!);
+  if (isNewAccount && limits.newAccountMaxOrders > 0 && createdMs != null) {
+    const sinceReg = new Date(createdMs);
     const [newAgg] = await db
       .select({ orderCount: sql<number>`count(*)` })
       .from(order)
@@ -107,7 +115,7 @@ export async function enforceOrderRiskLimits(
           inArray(order.status, ["PENDING", "PAID", "DELIVERED"]),
         ),
       );
-    if (Number(newAgg?.orderCount ?? 0) >= NEW_ACCOUNT_MAX_ORDERS) {
+    if (Number(newAgg?.orderCount ?? 0) >= limits.newAccountMaxOrders) {
       appError("NEW_ACCOUNT_ORDER_COUNT_LIMIT");
     }
   }

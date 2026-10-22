@@ -2,11 +2,11 @@ import { normalizeSiteTimezone } from "@/lib/site-timezone";
 
 const URL_PROTOCOLS = new Set(["http:", "https:"]);
 
-/** Integer >= 0; invalid values fall back to default. Cap at 100 million sen (RM 1M). */
-function clampLimit(value: unknown, fallback: number) {
+/** Integer >= 0; invalid values fall back to default. Cap at 100 million sen (RM 1M) for money fields. */
+function clampLimit(value: unknown, fallback: number, max = 100_000_000) {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n) || n < 0) return fallback;
-  return Math.min(Math.floor(n), 100_000_000);
+  return Math.min(Math.floor(n), max);
 }
 
 function optionalText(value: unknown, field: string, maxLength: number) {
@@ -48,6 +48,19 @@ export type SiteSettingsInput = {
   maxOrderAmountCents?: number;
   maxDailyUserAmountCents?: number;
   maxDailyUserOrders?: number;
+  newAccountWindowHours?: number;
+  newAccountMaxOrderCents?: number;
+  newAccountMaxOrders?: number;
+  ipMultiAccountMaxUsers?: number;
+  ipMultiAccountWindowMinutes?: number;
+  orderCreateIpLimit?: number;
+  orderCreateUserLimit?: number;
+  orderCreateDeviceLimit?: number;
+  orderCreateWindowMinutes?: number;
+  alertPaidOrderBurst?: number;
+  alertSupplierFailBurst?: number;
+  supplierMaxAttempts?: number;
+  stepUpMinutes?: number;
   timezone: string;
 };
 
@@ -80,7 +93,20 @@ export function validateSiteSettingsInput(input: SiteSettingsInput) {
     autoFulfillEnabled: input.autoFulfillEnabled !== false,
     maxOrderAmountCents: clampLimit(input.maxOrderAmountCents, 50_000),
     maxDailyUserAmountCents: clampLimit(input.maxDailyUserAmountCents, 200_000),
-    maxDailyUserOrders: clampLimit(input.maxDailyUserOrders, 50),
+    maxDailyUserOrders: clampLimit(input.maxDailyUserOrders, 50, 10_000),
+    newAccountWindowHours: clampLimit(input.newAccountWindowHours, 24, 720),
+    newAccountMaxOrderCents: clampLimit(input.newAccountMaxOrderCents, 10_000),
+    newAccountMaxOrders: clampLimit(input.newAccountMaxOrders, 3, 1_000),
+    ipMultiAccountMaxUsers: clampLimit(input.ipMultiAccountMaxUsers, 6, 1_000),
+    ipMultiAccountWindowMinutes: clampLimit(input.ipMultiAccountWindowMinutes, 60, 10_080),
+    orderCreateIpLimit: clampLimit(input.orderCreateIpLimit, 12, 10_000),
+    orderCreateUserLimit: clampLimit(input.orderCreateUserLimit, 6, 10_000),
+    orderCreateDeviceLimit: clampLimit(input.orderCreateDeviceLimit, 8, 10_000),
+    orderCreateWindowMinutes: clampLimit(input.orderCreateWindowMinutes, 15, 1_440),
+    alertPaidOrderBurst: clampLimit(input.alertPaidOrderBurst, 20, 10_000),
+    alertSupplierFailBurst: clampLimit(input.alertSupplierFailBurst, 5, 10_000),
+    supplierMaxAttempts: clampLimit(input.supplierMaxAttempts, 5, 50),
+    stepUpMinutes: clampLimit(input.stepUpMinutes, 10, 120),
     timezone,
   };
 }
