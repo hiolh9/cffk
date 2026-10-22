@@ -6,7 +6,13 @@ export type SecurityRateAction =
   | "AUTH_PASSWORD_RESET"
   | "AUTH_2FA"
   | "TELEFUNC"
-  | "ADMIN_TELEFUNC";
+  | "ADMIN_TELEFUNC"
+  /** Checkout: per IP (any user) */
+  | "ORDER_CREATE_IP"
+  /** Checkout: per logged-in user + IP */
+  | "ORDER_CREATE_USER"
+  /** Checkout: per device fingerprint + IP */
+  | "ORDER_CREATE_DEVICE";
 
 const POLICY: Record<SecurityRateAction, { limit: number; windowMs: number }> = {
   AUTH_SIGN_IN: { limit: 12, windowMs: 15 * 60_000 },
@@ -15,6 +21,10 @@ const POLICY: Record<SecurityRateAction, { limit: number; windowMs: number }> = 
   AUTH_2FA: { limit: 20, windowMs: 15 * 60_000 },
   TELEFUNC: { limit: 180, windowMs: 60_000 },
   ADMIN_TELEFUNC: { limit: 240, windowMs: 60_000 },
+  // Moderate defaults — tighten after Google login if abuse appears
+  ORDER_CREATE_IP: { limit: 20, windowMs: 15 * 60_000 },
+  ORDER_CREATE_USER: { limit: 10, windowMs: 15 * 60_000 },
+  ORDER_CREATE_DEVICE: { limit: 12, windowMs: 15 * 60_000 },
 };
 
 function bytesToHex(bytes: Uint8Array) {
