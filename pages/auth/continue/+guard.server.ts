@@ -4,6 +4,7 @@ import { env } from "@/server/env";
 
 export function guard(pageContext: PageContextServer) {
   if (!pageContext.user) throw redirect("/login");
+  // Admins go to dashboard; storefront users are redirected client-side
+  // (supports ?redirect= back to product after login).
   if (pageContext.isAdmin && env.ADMIN_PATH) throw redirect(`/${env.ADMIN_PATH}/dash`);
-  throw redirect("/");
 }
