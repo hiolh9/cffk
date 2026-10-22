@@ -5,6 +5,7 @@ import { processOrderEvents } from "./email/order-events";
 import { recordScheduledMaintenanceFailure } from "./scheduled-task-log";
 import { reconcilePendingAlipayPayments } from "./payment/reconciliation-service";
 import { processPendingSupplierOrders } from "./supplier/process";
+import { getOpsKillSwitches } from "./ops/kill-switch";
 import { runSupplierMaintenance } from "./supplier/maintenance";
 
 export const ORDER_PAYMENT_TIMEOUT_MS = 30 * 60 * 1000;
@@ -36,9 +37,12 @@ export async function runScheduledMaintenance(database: D1Database, runtime: Rec
 
     const cutoff = new Date(now.getTime() - ORDER_PAYMENT_TIMEOUT_MS);
     attemptedTasks += 2;
+    const switches = await getOpsKillSwitches(database);
     const [orderCleanupResult, automaticDeliveryResult] = await Promise.allSettled([
       closeExpiredPendingOrders(database, cutoff, 100, reconciliation?.closeableOrderIds ?? []),
-      processPendingAutomaticDeliveries(database),
+      switches.autoFulfillEnabled
+        ? processPendingAutomaticDeliveries(database)
+        : Promise.resolve({ attempted: 0, delivered: 0, failed: 0, paused: true as const }),
     ]);
     if (orderCleanupResult.status === "fulfilled") {
       orderCleanup = orderCleanupResult.value;
@@ -69,8 +73,13 @@ export async function runScheduledMaintenance(database: D1Database, runtime: Rec
 
   attemptedTasks += 1;
   try {
-    supplierOrders = await processPendingSupplierOrders(database, runtime);
-    if (supplierOrders.failed > 0) failures.push(`供应商采购失败: ${supplierOrders.failed}`);
+    const switchesForSupplier = await getOpsKillSwitches(database);
+    if (!switchesForSupplier.autoFulfillEnabled) {
+      supplierOrders = { processed: 0, failed: 0, paused: true as const };
+    } else {
+      supplierOrders = await processPendingSupplierOrders(database, runtime);
+      if (supplierOrders.failed > 0) failures.push(`供应商采购失败: ${supplierOrders.failed}`);
+    }
   } catch (cause) {
     failedTasks += 1;
     failures.push(`供应商采购: ${errorMessage(cause)}`);
