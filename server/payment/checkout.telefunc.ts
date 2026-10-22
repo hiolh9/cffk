@@ -1,9 +1,8 @@
-import { eq } from "drizzle-orm";
 import { telefuncAction } from "@/server/telefunc-action";
 import { requireUser } from "@/server/telefunc-context";
 import { enforceSecurityRateLimit } from "@/server/security/rate-limit";
 import { getOpsKillSwitches } from "@/server/ops/kill-switch";
-import { user as userTable } from "@/database/drizzle/schema";
+import { assertCheckoutAccount } from "@/server/ops/risk-limits";
 import { appError } from "@/lib/app-error";
 import { requirePaymentFlowService } from "./flow-service";
 import type { PaymentCreateInput } from "./types";
@@ -18,21 +17,14 @@ function normalizeDeviceId(value: unknown): string | null {
 }
 
 async function internalOnCreatePayment(input: PaymentCreateInput) {
-  const { user, database, context, db } = requireUser();
+  const { user, database, context } = requireUser();
 
   const switches = await getOpsKillSwitches(database);
   if (!switches.checkoutEnabled) {
     appError("CHECKOUT_DISABLED");
   }
 
-  const [account] = await db
-    .select({ disabledAt: userTable.disabledAt })
-    .from(userTable)
-    .where(eq(userTable.id, user.id))
-    .limit(1);
-  if (account?.disabledAt) {
-    appError("ACCOUNT_DISABLED");
-  }
+  await assertCheckoutAccount(database, user.id);
 
   const deviceId = normalizeDeviceId(input.deviceId);
 
