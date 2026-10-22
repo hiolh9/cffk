@@ -1,6 +1,6 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
-import { pushChannelConfig, supplierAccount, supplierOrder } from "@/database/drizzle/schema";
+import { order, pushChannelConfig, supplierAccount, supplierOrder } from "@/database/drizzle/schema";
 import { parseTelegramProviderConfig, sendTelegramPush } from "@/server/push/telegram-provider";
 import { reportUnexpectedServerError } from "@/server/error-handling";
 
@@ -53,6 +53,22 @@ export async function runOpsHealthAlerts(database: D1Database, now = new Date())
     results.push({ key: "supplier-fail-burst", ...r });
   }
 
+  // Paid-order burst: possible card testing or promo abuse after gateway pass.
+  const [paidAgg] = await db
+    .select({ paid: sql<number>`count(*)` })
+    .from(order)
+    .where(and(eq(order.paymentStatus, "PAID"), gte(order.paidAt, since)));
+  const paid = Number(paidAgg?.paid ?? 0);
+  if (paid >= 20) {
+    const r = await trySendAdminTelegram(
+      database,
+      "支付成功订单激增",
+      `最近 15 分钟有 ${paid} 笔订单标记为已支付。请核对网关账单与库存/代充预存款，必要时暂停下单或自动代充。`,
+      "paid-order-burst",
+    );
+    results.push({ key: "paid-order-burst", ...r });
+  }
+
   const accounts = await db
     .select({
       name: supplierAccount.name,
@@ -87,5 +103,5 @@ export async function runOpsHealthAlerts(database: D1Database, now = new Date())
     results.push({ key: "supplier-balance-low", ...r });
   }
 
-  return { failed, lowBalanceAccounts: low.length, results };
+  return { failed, paid, lowBalanceAccounts: low.length, results };
 }

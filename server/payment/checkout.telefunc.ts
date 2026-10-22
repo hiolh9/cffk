@@ -1,6 +1,7 @@
 import { telefuncAction } from "@/server/telefunc-action";
 import { requireUser } from "@/server/telefunc-context";
 import { enforceSecurityRateLimit } from "@/server/security/rate-limit";
+import { enforceIpMultiAccountLimit } from "@/server/security/ip-multi-account";
 import { getOpsKillSwitches } from "@/server/ops/kill-switch";
 import { assertCheckoutAccount } from "@/server/ops/risk-limits";
 import { appError } from "@/lib/app-error";
@@ -26,7 +27,6 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
 
   await assertCheckoutAccount(database, user.id);
 
-  // Device id is required so ORDER_CREATE_DEVICE rate limits cannot be skipped.
   const deviceId = normalizeDeviceId(input.deviceId);
   if (!deviceId) {
     appError("DEVICE_ID_REQUIRED");
@@ -45,6 +45,10 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
     action: "ORDER_CREATE_DEVICE",
     clientIp: context.clientIp,
     extra: deviceId,
+  });
+  await enforceIpMultiAccountLimit(database, {
+    clientIp: context.clientIp,
+    userId: user.id,
   });
 
   const { deviceId: _ignored, ...orderInput } = input;

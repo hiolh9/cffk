@@ -16,9 +16,10 @@ const DEFAULTS: OpsRiskLimits = {
   maxDailyUserOrders: 50,
 };
 
-/** New accounts (< 24h) get a lower single-order ceiling to slow card-testing / burner accounts. */
+/** New accounts (< 24h) get tighter ceilings to slow burner / card-test abuse. */
 const NEW_ACCOUNT_WINDOW_MS = 24 * 60 * 60_000;
 const NEW_ACCOUNT_MAX_ORDER_CENTS = 10_000; // RM 100
+const NEW_ACCOUNT_MAX_ORDERS = 3;
 
 function nonNegInt(value: unknown, fallback: number) {
   const n = typeof value === "number" ? value : Number(value);
@@ -82,16 +83,32 @@ export async function enforceOrderRiskLimits(
 
   const db = createDrizzleDb(database);
 
-  // New-account ceiling: burner accounts cannot place large orders in the first 24h.
   const [account] = await db
     .select({ createdAt: user.createdAt })
     .from(user)
     .where(eq(user.id, input.ownerUserId))
     .limit(1);
   const createdMs = toMs(account?.createdAt);
-  if (createdMs != null && now.getTime() - createdMs < NEW_ACCOUNT_WINDOW_MS) {
-    if (amount > NEW_ACCOUNT_MAX_ORDER_CENTS) {
-      appError("NEW_ACCOUNT_ORDER_LIMIT");
+  const isNewAccount = createdMs != null && now.getTime() - createdMs < NEW_ACCOUNT_WINDOW_MS;
+
+  if (isNewAccount && amount > NEW_ACCOUNT_MAX_ORDER_CENTS) {
+    appError("NEW_ACCOUNT_ORDER_LIMIT");
+  }
+
+  if (isNewAccount) {
+    const sinceReg = new Date(createdMs!);
+    const [newAgg] = await db
+      .select({ orderCount: sql<number>`count(*)` })
+      .from(order)
+      .where(
+        and(
+          eq(order.ownerUserId, input.ownerUserId),
+          gte(order.createdAt, sinceReg),
+          inArray(order.status, ["PENDING", "PAID", "DELIVERED"]),
+        ),
+      );
+    if (Number(newAgg?.orderCount ?? 0) >= NEW_ACCOUNT_MAX_ORDERS) {
+      appError("NEW_ACCOUNT_ORDER_COUNT_LIMIT");
     }
   }
 

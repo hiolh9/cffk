@@ -7,6 +7,7 @@ import { dateBoundaryInTimezone } from "@/lib/site-timezone";
 import { notifyOrderEmailEvents } from "@/server/email/order-events";
 import { getSiteSettings } from "@/server/site/public-settings";
 import { requireAdminSecure } from "@/server/telefunc-context";
+import { assertStepUp } from "@/server/security/step-up";
 import type { AddressSnapshot } from "@/server/payment/types";
 import { closePendingOrder, deliverPaidOrder } from "./service";
 import { PaymentFlowService } from "@/server/payment/flow-service";
@@ -72,8 +73,10 @@ async function internalOnCloseAdminOrder(input: { orderId: number }) {
   return record;
 }
 
+/** Manual mark-paid / replenish triggers supplier debit — require fresh step-up. */
 async function internalOnReplenishAdminOrder(input: { orderId: number }) {
-  const { database, runtime, db } = await requireAdminSecure();
+  const { database, runtime, db, adminUserId } = await requireAdminSecure();
+  await assertStepUp(database, adminUserId);
   if (!input || typeof input !== "object" || !Number.isInteger(input.orderId) || input.orderId <= 0) appError("ORDER_ID_INVALID");
   const [record] = await db.select({ id: order.id, orderNo: order.orderNo, status: order.status, paymentStatus: order.paymentStatus }).from(order).where(eq(order.id, input.orderId)).limit(1);
   if (!record) appError("ORDER_NOT_FOUND");
@@ -86,7 +89,8 @@ async function internalOnReplenishAdminOrder(input: { orderId: number }) {
 }
 
 async function internalOnRetryAutomaticDelivery(input: { orderId: number }) {
-  const { database, runtime, db } = await requireAdminSecure();
+  const { database, runtime, db, adminUserId } = await requireAdminSecure();
+  await assertStepUp(database, adminUserId);
   const [snapshot] = await db.select({ fulfillmentSource: order.fulfillmentSourceSnapshot }).from(order).where(eq(order.id, input.orderId)).limit(1);
   if (!snapshot) appError("ORDER_NOT_FOUND");
   if (snapshot.fulfillmentSource === "SUPPLIER") {
@@ -102,7 +106,8 @@ async function internalOnRetryAutomaticDelivery(input: { orderId: number }) {
 }
 
 async function internalOnRecordManualDelivery(input: { orderId: number; content: string; failed?: boolean }) {
-  const { database, runtime, db } = await requireAdminSecure();
+  const { database, runtime, db, adminUserId } = await requireAdminSecure();
+  await assertStepUp(database, adminUserId);
   if (!input || !Number.isInteger(input.orderId) || input.orderId <= 0) appError("ORDER_ID_INVALID");
   const content = String(input.content ?? "").trim();
   if (!content || content.length > 10000) appError("DELIVERY_CONTENT_INVALID");

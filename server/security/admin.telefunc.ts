@@ -6,8 +6,9 @@ import { appError } from "@/lib/app-error";
 import { requireAdmin, requireAdminSecure } from "@/server/telefunc-context";
 import { env } from "@/server/env";
 import { getTurnstileConfig } from "@/lib/turnstile-config";
-import { grantStepUp } from "@/server/security/step-up";
+import { grantStepUp, STEP_UP_TTL_MINUTES } from "@/server/security/step-up";
 import { getAdminIpAllowlist } from "@/server/security/admin-ip";
+import { IP_MULTI_ACCOUNT_POLICY } from "@/server/security/ip-multi-account";
 
 async function internalOnGetSecurityStatus() {
   // Intentionally requireAdmin (not Secure) so admins can open this page before enabling 2FA.
@@ -27,7 +28,9 @@ async function internalOnGetSecurityStatus() {
       credentialsEncryptedAtRest: true,
       adminIpAllowlistConfigured: getAdminIpAllowlist().length > 0,
       sessionHours: 8,
-      stepUpMinutes: 15,
+      stepUpMinutes: STEP_UP_TTL_MINUTES,
+      ipMultiAccountMaxUsers: IP_MULTI_ACCOUNT_POLICY.maxDistinctUsers,
+      ipMultiAccountWindowMinutes: IP_MULTI_ACCOUNT_POLICY.windowMinutes,
     },
     turnstile: {
       siteKey: turnstile.siteKey,
@@ -43,7 +46,7 @@ export const onGetSecurityStatus = telefuncAction(internalOnGetSecurityStatus);
 async function internalOnGrantStepUp() {
   const { database, adminUserId } = await requireAdminSecure();
   await grantStepUp(database, adminUserId);
-  return { ok: true, validMinutes: 15 };
+  return { ok: true, validMinutes: STEP_UP_TTL_MINUTES };
 }
 
 export const onGrantStepUp = telefuncAction(internalOnGrantStepUp);

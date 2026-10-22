@@ -65,6 +65,7 @@ export const onSaveSupplierAccount = telefuncAction(async (input: unknown) => {
 
 export const onSetSupplierAccountEnabled = telefuncAction(async (input: unknown) => {
   const { database, db, adminUserId } = await requireAdminSecure();
+  await assertStepUp(database, adminUserId);
   const parsed = supplierAccountEnabledSchema.safeParse(input);
   if (!parsed.success) appError("SUPPLIER_ACCOUNT_INPUT_INVALID");
   const [updated] = await db.update(supplierAccount).set({ enabled: parsed.data.enabled, updatedAt: new Date() }).where(eq(supplierAccount.id, parsed.data.id)).returning();

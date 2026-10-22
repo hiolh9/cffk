@@ -1,10 +1,10 @@
 /**
  * Short-lived step-up confirmation for sensitive admin mutations
- * (credential changes, account deletion, etc.).
- * Granted automatically on successful login; valid ~15 minutes.
+ * (credential changes, account deletion, manual mark-paid, etc.).
+ * Granted automatically on successful login; valid ~10 minutes.
  */
 
-const STEP_UP_TTL_MS = 15 * 60_000;
+const STEP_UP_TTL_MS = 10 * 60_000;
 
 function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
