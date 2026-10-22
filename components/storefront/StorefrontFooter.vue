@@ -1,10 +1,10 @@
 <template>
-  <footer class="mt-auto border-t border-border/70 bg-gradient-to-b from-muted/30 to-muted/60">
+  <footer class="mt-auto border-t border-border/70 bg-muted/40">
     <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         <div class="min-w-0 space-y-3">
           <div class="flex items-center gap-2.5">
-            
+            <span class="flex size-9 items-center justify-center rounded-xl bg-primary text-xs font-bold text-primary-foreground shadow-sm">SP</span>
             <span class="text-sm font-semibold text-foreground">Sparkpay Digital Services</span>
           </div>
           <p v-if="site.footerText" class="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
@@ -46,7 +46,7 @@
               href="https://wa.me/60109349681"
               target="_blank"
               rel="noopener noreferrer"
-              class="inline-flex h-10 items-center gap-2 rounded-full brand-gradient px-4 text-sm font-medium text-white shadow-sm shadow-brand/20"
+              class="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
             >
               <HeadphonesIcon class="size-4" />
               WhatsApp

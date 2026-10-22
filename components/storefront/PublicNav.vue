@@ -54,7 +54,7 @@
     </Button>
 
     <template v-if="!user">
-      <Button size="sm" class="brand-gradient ml-1 border-0 text-white shadow-sm shadow-brand/20 hover:opacity-95" as-child>
+      <Button size="sm" class="ml-1 border-0 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90" as-child>
         <a href="/login">{{ messages.nav.signIn }}</a>
       </Button>
     </template>
@@ -69,7 +69,7 @@
             :aria-label="t(messages.nav.accountMenu, { name: currentUserName })"
           >
             <Avatar class="size-8 ring-2 ring-brand/25">
-              <AvatarFallback class="brand-gradient text-xs font-semibold text-white">{{ userInitials }}</AvatarFallback>
+              <AvatarFallback class="bg-primary text-xs font-semibold text-primary-foreground">{{ userInitials }}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
