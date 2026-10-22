@@ -19,6 +19,11 @@ export async function createSupplierOrder(database: D1Database, orderId: number)
   if (record.paymentStatus !== "PAID" || record.fulfillmentSource !== "SUPPLIER") return null;
   if (record.productSkuId === null) return null;
 
+  const { getOpsKillSwitches } = await import("@/server/ops/kill-switch");
+  const switches = await getOpsKillSwitches(database);
+  // Pause enqueue so paid orders wait until ops re-enables auto fulfill.
+  if (!switches.autoFulfillEnabled) return null;
+
   const [binding] = await db.select({
     id: supplierBinding.id,
     provider: supplierBinding.provider,

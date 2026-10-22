@@ -36,6 +36,10 @@ export type SiteSettingsInput = {
   headCode?: string | null;
   footerCode?: string | null;
   registrationEnabled?: boolean;
+  /** false = reject all new storefront orders */
+  checkoutEnabled?: boolean;
+  /** false = pause supplier API + local auto-delivery cron */
+  autoFulfillEnabled?: boolean;
   timezone: string;
 };
 
@@ -64,6 +68,8 @@ export function validateSiteSettingsInput(input: SiteSettingsInput) {
     headCode: optionalText(input.headCode, "SITE_HEAD_CODE", 20_000),
     footerCode: optionalText(input.footerCode, "SITE_FOOTER_CODE", 20_000),
     registrationEnabled: input.registrationEnabled === true,
+    checkoutEnabled: input.checkoutEnabled !== false,
+    autoFulfillEnabled: input.autoFulfillEnabled !== false,
     timezone,
   };
 }

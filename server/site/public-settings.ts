@@ -41,6 +41,8 @@ const defaultSettings: SiteSettingRecord = {
   headCode: null,
   footerCode: null,
   registrationEnabled: false,
+  checkoutEnabled: true,
+  autoFulfillEnabled: true,
   timezone: "Asia/Shanghai",
   createdAt: new Date(0),
   updatedAt: new Date(0),
