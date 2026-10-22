@@ -31,10 +31,8 @@ export type PublicCatalog = {
     coverImage: string | null;
     price: string;
     deliveryType: "CARD_AUTO" | "FIXED_CARD" | "MANUAL" | "EXPRESS" | "SUPPLIER";
-
     physicalStock: number | null;
     availableStock: number | null;
-
     minBuy: number;
     maxBuy: number;
   }>;
@@ -44,8 +42,9 @@ export type PublicProductDetail = PublicCatalog["products"][number] & {
   description: string | null;
   purchaseNote: string | null;
   manualDeliveryHint: string | null;
+  ratingValue: string | null;
+  reviewCount: number | null;
   skus: PublicSku[];
-
 };
 
 export async function getPublicProductDetail(database: D1Database, slug: string): Promise<PublicProductDetail | null> {
@@ -64,6 +63,8 @@ export async function getPublicProductDetail(database: D1Database, slug: string)
       description: productV2.description,
       purchaseNote: productV2.purchaseNote,
       manualDeliveryHint: productV2.manualDeliveryHint,
+      ratingValue: productV2.ratingValue,
+      reviewCount: productV2.reviewCount,
       categoryName: category.name,
     })
     .from(productV2)
@@ -92,7 +93,6 @@ async function countAvailableCardStockBySku(db: ReturnType<typeof createDrizzleD
   const [result] = await db.select({ count: sql<number>`count(*)` }).from(card).where(and(eq(card.productSkuId, skuId), eq(card.status, "UNUSED")));
   return result?.count ?? 0;
 }
-
 
 export async function getPublicCatalog(database: D1Database): Promise<PublicCatalog> {
   const db = createDrizzleDb(database);

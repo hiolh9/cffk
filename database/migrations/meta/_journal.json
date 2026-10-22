@@ -43,6 +43,13 @@
       "when": 1792550000000,
       "tag": "0005_cogs_fx_split",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792700000000,
+      "tag": "0006_product_seo_rating",
+      "breakpoints": true
     }
   ]
 }
