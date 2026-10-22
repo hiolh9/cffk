@@ -4,7 +4,7 @@
       <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         <div class="min-w-0 space-y-3">
           <div class="flex items-center gap-2.5">
-            <span class="brand-gradient flex size-9 items-center justify-center rounded-xl text-xs font-bold text-white shadow-sm">SP</span>
+            
             <span class="text-sm font-semibold text-foreground">Sparkpay Digital Services</span>
           </div>
           <p v-if="site.footerText" class="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
