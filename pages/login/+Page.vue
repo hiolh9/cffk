@@ -121,5 +121,22 @@ const submit = handleSubmit(async (input) => {
   }
 });
 
-onMounted(() => { void loadTurnstile().catch(() => { formError.value = messages.value.auth.login.captchaLoadFailed; }); });
+onMounted(() => {
+  try {
+    const redirect = new URLSearchParams(window.location.search).get("redirect")?.trim();
+    if (
+      redirect
+      && redirect.startsWith("/")
+      && !redirect.startsWith("//")
+      && !redirect.startsWith("/login")
+      && !redirect.startsWith("/signup")
+      && !redirect.startsWith("/auth/")
+    ) {
+      sessionStorage.setItem("auth_redirect", redirect);
+    }
+  } catch {
+    /* ignore storage errors */
+  }
+  void loadTurnstile().catch(() => { formError.value = messages.value.auth.login.captchaLoadFailed; });
+});
 </script>
