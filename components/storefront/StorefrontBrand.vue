@@ -3,7 +3,7 @@
     <span class="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10">
       <img :src="brandLogoUrl" :alt="`${siteName} Logo`" class="size-full object-contain" />
     </span>
-    <span class="brand-text-gradient truncate text-base font-extrabold tracking-tight sm:text-[1.05rem]" style="font-weight:700">{{ siteName }}</span>
+    <span class="truncate text-base font-bold tracking-tight text-brand sm:text-[1.05rem]">{{ siteName }}</span>
   </a>
 </template>
 
