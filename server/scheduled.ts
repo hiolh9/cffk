@@ -6,6 +6,7 @@ import { recordScheduledMaintenanceFailure } from "./scheduled-task-log";
 import { reconcilePendingAlipayPayments } from "./payment/reconciliation-service";
 import { processPendingSupplierOrders } from "./supplier/process";
 import { getOpsKillSwitches } from "./ops/kill-switch";
+import { runOpsHealthAlerts } from "./ops/ops-alert";
 import { runSupplierMaintenance } from "./supplier/maintenance";
 
 export const ORDER_PAYMENT_TIMEOUT_MS = 30 * 60 * 1000;
@@ -126,7 +127,14 @@ export async function runScheduledMaintenance(database: D1Database, runtime: Rec
     }
   }
 
-  return { runFiveMinuteMaintenance, reconciliation, orderCleanup, automaticDelivery, supplierOrders, supplierMaintenance, orderEvents, pushRetry };
+  let opsAlerts: Awaited<ReturnType<typeof runOpsHealthAlerts>> | null = null;
+  try {
+    opsAlerts = await runOpsHealthAlerts(database, now);
+  } catch (cause) {
+    reportUnexpectedServerError("scheduled-ops-health-alerts", cause);
+  }
+
+  return { runFiveMinuteMaintenance, reconciliation, orderCleanup, automaticDelivery, supplierOrders, supplierMaintenance, orderEvents, pushRetry, opsAlerts };
 }
 
 function errorMessage(cause: unknown) {
