@@ -8,18 +8,22 @@ export type OpsRiskLimits = {
   maxOrderAmountCents: number;
   maxDailyUserAmountCents: number;
   maxDailyUserOrders: number;
+  maxHourlyUserOrders: number;
   newAccountWindowHours: number;
   newAccountMaxOrderCents: number;
   newAccountMaxOrders: number;
+  reviewOrderAmountCents: number;
 };
 
 const DEFAULTS: OpsRiskLimits = {
   maxOrderAmountCents: 50_000,
   maxDailyUserAmountCents: 200_000,
   maxDailyUserOrders: 50,
+  maxHourlyUserOrders: 10,
   newAccountWindowHours: 24,
   newAccountMaxOrderCents: 10_000,
   newAccountMaxOrders: 3,
+  reviewOrderAmountCents: 30_000,
 };
 
 function nonNegInt(value: unknown, fallback: number) {
@@ -36,6 +40,8 @@ export async function getOpsRiskLimits(database: D1Database): Promise<OpsRiskLim
         maxOrderAmountCents: siteSetting.maxOrderAmountCents,
         maxDailyUserAmountCents: siteSetting.maxDailyUserAmountCents,
         maxDailyUserOrders: siteSetting.maxDailyUserOrders,
+        maxHourlyUserOrders: siteSetting.maxHourlyUserOrders,
+        reviewOrderAmountCents: siteSetting.reviewOrderAmountCents,
         newAccountWindowHours: siteSetting.newAccountWindowHours,
         newAccountMaxOrderCents: siteSetting.newAccountMaxOrderCents,
         newAccountMaxOrders: siteSetting.newAccountMaxOrders,
@@ -48,6 +54,8 @@ export async function getOpsRiskLimits(database: D1Database): Promise<OpsRiskLim
       maxOrderAmountCents: nonNegInt(row.maxOrderAmountCents, DEFAULTS.maxOrderAmountCents),
       maxDailyUserAmountCents: nonNegInt(row.maxDailyUserAmountCents, DEFAULTS.maxDailyUserAmountCents),
       maxDailyUserOrders: nonNegInt(row.maxDailyUserOrders, DEFAULTS.maxDailyUserOrders),
+      maxHourlyUserOrders: nonNegInt((row as any).maxHourlyUserOrders, DEFAULTS.maxHourlyUserOrders),
+      reviewOrderAmountCents: nonNegInt((row as any).reviewOrderAmountCents, DEFAULTS.reviewOrderAmountCents),
       newAccountWindowHours: nonNegInt(row.newAccountWindowHours, DEFAULTS.newAccountWindowHours),
       newAccountMaxOrderCents: nonNegInt(row.newAccountMaxOrderCents, DEFAULTS.newAccountMaxOrderCents),
       newAccountMaxOrders: nonNegInt(row.newAccountMaxOrders, DEFAULTS.newAccountMaxOrders),
@@ -120,6 +128,23 @@ export async function enforceOrderRiskLimits(
     }
   }
 
+  const hourAgo = new Date(now.getTime() - 60 * 60_000);
+  if (limits.maxHourlyUserOrders > 0) {
+    const [hourAgg] = await db
+      .select({ orderCount: sql<number>`count(*)` })
+      .from(order)
+      .where(
+        and(
+          eq(order.ownerUserId, input.ownerUserId),
+          gte(order.createdAt, hourAgo),
+          inArray(order.status, ["PENDING", "PAID", "DELIVERED"]),
+        ),
+      );
+    if (Number(hourAgg?.orderCount ?? 0) >= limits.maxHourlyUserOrders) {
+      appError("ORDER_HOURLY_COUNT_LIMIT");
+    }
+  }
+
   const since = startOfUtcDay(now);
 
   const [agg] = await db
@@ -160,4 +185,9 @@ export async function assertCheckoutAccount(database: D1Database, userId: string
   if (!row) appError("AUTH_REQUIRED");
   if (row.disabledAt) appError("ACCOUNT_DISABLED");
   if (!row.emailVerified) appError("EMAIL_NOT_VERIFIED");
+}
+
+export async function getReviewOrderAmountCents(database: D1Database) {
+  const limits = await getOpsRiskLimits(database);
+  return limits.reviewOrderAmountCents;
 }
