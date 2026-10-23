@@ -138,6 +138,26 @@ export async function processSupplierOrder(database: D1Database, supplierOrderId
     } catch {
       /* missing column before migration: continue normal fulfill */
     }
+    try {
+      const { getStoredUserRiskScore, getBehaviorReviewThreshold } = await import("@/server/ops/behavior-score");
+      const [owner] = await db.select({ ownerUserId: order.ownerUserId }).from(order).where(eq(order.id, task.orderId)).limit(1);
+      if (owner?.ownerUserId) {
+        const score = await getStoredUserRiskScore(database, owner.ownerUserId);
+        const thr = await getBehaviorReviewThreshold(database);
+        if (thr > 0 && score >= thr) {
+          await db
+            .update(supplierOrder)
+            .set({
+              nextRetryAt: new Date(Date.now() + 6 * 60 * 60_000),
+              updatedAt: new Date(),
+            })
+            .where(eq(supplierOrder.id, task.id));
+          return { status: "pending" as const, errorCode: "behavior_review_hold" };
+        }
+      }
+    } catch {
+      /* behavior score optional */
+    }
   }
 
   const maxAttempts = await resolveMaxAttempts(database);
