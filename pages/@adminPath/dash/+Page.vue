@@ -2,154 +2,139 @@
   <section class="flex w-full flex-col gap-6">
     <AdminPageHeader />
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-      <Card v-for="metric in metrics" :key="metric.label" class="gap-0">
-        <CardHeader class="pb-0">
-          <CardDescription>{{ metric.label }}</CardDescription>
-          <CardTitle class="text-2xl font-semibold tabular-nums">{{ metric.value }}</CardTitle>
-        </CardHeader>
-        <CardFooter class="pt-1.5 text-sm text-muted-foreground">{{ metric.description }}</CardFooter>
-      </Card>
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div v-for="item in summaryCards" :key="item.label" class="rounded-md border bg-card p-4">
+        <p class="text-sm text-muted-foreground">{{ item.label }}</p>
+        <p class="mt-2 text-2xl font-semibold tabular-nums">{{ item.value }}</p>
+      </div>
     </div>
 
-    <Card>
-      <CardHeader class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div class="space-y-1.5">
-          <CardTitle>订单趋势</CardTitle>
-          <CardDescription>按店铺时区统计新建与已支付订单。</CardDescription>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <div class="rounded-md border bg-card p-4">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-semibold">近 14 日趋势</h2>
+            <p class="text-sm text-muted-foreground">订单量 / 已付金额（RM）</p>
+          </div>
         </div>
-        <ButtonGroup aria-label="选择统计周期">
-          <Button
-            v-for="option in rangeOptions"
-            :key="option.days"
-            size="sm"
-            :variant="selectedRange === option.days ? 'secondary' : 'outline'"
-            :aria-pressed="selectedRange === option.days"
-            @click="selectedRange = option.days"
-          >
-            {{ option.label }}
-          </Button>
-        </ButtonGroup>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer :config="chartConfig" class="h-80 min-h-65 w-full sm:h-95">
+        <div class="h-64">
           <VisXYContainer :data="visibleTrend" :margin="{ left: 8, right: 8, top: 12, bottom: 8 }">
             <VisArea
-              :x="xAccessor"
-              :y="createdOrdersAccessor"
-              :color="chartConfig.createdOrders.color"
-              :opacity="0.18"
-              :line="true"
-              :line-color="chartConfig.createdOrders.color"
-              :line-width="2"
-              curve-type="monotoneX"
+              :x="(d: TrendPoint) => d.i"
+              :y="(d: TrendPoint) => d.orders"
+              color="var(--color-chart-1)"
+              :opacity="0.25"
             />
             <VisArea
-              :x="xAccessor"
-              :y="paidOrdersAccessor"
-              :color="chartConfig.paidOrders.color"
-              :opacity="0.15"
-              :line="true"
-              :line-color="chartConfig.paidOrders.color"
-              :line-width="2"
-              curve-type="monotoneX"
+              :x="(d: TrendPoint) => d.i"
+              :y="(d: TrendPoint) => d.paidRm"
+              color="var(--color-chart-2)"
+              :opacity="0.2"
             />
             <VisAxis
               type="x"
-              :x="xAccessor"
-              :tick-format="formatAxisDate"
-              :num-ticks="axisTickCount"
-              :tick-line="false"
-              :domain-line="false"
-              :tick-text-hide-overlapping="true"
+              :tick-format="(v: number) => visibleTrend[Math.round(v)]?.label ?? ''"
+              :num-ticks="Math.min(7, visibleTrend.length)"
             />
-            <VisAxis
-              type="y"
-              :y="createdOrdersAccessor"
-              :tick-format="formatOrderCount"
-              :num-ticks="5"
-              :tick-line="false"
-              :domain-line="false"
-            />
+            <VisAxis type="y" />
             <ChartTooltip />
             <ChartCrosshair
-              :x="xAccessor"
-              :y="[createdOrdersAccessor, paidOrdersAccessor]"
-              :color="crosshairColors"
               :template="tooltipTemplate"
+              color="var(--color-chart-1)"
             />
           </VisXYContainer>
-        </ChartContainer>
-        <div class="mt-3 flex items-center justify-center gap-5 text-sm text-muted-foreground">
-          <div v-for="(item, key) in chartConfig" :key="key" class="flex items-center gap-2">
-            <span class="size-2.5 rounded-full" :style="{ backgroundColor: item.color }" />
-            {{ item.label }}
-          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      <div class="rounded-md border bg-card p-4">
+        <h2 class="text-base font-semibold">运营快照</h2>
+        <ul class="mt-4 grid gap-2 text-sm">
+          <li v-for="row in snapshotRows" :key="row.label" class="flex justify-between gap-3 border-b py-2 last:border-0">
+            <span class="text-muted-foreground">{{ row.label }}</span>
+            <span class="font-medium tabular-nums">{{ row.value }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
   </section>
 </template>
 
 <script lang="ts" setup>
-import { computed, ref } from "vue";
-import { useData } from "vike-vue/useData";
-import { VisArea, VisAxis, VisXYContainer } from "@unovis/vue";
+import { computed, onMounted, ref } from "vue";
+import { defineAsyncComponent } from "vue";
+// Async-load chart lib so it is not evaluated at Worker startup (avoids CF 10021 class-extends issues).
+const VisArea = defineAsyncComponent(() => import("@unovis/vue").then((m) => m.VisArea));
+const VisAxis = defineAsyncComponent(() => import("@unovis/vue").then((m) => m.VisAxis));
+const VisXYContainer = defineAsyncComponent(() => import("@unovis/vue").then((m) => m.VisXYContainer));
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue";
-import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  ChartContainer,
   ChartCrosshair,
   ChartTooltip,
   ChartTooltipContent,
   componentToString,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { formatDashboardTrendDate, type DashboardOrderTrendPoint, type DashboardTrendRange } from "@/lib/dashboard-trend";
-import { useSiteTimezone } from "@/lib/site-timezone";
-import type { Data } from "./+data.server";
+import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
+import { onGetDashboardSummary } from "@/server/ops/dashboard.telefunc";
 
-const data = useData<Data>();
-const timezone = useSiteTimezone();
-const selectedRange = ref<DashboardTrendRange>(30);
-const rangeOptions: Array<{ days: DashboardTrendRange; label: string }> = [
-  { days: 90, label: "最近 3 个月" },
-  { days: 30, label: "最近 30 天" },
-  { days: 7, label: "最近 7 天" },
-];
+type TrendPoint = { i: number; label: string; orders: number; paidRm: number };
+
+const loading = ref(true);
+const error = ref<string | null>(null);
+const summary = ref<Awaited<ReturnType<typeof onGetDashboardSummary>> | null>(null);
+
 const chartConfig = {
-  createdOrders: { label: "新建订单", color: "#2563eb" },
-  paidOrders: { label: "已支付订单", color: "#f97316" },
+  orders: { label: "订单", color: "var(--color-chart-1)" },
+  paidRm: { label: "已付(RM)", color: "var(--color-chart-2)" },
 } satisfies ChartConfig;
-const xAccessor = (point: DashboardOrderTrendPoint) => point.timestamp;
-const createdOrdersAccessor = (point: DashboardOrderTrendPoint) => point.createdOrders;
-const paidOrdersAccessor = (point: DashboardOrderTrendPoint) => point.paidOrders;
-const crosshairColors = (_point: DashboardOrderTrendPoint, index: number) => index === 0
-  ? chartConfig.createdOrders.color
-  : chartConfig.paidOrders.color;
+
 const tooltipTemplate = componentToString(chartConfig, ChartTooltipContent, {
-  hiddenKeys: ["date", "timestamp"],
-  labelFormatter: (value: number | Date) => formatDashboardTrendDate(Number(value), timezone.value, true),
+  valueFormatter: (v: number) => String(v),
 });
 
-const metrics = computed(() => [
-  { label: "订单总数", value: data.metrics.totalOrders, description: "全部订单" },
-  { label: "已支付订单", value: data.metrics.paidOrders, description: "支付状态为已支付" },
-  { label: "已支付金额", value: `¥${data.metrics.paidAmount}`, description: "累计实收金额" },
-  { label: "上架商品", value: data.metrics.activeProducts, description: "当前可公开展示" },
-  { label: "可用卡密", value: data.metrics.availableCards, description: "未使用自动发货库存" },
-]);
-const visibleTrend = computed(() => data.orderTrend.slice(-selectedRange.value));
-const axisTickCount = computed(() => selectedRange.value === 7 ? 7 : selectedRange.value === 30 ? 6 : 7);
+const visibleTrend = computed<TrendPoint[]>(() => {
+  const rows = summary.value?.trend ?? [];
+  return rows.map((r, i) => ({
+    i,
+    label: r.date?.slice(5) ?? String(i),
+    orders: Number(r.orders ?? 0),
+    paidRm: Math.round(Number(r.paidCents ?? 0) / 100),
+  }));
+});
 
-function formatAxisDate(value: number | Date) {
-  return formatDashboardTrendDate(Number(value), timezone.value);
+const summaryCards = computed(() => {
+  const s = summary.value;
+  if (!s) return [];
+  return [
+    { label: "今日订单", value: String(s.todayOrders ?? 0) },
+    { label: "今日已付(RM)", value: String(Math.round(Number(s.todayPaidCents ?? 0) / 100)) },
+    { label: "待发货", value: String(s.pendingDelivery ?? 0) },
+    { label: "代充失败(24h)", value: String(s.supplierFail24h ?? 0) },
+  ];
+});
+
+const snapshotRows = computed(() => {
+  const s = summary.value;
+  if (!s) return [];
+  return [
+    { label: "总用户", value: String(s.totalUsers ?? 0) },
+    { label: "总商品", value: String(s.totalProducts ?? 0) },
+    { label: "待支付订单", value: String(s.pendingPayment ?? 0) },
+    { label: "风控拦截(24h)", value: String(s.riskBlocks24h ?? 0) },
+  ];
+});
+
+async function load() {
+  loading.value = true;
+  error.value = null;
+  try {
+    summary.value = await runTelefunc(() => onGetDashboardSummary(), { notifyError: false });
+  } catch (cause) {
+    error.value = userErrorMessage(cause);
+  } finally {
+    loading.value = false;
+  }
 }
 
-function formatOrderCount(value: number | Date) {
-  const count = Number(value);
-  return Number.isInteger(count) ? String(count) : "";
-}
+onMounted(load);
 </script>
