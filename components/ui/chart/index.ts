@@ -1,4 +1,5 @@
 import type { Component, Ref } from "vue"
+import { defineAsyncComponent } from "vue"
 import { createContext } from "reka-ui"
 
 export { default as ChartContainer } from "./ChartContainer.vue"
@@ -26,4 +27,9 @@ interface ChartContextProps {
 
 export const [useChart, provideChartContext] = createContext<ChartContextProps>("Chart")
 
-export { VisCrosshair as ChartCrosshair, VisTooltip as ChartTooltip } from "@unovis/vue"
+export const ChartCrosshair = defineAsyncComponent(() =>
+  import("@unovis/vue").then((m) => m.VisCrosshair),
+)
+export const ChartTooltip = defineAsyncComponent(() =>
+  import("@unovis/vue").then((m) => m.VisTooltip),
+)
