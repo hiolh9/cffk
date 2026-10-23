@@ -9,6 +9,7 @@ import { getTurnstileConfig } from "@/lib/turnstile-config";
 import { grantStepUp, getStepUpMinutes } from "@/server/security/step-up";
 import { getAdminIpAllowlist } from "@/server/security/admin-ip";
 import { getIpMultiAccountPolicy } from "@/server/security/ip-multi-account";
+import { upsertRiskBlacklist, disableRiskBlacklist, listRiskBlacklist, type RiskBlacklistKind } from "@/server/security/blacklist";
 
 async function internalOnGetSecurityStatus() {
   const { database, db, adminUserId } = requireAdmin();
@@ -54,3 +55,25 @@ async function internalOnGrantStepUp() {
 }
 
 export const onGrantStepUp = telefuncAction(internalOnGrantStepUp);
+
+async function internalOnListRiskBlacklist() {
+  const { database } = await requireAdminSecure();
+  const items = await listRiskBlacklist(database, 200);
+  return { items };
+}
+
+async function internalOnUpsertRiskBlacklist(input: { kind: RiskBlacklistKind; value: string; reason?: string | null; enabled?: boolean }) {
+  const { database } = await requireAdminSecure();
+  return upsertRiskBlacklist(database, input);
+}
+
+async function internalOnDisableRiskBlacklist(input: { id: number }) {
+  const { database } = await requireAdminSecure();
+  const id = Number(input?.id);
+  if (!Number.isFinite(id) || id < 1) appError("RISK_BLACKLIST_INVALID");
+  return disableRiskBlacklist(database, id);
+}
+
+export const onListRiskBlacklist = telefuncAction(internalOnListRiskBlacklist);
+export const onUpsertRiskBlacklist = telefuncAction(internalOnUpsertRiskBlacklist);
+export const onDisableRiskBlacklist = telefuncAction(internalOnDisableRiskBlacklist);

@@ -61,6 +61,10 @@ export type SiteSettingsInput = {
   alertSupplierFailBurst?: number;
   supplierMaxAttempts?: number;
   stepUpMinutes?: number;
+  deviceMultiUserMaxUsers?: number;
+  deviceMultiUserWindowMinutes?: number;
+  reviewOrderAmountCents?: number;
+  maxHourlyUserOrders?: number;
   timezone: string;
 };
 
@@ -97,7 +101,7 @@ export function validateSiteSettingsInput(input: SiteSettingsInput) {
     newAccountWindowHours: clampLimit(input.newAccountWindowHours, 24, 720),
     newAccountMaxOrderCents: clampLimit(input.newAccountMaxOrderCents, 10_000),
     newAccountMaxOrders: clampLimit(input.newAccountMaxOrders, 3, 1_000),
-    ipMultiAccountMaxUsers: clampLimit(input.ipMultiAccountMaxUsers, 6, 1_000),
+    ipMultiAccountMaxUsers: clampLimit(input.ipMultiAccountMaxUsers, 3, 1_000),
     ipMultiAccountWindowMinutes: clampLimit(input.ipMultiAccountWindowMinutes, 60, 10_080),
     orderCreateIpLimit: clampLimit(input.orderCreateIpLimit, 12, 10_000),
     orderCreateUserLimit: clampLimit(input.orderCreateUserLimit, 6, 10_000),
@@ -107,6 +111,10 @@ export function validateSiteSettingsInput(input: SiteSettingsInput) {
     alertSupplierFailBurst: clampLimit(input.alertSupplierFailBurst, 5, 10_000),
     supplierMaxAttempts: clampLimit(input.supplierMaxAttempts, 5, 50),
     stepUpMinutes: clampLimit(input.stepUpMinutes, 10, 120),
+    deviceMultiUserMaxUsers: clampLimit(input.deviceMultiUserMaxUsers, 3, 1_000),
+    deviceMultiUserWindowMinutes: clampLimit(input.deviceMultiUserWindowMinutes, 1440, 10_080),
+    reviewOrderAmountCents: clampLimit(input.reviewOrderAmountCents, 30_000),
+    maxHourlyUserOrders: clampLimit(input.maxHourlyUserOrders, 10, 10_000),
     timezone,
   };
 }
