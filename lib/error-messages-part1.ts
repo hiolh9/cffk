@@ -17,6 +17,7 @@ export const errorMessagesPart1: Record<string, string> = {
   DEVICE_MULTI_USER_LIMIT: "该设备关联账号过多，请更换设备或联系客服。",
   ORDER_HOURLY_COUNT_LIMIT: "本小时下单次数已达上限，请稍后再试。",
   RISK_BLACKLIST_INVALID: "黑名单参数无效。",
+  BEHAVIOR_RISK_BLOCKED: "当前账号存在异常风险，暂时无法下单，请联系客服。",
   ADMIN_ACCESS_REQUIRED: "管理员身份已失效，请重新登录。",
   ADMIN_2FA_REQUIRED: "此操作需要开启双因素认证（2FA）。请先在账户设置中启用 2FA 后再试。",
   ADMIN_STEP_UP_REQUIRED: "敏感操作需要重新确认登录会话，请重新登录后台后再试。",
