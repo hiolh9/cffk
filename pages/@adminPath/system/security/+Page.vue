@@ -148,7 +148,7 @@ async function startTwoFactorSetup() {
     const secret = result.data?.totpURI?.split("secret=")[1]?.split("&")[0] || result.data?.secret || "";
     setup.value = {
       secret,
-      qrCode: await (await import("qrcode")).default.toDataURL(result.data.totpURI, { margin: 1, width: 256 }),
+      qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(result.data.totpURI)}`,
     };
     backupCodes.value = result.data.backupCodes ?? [];
   } catch (cause) {
