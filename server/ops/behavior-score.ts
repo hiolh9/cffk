@@ -2,7 +2,7 @@ import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
 import { order, riskUserScore, siteSetting, user } from "@/database/drizzle/schema";
 import { appError } from "@/lib/app-error";
-import { countDeviceUsers, countUserDevices, countUserIps } from "@/server/security/device-sighting";
+import { countDeviceUsers, countFpUsers, countUserDevices, countUserIps } from "@/server/security/device-sighting";
 
 export type BehaviorScoreResult = {
   score: number;
@@ -57,13 +57,9 @@ function toMs(value: unknown): number | null {
   return null;
 }
 
-/**
- * Lightweight transparent score (0–100+). Soft-coded thresholds.
- * Does not replace hard limits; stacks on top of them.
- */
 export async function computeAndStoreBehaviorScore(
   database: D1Database,
-  input: { userId: string; deviceId: string; clientIp?: string | null; now?: Date },
+  input: { userId: string; deviceId: string; clientIp?: string | null; fpHash?: string | null; now?: Date },
 ): Promise<BehaviorScoreResult> {
   const cfg = await loadConfig(database);
   const now = input.now ?? new Date();
@@ -105,7 +101,7 @@ export async function computeAndStoreBehaviorScore(
       reasons.push("elevated_hourly_orders");
     }
   } catch {
-    /* ignore order/user query failures */
+    /* ignore */
   }
 
   const devices = await countUserDevices(database, input.userId, since);
@@ -127,6 +123,17 @@ export async function computeAndStoreBehaviorScore(
   } else if (deviceUsers >= 3) {
     score += 15;
     reasons.push(`shared_device:${deviceUsers}`);
+  }
+
+  if (input.fpHash?.trim()) {
+    const fpUsers = await countFpUsers(database, input.fpHash, since);
+    if (fpUsers >= 4) {
+      score += 35;
+      reasons.push(`shared_fp:${fpUsers}`);
+    } else if (fpUsers >= 3) {
+      score += 20;
+      reasons.push(`shared_fp:${fpUsers}`);
+    }
   }
 
   const review = cfg.behaviorScoreReview > 0 && score >= cfg.behaviorScoreReview;
@@ -155,7 +162,7 @@ export async function computeAndStoreBehaviorScore(
 
 export async function enforceBehaviorScore(
   database: D1Database,
-  input: { userId: string; deviceId: string; clientIp?: string | null },
+  input: { userId: string; deviceId: string; clientIp?: string | null; fpHash?: string | null },
 ): Promise<BehaviorScoreResult> {
   const result = await computeAndStoreBehaviorScore(database, input);
   if (result.block) {
@@ -198,7 +205,6 @@ export async function getStoredUserRiskScore(database: D1Database, userId: strin
       .limit(1);
     if (!row) return 0;
     const updated = toMs(row.updatedAt);
-    // Ignore scores older than 48h
     if (updated != null && Date.now() - updated > 48 * 60 * 60_000) return 0;
     return Number(row.score ?? 0);
   } catch {
