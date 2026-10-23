@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
 import { riskDeviceSighting } from "@/database/drizzle/schema";
 
@@ -21,9 +21,10 @@ export async function recordDeviceSighting(
 
   const now = new Date();
   const ip = input.clientIp?.trim() && input.clientIp.trim() !== "unknown" ? input.clientIp.trim() : null;
-  const fpHash = input.fpHash?.trim() && /^[a-f0-9]{16,64}$/i.test(input.fpHash.trim())
-    ? input.fpHash.trim().toLowerCase()
-    : null;
+  const fpHash =
+    input.fpHash?.trim() && /^[a-f0-9]{16,64}$/i.test(input.fpHash.trim())
+      ? input.fpHash.trim().toLowerCase()
+      : null;
 
   try {
     const db = createDrizzleDb(database);
@@ -59,11 +60,7 @@ export async function recordDeviceSighting(
   }
 }
 
-export async function countUserDevices(
-  database: D1Database,
-  userId: string,
-  since: Date,
-): Promise<number> {
+export async function countUserDevices(database: D1Database, userId: string, since: Date): Promise<number> {
   try {
     const db = createDrizzleDb(database);
     const [row] = await db
@@ -76,11 +73,7 @@ export async function countUserDevices(
   }
 }
 
-export async function countUserIps(
-  database: D1Database,
-  userId: string,
-  since: Date,
-): Promise<number> {
+export async function countUserIps(database: D1Database, userId: string, since: Date): Promise<number> {
   try {
     const db = createDrizzleDb(database);
     const [row] = await db
@@ -93,11 +86,7 @@ export async function countUserIps(
   }
 }
 
-export async function countDeviceUsers(
-  database: D1Database,
-  deviceId: string,
-  since: Date,
-): Promise<number> {
+export async function countDeviceUsers(database: D1Database, deviceId: string, since: Date): Promise<number> {
   try {
     const db = createDrizzleDb(database);
     const [row] = await db
@@ -110,11 +99,7 @@ export async function countDeviceUsers(
   }
 }
 
-export async function countFpUsers(
-  database: D1Database,
-  fpHash: string,
-  since: Date,
-): Promise<number> {
+export async function countFpUsers(database: D1Database, fpHash: string, since: Date): Promise<number> {
   const hash = fpHash?.trim().toLowerCase();
   if (!hash) return 0;
   try {
@@ -138,21 +123,45 @@ export async function listRecentSightings(database: D1Database, limit = 50) {
     .limit(Math.min(Math.max(limit, 1), 200));
 }
 
+/** Aggregate shared fingerprints in application code (D1-friendly). */
 export async function listSharedFingerprints(database: D1Database, minUsers = 2, limit = 30) {
   try {
     const db = createDrizzleDb(database);
-    return await db
+    const rows = await db
       .select({
         fpHash: riskDeviceSighting.fpHash,
-        userCount: sql<number>`count(distinct ${riskDeviceSighting.userId})`,
-        lastSeenAt: sql<number>`max(${riskDeviceSighting.lastSeenAt})`,
+        userId: riskDeviceSighting.userId,
+        lastSeenAt: riskDeviceSighting.lastSeenAt,
       })
       .from(riskDeviceSighting)
-      .where(isNotNull(riskDeviceSighting.fpHash))
-      .groupBy(riskDeviceSighting.fpHash)
-      .having(sql`count(distinct ${riskDeviceSighting.userId}) >= ${minUsers}`)
-      .orderBy(sql`count(distinct ${riskDeviceSighting.userId}) desc`)
-      .limit(Math.min(Math.max(limit, 1), 100));
+      .orderBy(desc(riskDeviceSighting.lastSeenAt))
+      .limit(2000);
+
+    const map = new Map<string, { users: Set<string>; lastSeenAt: number }>();
+    for (const row of rows) {
+      const fp = row.fpHash?.trim();
+      if (!fp) continue;
+      const entry = map.get(fp) ?? { users: new Set<string>(), lastSeenAt: 0 };
+      entry.users.add(row.userId);
+      const ts =
+        row.lastSeenAt instanceof Date
+          ? row.lastSeenAt.getTime()
+          : typeof row.lastSeenAt === "number"
+            ? row.lastSeenAt
+            : 0;
+      if (ts > entry.lastSeenAt) entry.lastSeenAt = ts;
+      map.set(fp, entry);
+    }
+
+    return [...map.entries()]
+      .map(([fpHash, v]) => ({
+        fpHash,
+        userCount: v.users.size,
+        lastSeenAt: v.lastSeenAt,
+      }))
+      .filter((x) => x.userCount >= minUsers)
+      .sort((a, b) => b.userCount - a.userCount)
+      .slice(0, Math.min(Math.max(limit, 1), 100));
   } catch {
     return [];
   }
