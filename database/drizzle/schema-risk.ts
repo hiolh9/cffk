@@ -5,7 +5,7 @@ export const riskBlacklist = sqliteTable(
   "riskBlacklist",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    /** IP | USER | DEVICE */
+    /** IP | USER | DEVICE | FP */
     kind: text("kind").notNull(),
     value: text("value").notNull(),
     reason: text("reason"),
@@ -23,6 +23,8 @@ export const riskDeviceSighting = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("userId").notNull(),
     deviceId: text("deviceId").notNull(),
+    /** Canvas/WebGL hard fingerprint hash (optional). */
+    fpHash: text("fpHash"),
     clientIp: text("clientIp"),
     firstSeenAt: integer("firstSeenAt", { mode: "timestamp_ms" }).notNull(),
     lastSeenAt: integer("lastSeenAt", { mode: "timestamp_ms" }).notNull(),
@@ -32,6 +34,7 @@ export const riskDeviceSighting = sqliteTable(
     uniqueIndex("riskDeviceSighting_user_device_uidx").on(t.userId, t.deviceId),
     index("riskDeviceSighting_device_idx").on(t.deviceId),
     index("riskDeviceSighting_user_idx").on(t.userId),
+    index("riskDeviceSighting_fp_idx").on(t.fpHash),
   ],
 );
 
