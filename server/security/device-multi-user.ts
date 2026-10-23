@@ -24,17 +24,11 @@ function nonNegInt(value: unknown, fallback: number) {
 async function loadPolicy(database: D1Database) {
   try {
     const db = createDrizzleDb(database);
-    const [row] = await db
-      .select({
-        maxUsers: siteSetting.deviceMultiUserMaxUsers,
-        windowMinutes: siteSetting.deviceMultiUserWindowMinutes,
-      })
-      .from(siteSetting)
-      .where(eq(siteSetting.id, 1))
-      .limit(1);
+    const [row] = await db.select().from(siteSetting).where(eq(siteSetting.id, 1)).limit(1);
+    const r = (row ?? {}) as Record<string, unknown>;
     return {
-      maxUsers: nonNegInt(row?.maxUsers, FALLBACK_MAX),
-      windowMs: Math.max(1, nonNegInt(row?.windowMinutes, 1440)) * 60_000,
+      maxUsers: nonNegInt(r.deviceMultiUserMaxUsers, FALLBACK_MAX),
+      windowMs: Math.max(1, nonNegInt(r.deviceMultiUserWindowMinutes, 1440)) * 60_000,
     };
   } catch {
     return { maxUsers: FALLBACK_MAX, windowMs: FALLBACK_WINDOW_MS };

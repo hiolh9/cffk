@@ -35,30 +35,19 @@ function nonNegInt(value: unknown, fallback: number) {
 export async function getOpsRiskLimits(database: D1Database): Promise<OpsRiskLimits> {
   try {
     const db = createDrizzleDb(database);
-    const [row] = await db
-      .select({
-        maxOrderAmountCents: siteSetting.maxOrderAmountCents,
-        maxDailyUserAmountCents: siteSetting.maxDailyUserAmountCents,
-        maxDailyUserOrders: siteSetting.maxDailyUserOrders,
-        maxHourlyUserOrders: siteSetting.maxHourlyUserOrders,
-        reviewOrderAmountCents: siteSetting.reviewOrderAmountCents,
-        newAccountWindowHours: siteSetting.newAccountWindowHours,
-        newAccountMaxOrderCents: siteSetting.newAccountMaxOrderCents,
-        newAccountMaxOrders: siteSetting.newAccountMaxOrders,
-      })
-      .from(siteSetting)
-      .where(eq(siteSetting.id, 1))
-      .limit(1);
+    // Select full row then read soft columns via any until schema-tables-a is migrated in types.
+    const [row] = await db.select().from(siteSetting).where(eq(siteSetting.id, 1)).limit(1);
     if (!row) return { ...DEFAULTS };
+    const r = row as Record<string, unknown>;
     return {
-      maxOrderAmountCents: nonNegInt(row.maxOrderAmountCents, DEFAULTS.maxOrderAmountCents),
-      maxDailyUserAmountCents: nonNegInt(row.maxDailyUserAmountCents, DEFAULTS.maxDailyUserAmountCents),
-      maxDailyUserOrders: nonNegInt(row.maxDailyUserOrders, DEFAULTS.maxDailyUserOrders),
-      maxHourlyUserOrders: nonNegInt((row as any).maxHourlyUserOrders, DEFAULTS.maxHourlyUserOrders),
-      reviewOrderAmountCents: nonNegInt((row as any).reviewOrderAmountCents, DEFAULTS.reviewOrderAmountCents),
-      newAccountWindowHours: nonNegInt(row.newAccountWindowHours, DEFAULTS.newAccountWindowHours),
-      newAccountMaxOrderCents: nonNegInt(row.newAccountMaxOrderCents, DEFAULTS.newAccountMaxOrderCents),
-      newAccountMaxOrders: nonNegInt(row.newAccountMaxOrders, DEFAULTS.newAccountMaxOrders),
+      maxOrderAmountCents: nonNegInt(r.maxOrderAmountCents, DEFAULTS.maxOrderAmountCents),
+      maxDailyUserAmountCents: nonNegInt(r.maxDailyUserAmountCents, DEFAULTS.maxDailyUserAmountCents),
+      maxDailyUserOrders: nonNegInt(r.maxDailyUserOrders, DEFAULTS.maxDailyUserOrders),
+      maxHourlyUserOrders: nonNegInt(r.maxHourlyUserOrders, DEFAULTS.maxHourlyUserOrders),
+      reviewOrderAmountCents: nonNegInt(r.reviewOrderAmountCents, DEFAULTS.reviewOrderAmountCents),
+      newAccountWindowHours: nonNegInt(r.newAccountWindowHours, DEFAULTS.newAccountWindowHours),
+      newAccountMaxOrderCents: nonNegInt(r.newAccountMaxOrderCents, DEFAULTS.newAccountMaxOrderCents),
+      newAccountMaxOrders: nonNegInt(r.newAccountMaxOrders, DEFAULTS.newAccountMaxOrders),
     };
   } catch {
     return { ...DEFAULTS };
