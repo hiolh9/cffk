@@ -131,3 +131,17 @@ export async function runOpsHealthAlerts(database: D1Database, now = new Date())
 
   return { failed, paid, lowBalanceAccounts: low.length, results };
 }
+
+export async function alertManualReviewHold(
+  database: D1Database,
+  input: { orderNo: string; amountCents: number; thresholdCents: number },
+) {
+  const rm = (input.amountCents / 100).toFixed(2);
+  const thr = (input.thresholdCents / 100).toFixed(2);
+  return trySendAdminTelegram(
+    database,
+    "大额订单待人工审核",
+    `订单 ${input.orderNo} 金额 RM ${rm} 已达到人工审核阈值 RM ${thr}，已暂停自动代充。请在供应商订单中人工处理，或调高「人工审核金额阈值」后等待自动重试。`,
+    `manual-review:${input.orderNo}`,
+  );
+}
