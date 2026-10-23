@@ -4,7 +4,7 @@ export * from "./schema-tables-b1";
 export * from "./schema-tables-b2";
 
 import {
-  user, session, account, verification, twoFactor, adminBootstrap, siteSetting,
+  user, session, account, verification, twoFactor, adminBootstrap, siteSetting, riskBlacklist,
   category, productV2, productSku, discountCode, order, customerAddress,
 } from "./schema-tables-a";
 import {
@@ -18,7 +18,7 @@ import {
 import { auditLog, invoiceSequence, accountingArchive } from "./schema-accounting";
 
 export const schema = {
-  user, session, account, verification, twoFactor, adminBootstrap, siteSetting,
+  user, session, account, verification, twoFactor, adminBootstrap, siteSetting, riskBlacklist,
   category, productV2, productSku, discountCode, order, customerAddress,
   card, orderDelivery, paymentAttempt, automaticDeliveryJob, orderEvent, transactionGuard,
   paymentProvider, paymentLog, pushChannelConfig, orderRequestRateLimit, guestOrderRecoveryChallenge,

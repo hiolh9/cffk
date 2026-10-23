@@ -2,6 +2,8 @@ import { telefuncAction } from "@/server/telefunc-action";
 import { requireUser } from "@/server/telefunc-context";
 import { enforceSecurityRateLimit } from "@/server/security/rate-limit";
 import { enforceIpMultiAccountLimit } from "@/server/security/ip-multi-account";
+import { enforceDeviceMultiUserLimit } from "@/server/security/device-multi-user";
+import { enforceRiskBlacklist } from "@/server/security/blacklist";
 import { getOpsKillSwitches } from "@/server/ops/kill-switch";
 import { assertCheckoutAccount } from "@/server/ops/risk-limits";
 import { appError } from "@/lib/app-error";
@@ -31,6 +33,13 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
   if (!deviceId) {
     appError("DEVICE_ID_REQUIRED");
   }
+
+  await enforceRiskBlacklist(database, {
+    clientIp: context.clientIp,
+    userId: user.id,
+    deviceId,
+  });
+  await enforceDeviceMultiUserLimit(database, { deviceId, userId: user.id });
 
   await enforceSecurityRateLimit(database, {
     action: "ORDER_CREATE_IP",

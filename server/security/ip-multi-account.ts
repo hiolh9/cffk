@@ -9,7 +9,7 @@ import { appError } from "@/lib/app-error";
  */
 
 const FALLBACK_WINDOW_MS = 60 * 60_000;
-const FALLBACK_MAX_USERS = 6;
+const FALLBACK_MAX_USERS = 3;
 
 function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
