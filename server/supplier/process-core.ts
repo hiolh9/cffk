@@ -104,12 +104,39 @@ export async function processSupplierOrder(database: D1Database, supplierOrderId
 
   if (task.orderId != null) {
     const [paidOrder] = await db
-      .select({ paymentStatus: order.paymentStatus, status: order.status })
+      .select({ paymentStatus: order.paymentStatus, status: order.status, amount: order.amount, orderNo: order.orderNo })
       .from(order)
       .where(eq(order.id, task.orderId))
       .limit(1);
     if (!paidOrder || paidOrder.paymentStatus !== "PAID") {
       return failTask(db, task.id, "order_not_paid", true);
+    }
+    try {
+      const { getReviewOrderAmountCents } = await import("@/server/ops/risk-limits");
+      const reviewCents = await getReviewOrderAmountCents(database);
+      const amount = Number(paidOrder.amount ?? 0);
+      if (reviewCents > 0 && Number.isFinite(amount) && amount >= reviewCents) {
+        await db
+          .update(supplierOrder)
+          .set({
+            nextRetryAt: new Date(Date.now() + 6 * 60 * 60_000),
+            updatedAt: new Date(),
+          })
+          .where(eq(supplierOrder.id, task.id));
+        try {
+          const { alertManualReviewHold } = await import("@/server/ops/ops-alert");
+          await alertManualReviewHold(database, {
+            orderNo: String(paidOrder.orderNo ?? task.orderId),
+            amountCents: amount,
+            thresholdCents: reviewCents,
+          });
+        } catch {
+          /* alert best-effort */
+        }
+        return { status: "pending" as const, errorCode: "manual_review_required" };
+      }
+    } catch {
+      /* missing column before migration: continue normal fulfill */
     }
   }
 
