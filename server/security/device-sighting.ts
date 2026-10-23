@@ -1,0 +1,101 @@
+import { and, eq, gte, sql } from "drizzle-orm";
+import { createDrizzleDb } from "@/database/drizzle";
+import { riskDeviceSighting } from "@/database/drizzle/schema";
+
+/**
+ * Persist user ↔ device ↔ IP observations for lightweight device strength.
+ * Best-effort: failures must not break checkout.
+ */
+export async function recordDeviceSighting(
+  database: D1Database,
+  input: { userId: string; deviceId: string; clientIp?: string | null },
+) {
+  const userId = input.userId?.trim();
+  const deviceId = input.deviceId?.trim();
+  if (!userId || !deviceId) return;
+
+  const now = new Date();
+  const ip = input.clientIp?.trim() && input.clientIp.trim() !== "unknown" ? input.clientIp.trim() : null;
+
+  try {
+    const db = createDrizzleDb(database);
+    const [existing] = await db
+      .select({ id: riskDeviceSighting.id, sightingCount: riskDeviceSighting.sightingCount })
+      .from(riskDeviceSighting)
+      .where(and(eq(riskDeviceSighting.userId, userId), eq(riskDeviceSighting.deviceId, deviceId)))
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(riskDeviceSighting)
+        .set({
+          clientIp: ip ?? undefined,
+          lastSeenAt: now,
+          sightingCount: (existing.sightingCount ?? 1) + 1,
+        })
+        .where(eq(riskDeviceSighting.id, existing.id));
+    } else {
+      await db.insert(riskDeviceSighting).values({
+        userId,
+        deviceId,
+        clientIp: ip,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        sightingCount: 1,
+      });
+    }
+  } catch {
+    // Table may not exist before migration.
+  }
+}
+
+export async function countUserDevices(
+  database: D1Database,
+  userId: string,
+  since: Date,
+): Promise<number> {
+  try {
+    const db = createDrizzleDb(database);
+    const [row] = await db
+      .select({ n: sql<number>`count(distinct ${riskDeviceSighting.deviceId})` })
+      .from(riskDeviceSighting)
+      .where(and(eq(riskDeviceSighting.userId, userId), gte(riskDeviceSighting.lastSeenAt, since)));
+    return Number(row?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function countUserIps(
+  database: D1Database,
+  userId: string,
+  since: Date,
+): Promise<number> {
+  try {
+    const db = createDrizzleDb(database);
+    const [row] = await db
+      .select({ n: sql<number>`count(distinct ${riskDeviceSighting.clientIp})` })
+      .from(riskDeviceSighting)
+      .where(and(eq(riskDeviceSighting.userId, userId), gte(riskDeviceSighting.lastSeenAt, since)));
+    return Number(row?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function countDeviceUsers(
+  database: D1Database,
+  deviceId: string,
+  since: Date,
+): Promise<number> {
+  try {
+    const db = createDrizzleDb(database);
+    const [row] = await db
+      .select({ n: sql<number>`count(distinct ${riskDeviceSighting.userId})` })
+      .from(riskDeviceSighting)
+      .where(and(eq(riskDeviceSighting.deviceId, deviceId), gte(riskDeviceSighting.lastSeenAt, since)));
+    return Number(row?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}

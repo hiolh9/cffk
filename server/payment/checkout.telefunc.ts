@@ -4,6 +4,8 @@ import { enforceSecurityRateLimit } from "@/server/security/rate-limit";
 import { enforceIpMultiAccountLimit } from "@/server/security/ip-multi-account";
 import { enforceDeviceMultiUserLimit } from "@/server/security/device-multi-user";
 import { enforceRiskBlacklist } from "@/server/security/blacklist";
+import { recordDeviceSighting } from "@/server/security/device-sighting";
+import { enforceBehaviorScore } from "@/server/ops/behavior-score";
 import { getOpsKillSwitches } from "@/server/ops/kill-switch";
 import { assertCheckoutAccount } from "@/server/ops/risk-limits";
 import { appError } from "@/lib/app-error";
@@ -39,7 +41,20 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
     userId: user.id,
     deviceId,
   });
+
+  // Strengthen device: persist user↔device↔IP before multi-user / score checks.
+  await recordDeviceSighting(database, {
+    userId: user.id,
+    deviceId,
+    clientIp: context.clientIp,
+  });
+
   await enforceDeviceMultiUserLimit(database, { deviceId, userId: user.id });
+  await enforceBehaviorScore(database, {
+    userId: user.id,
+    deviceId,
+    clientIp: context.clientIp,
+  });
 
   await enforceSecurityRateLimit(database, {
     action: "ORDER_CREATE_IP",
