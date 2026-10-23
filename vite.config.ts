@@ -33,8 +33,18 @@ export default defineConfig({
       "@": path.resolve(path.dirname(fileURLToPath(import.meta.url))),
     },
   },
+  // Vite 8 / Rolldown: circular deps can emit child class before parent →
+  // "Class extends value undefined" at Worker startup validation (CF 10021).
+  // See: https://github.com/vitejs/vite/issues/22307
+  legacy: {
+    // Restore pre-Rolldown CJS default-interop for packages that still break under strict rules.
+    inconsistentCjsInterop: true,
+  },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
+      output: {
+        strictExecutionOrder: true,
+      },
       external: ["wrangler"],
     },
   },
