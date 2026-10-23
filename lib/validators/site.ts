@@ -65,6 +65,11 @@ export type SiteSettingsInput = {
   deviceMultiUserWindowMinutes?: number;
   reviewOrderAmountCents?: number;
   maxHourlyUserOrders?: number;
+  behaviorWindowHours?: number;
+  maxDevicesPerUser?: number;
+  maxIpsPerUser?: number;
+  behaviorScoreReview?: number;
+  behaviorScoreBlock?: number;
   timezone: string;
 };
 
@@ -115,6 +120,11 @@ export function validateSiteSettingsInput(input: SiteSettingsInput) {
     deviceMultiUserWindowMinutes: clampLimit(input.deviceMultiUserWindowMinutes, 1440, 10_080),
     reviewOrderAmountCents: clampLimit(input.reviewOrderAmountCents, 30_000),
     maxHourlyUserOrders: clampLimit(input.maxHourlyUserOrders, 10, 10_000),
+    behaviorWindowHours: clampLimit(input.behaviorWindowHours, 24, 720),
+    maxDevicesPerUser: clampLimit(input.maxDevicesPerUser, 3, 100),
+    maxIpsPerUser: clampLimit(input.maxIpsPerUser, 5, 100),
+    behaviorScoreReview: clampLimit(input.behaviorScoreReview, 50, 200),
+    behaviorScoreBlock: clampLimit(input.behaviorScoreBlock, 80, 200),
     timezone,
   };
 }

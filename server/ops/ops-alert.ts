@@ -145,3 +145,12 @@ export async function alertManualReviewHold(
     `manual-review:${input.orderNo}`,
   );
 }
+
+export async function alertBehaviorRisk(
+  database: D1Database,
+  input: { userId: string; score: number; reasons: string[]; action: "block" | "review" },
+) {
+  const title = input.action === "block" ? "行为风险拦截下单" : "行为风险待人工关注";
+  const content = `用户 ${input.userId.slice(0, 12)}… 行为分 ${input.score}（${input.reasons.join(", ") || "n/a"}）。动作: ${input.action}`;
+  return trySendAdminTelegram(database, title, content, `behavior:${input.action}:${input.userId}`);
+}
