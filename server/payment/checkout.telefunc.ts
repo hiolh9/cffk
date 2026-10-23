@@ -13,11 +13,19 @@ import { requirePaymentFlowService } from "./flow-service";
 import type { PaymentCreateInput } from "./types";
 
 const DEVICE_ID_RE = /^[a-zA-Z0-9_-]{8,64}$/;
+const FP_HASH_RE = /^[a-f0-9]{16,64}$/i;
 
 function normalizeDeviceId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (!trimmed || !DEVICE_ID_RE.test(trimmed)) return null;
+  return trimmed;
+}
+
+function normalizeFpHash(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || !FP_HASH_RE.test(trimmed)) return null;
   return trimmed;
 }
 
@@ -35,18 +43,20 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
   if (!deviceId) {
     appError("DEVICE_ID_REQUIRED");
   }
+  const fpHash = normalizeFpHash(input.deviceFp);
 
   await enforceRiskBlacklist(database, {
     clientIp: context.clientIp,
     userId: user.id,
     deviceId,
+    fpHash,
   });
 
-  // Strengthen device: persist user↔device↔IP before multi-user / score checks.
   await recordDeviceSighting(database, {
     userId: user.id,
     deviceId,
     clientIp: context.clientIp,
+    fpHash,
   });
 
   await enforceDeviceMultiUserLimit(database, { deviceId, userId: user.id });
@@ -54,6 +64,7 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
     userId: user.id,
     deviceId,
     clientIp: context.clientIp,
+    fpHash,
   });
 
   await enforceSecurityRateLimit(database, {
@@ -70,12 +81,19 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
     clientIp: context.clientIp,
     extra: deviceId,
   });
+  if (fpHash) {
+    await enforceSecurityRateLimit(database, {
+      action: "ORDER_CREATE_DEVICE",
+      clientIp: context.clientIp,
+      extra: `fp:${fpHash}`,
+    });
+  }
   await enforceIpMultiAccountLimit(database, {
     clientIp: context.clientIp,
     userId: user.id,
   });
 
-  const { deviceId: _ignored, ...orderInput } = input;
+  const { deviceId: _d, deviceFp: _f, ...orderInput } = input;
   return requirePaymentFlowService().create(orderInput, user.id);
 }
 

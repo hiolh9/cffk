@@ -3,18 +3,23 @@ import { createDrizzleDb } from "@/database/drizzle";
 import { riskBlacklist } from "@/database/drizzle/schema";
 import { appError } from "@/lib/app-error";
 
-export type RiskBlacklistKind = "IP" | "USER" | "DEVICE";
+export type RiskBlacklistKind = "IP" | "USER" | "DEVICE" | "FP";
 
 function normalize(kind: RiskBlacklistKind, value: string) {
   const v = value.trim();
-  if (kind === "IP") return v.toLowerCase();
+  if (kind === "IP" || kind === "FP") return v.toLowerCase();
   if (kind === "DEVICE") return v;
   return v;
 }
 
 export async function enforceRiskBlacklist(
   database: D1Database,
-  input: { clientIp?: string | null; userId?: string | null; deviceId?: string | null },
+  input: {
+    clientIp?: string | null;
+    userId?: string | null;
+    deviceId?: string | null;
+    fpHash?: string | null;
+  },
 ) {
   const checks: Array<{ kind: RiskBlacklistKind; value: string }> = [];
   if (input.clientIp?.trim() && input.clientIp.trim() !== "unknown") {
@@ -25,6 +30,9 @@ export async function enforceRiskBlacklist(
   }
   if (input.deviceId?.trim()) {
     checks.push({ kind: "DEVICE", value: normalize("DEVICE", input.deviceId) });
+  }
+  if (input.fpHash?.trim() && /^[a-f0-9]{16,64}$/i.test(input.fpHash.trim())) {
+    checks.push({ kind: "FP", value: normalize("FP", input.fpHash.trim().toLowerCase()) });
   }
   if (!checks.length) return;
 
@@ -60,7 +68,7 @@ export async function upsertRiskBlacklist(
   input: { kind: RiskBlacklistKind; value: string; reason?: string | null; enabled?: boolean },
 ) {
   const kind = input.kind;
-  if (!["IP", "USER", "DEVICE"].includes(kind)) appError("RISK_BLACKLIST_INVALID");
+  if (!["IP", "USER", "DEVICE", "FP"].includes(kind)) appError("RISK_BLACKLIST_INVALID");
   const value = normalize(kind, input.value);
   if (!value || value.length > 256) appError("RISK_BLACKLIST_INVALID");
   const db = createDrizzleDb(database);
@@ -91,5 +99,5 @@ export async function disableRiskBlacklist(database: D1Database, id: number) {
     .update(riskBlacklist)
     .set({ enabled: false, updatedAt: new Date() })
     .where(eq(riskBlacklist.id, id));
-  return { ok: true };
+  return { ok: true as const };
 }

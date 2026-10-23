@@ -28,8 +28,10 @@ export type PaymentCreateInput = {
   addressId?: number;
   address?: PaymentAddressInput;
   discountCode?: string;
-  /** Stable client device fingerprint (localStorage UUID). Used for rate limits only. */
+  /** Soft device id (localStorage UUID). */
   deviceId?: string;
+  /** Hard fingerprint hash (canvas/webgl/…). */
+  deviceFp?: string;
 };
 
 export type PaymentResult = {
