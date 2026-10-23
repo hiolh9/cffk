@@ -1,18 +1,21 @@
 import { getOrCreateDeviceId } from "@/lib/device-id";
 
 export type DeviceFingerprintPayload = {
-  /** Soft id from localStorage (required by checkout). */
   deviceId: string;
-  /** SHA-256 hex of browser signals (canvas/webgl/screen/…). */
   fpHash: string;
 };
 
 async function sha256Hex(text: string): Promise<string> {
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    // Workers/SSR fallback: not a real hard fingerprint
+    return `soft:${text.slice(0, 48)}`;
+  }
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function canvasSignal(): string {
+  if (typeof document === "undefined") return "";
   try {
     const c = document.createElement("canvas");
     c.width = 240;
@@ -34,6 +37,7 @@ function canvasSignal(): string {
 }
 
 function webglSignal(): string {
+  if (typeof document === "undefined") return "";
   try {
     const c = document.createElement("canvas");
     const gl = (c.getContext("webgl") || c.getContext("experimental-webgl")) as WebGLRenderingContext | null;
@@ -48,12 +52,11 @@ function webglSignal(): string {
 }
 
 /**
- * Collect a stable-ish hardware/browser fingerprint.
- * Not immune to advanced spoofing, but survives localStorage clears better than soft deviceId alone.
+ * Collect a stable-ish browser fingerprint. Safe to call only in the browser.
  */
 export async function collectDeviceFingerprint(): Promise<DeviceFingerprintPayload> {
   const deviceId = getOrCreateDeviceId();
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
     return { deviceId, fpHash: deviceId };
   }
 
@@ -61,14 +64,16 @@ export async function collectDeviceFingerprint(): Promise<DeviceFingerprintPaylo
   const parts: Record<string, string> = {
     canvas: canvasSignal(),
     webgl: webglSignal(),
-    screen: `${screen.width}x${screen.height}x${screen.colorDepth}x${devicePixelRatio || 1}`,
-    tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+    screen:
+      typeof screen !== "undefined"
+        ? `${screen.width}x${screen.height}x${screen.colorDepth}x${typeof devicePixelRatio !== "undefined" ? devicePixelRatio : 1}`
+        : "",
+    tz: typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone || "" : "",
     lang: navigator.languages?.join(",") || navigator.language || "",
     platform: nav.userAgentData?.platform || navigator.platform || "",
     hw: String(navigator.hardwareConcurrency || 0),
     mem: String(nav.deviceMemory || 0),
     touch: String(navigator.maxTouchPoints || 0),
-    maxTouch: String(navigator.maxTouchPoints || 0),
     cookie: String(navigator.cookieEnabled),
   };
 
