@@ -1,5 +1,4 @@
 import type { Component, Ref } from "vue"
-import { defineAsyncComponent } from "vue"
 import { createContext } from "reka-ui"
 
 export { default as ChartContainer } from "./ChartContainer.vue"
@@ -7,7 +6,6 @@ export { default as ChartLegendContent } from "./ChartLegendContent.vue"
 export { default as ChartTooltipContent } from "./ChartTooltipContent.vue"
 export { componentToString } from "./utils"
 
-// Format: { THEME_NAME: CSS_SELECTOR }
 export const THEMES = { light: "", dark: ".dark" } as const
 
 export type ChartConfig = {
@@ -27,9 +25,6 @@ interface ChartContextProps {
 
 export const [useChart, provideChartContext] = createContext<ChartContextProps>("Chart")
 
-export const ChartCrosshair = defineAsyncComponent(() =>
-  import("@unovis/vue").then((m) => m.VisCrosshair),
-)
-export const ChartTooltip = defineAsyncComponent(() =>
-  import("@unovis/vue").then((m) => m.VisTooltip),
-)
+/** Temporarily stubbed — @unovis removed from Worker bundle until deploy is stable */
+export const ChartCrosshair = { name: "ChartCrosshair", render: () => null }
+export const ChartTooltip = { name: "ChartTooltip", render: () => null }

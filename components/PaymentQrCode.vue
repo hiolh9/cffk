@@ -1,29 +1,21 @@
 <template>
-  <canvas ref="canvas" class="mx-auto rounded-md bg-white p-2" aria-label="支付宝付款二维码" role="img" />
+  <img
+    v-if="value"
+    :src="qrSrc"
+    width="224"
+    height="224"
+    class="mx-auto rounded-md bg-white p-2"
+    alt="付款二维码"
+  />
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, watch } from "vue";
+import { computed } from "vue";
 
 const props = defineProps<{ value: string }>();
-const canvas = ref<HTMLCanvasElement | null>(null);
 
-async function renderCode() {
-  if (!canvas.value || !props.value) return;
-  // Dynamic import keeps `qrcode` out of Worker startup module graph
-  const QRCode = (await import("qrcode")).default;
-  await QRCode.toCanvas(canvas.value, props.value, {
-    errorCorrectionLevel: "M",
-    margin: 1,
-    width: 224,
-    color: { dark: "#111827", light: "#ffffff" },
-  });
-}
-
-onMounted(() => {
-  void renderCode();
-});
-watch(() => props.value, () => {
-  void renderCode();
+const qrSrc = computed(() => {
+  const data = encodeURIComponent(props.value || "");
+  return `https://api.qrserver.com/v1/create-qr-code/?size=224x224&margin=8&data=${data}`;
 });
 </script>

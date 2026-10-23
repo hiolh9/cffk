@@ -32,28 +32,9 @@
         </ButtonGroup>
       </CardHeader>
       <CardContent>
-        <ChartContainer :config="chartConfig" class="aspect-auto h-72 w-full">
-          <VisXYContainer :data="chartData" :margin="{ top: 10, right: 10, bottom: 24, left: 36 }">
-            <VisArea
-              :x="(d: any, i: number) => i"
-              :y0="0"
-              :y="(d: any) => d.created"
-              color="var(--color-created)"
-              :opacity="0.35"
-            />
-            <VisArea
-              :x="(d: any, i: number) => i"
-              :y0="0"
-              :y="(d: any) => d.paid"
-              color="var(--color-paid)"
-              :opacity="0.45"
-            />
-            <VisAxis type="x" :tick-format="(i: number) => chartData[i]?.label ?? ''" />
-            <VisAxis type="y" />
-            <ChartTooltip />
-            <ChartCrosshair color="var(--color-paid)" />
-          </VisXYContainer>
-        </ChartContainer>
+        <div class="flex h-72 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+          图表依赖已临时下线（保障部署）。指标卡片仍可用。
+        </div>
       </CardContent>
     </Card>
   </section>
@@ -62,45 +43,19 @@
 <script lang="ts" setup>
 import { computed, ref } from "vue";
 import { useData } from "vike-vue/useData";
-import { defineAsyncComponent } from "vue";
-const VisArea = defineAsyncComponent(() => import("@unovis/vue").then((m) => m.VisArea));
-const VisAxis = defineAsyncComponent(() => import("@unovis/vue").then((m) => m.VisAxis));
-const VisXYContainer = defineAsyncComponent(() => import("@unovis/vue").then((m) => m.VisXYContainer));
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartCrosshair,
-  ChartTooltip,
-  type ChartConfig,
-} from "@/components/ui/chart";
-import { formatDashboardTrendDate, type DashboardOrderTrendPoint, type DashboardTrendRange } from "@/lib/dashboard-trend";
-import { useSiteTimezone } from "@/lib/site-timezone";
+import type { DashboardTrendRange } from "@/lib/dashboard-trend";
 import type { Data } from "./+data.server";
 
 const data = useData<Data>();
-const { timezone } = useSiteTimezone();
 const rangeOptions: { days: DashboardTrendRange; label: string }[] = [
   { days: 7, label: "7 天" },
   { days: 14, label: "14 天" },
   { days: 30, label: "30 天" },
 ];
 const selectedRange = ref<DashboardTrendRange>(14);
-
-const chartConfig = {
-  created: { label: "新建", color: "hsl(var(--chart-1))" },
-  paid: { label: "已支付", color: "hsl(var(--chart-2))" },
-} satisfies ChartConfig;
-
 const metrics = computed(() => data.metrics ?? []);
-const chartData = computed(() => {
-  const trend: DashboardOrderTrendPoint[] = data.trends?.[selectedRange.value] ?? data.trend ?? [];
-  return trend.map((point) => ({
-    label: formatDashboardTrendDate(point.date, timezone.value),
-    created: point.createdCount ?? point.created ?? 0,
-    paid: point.paidCount ?? point.paid ?? 0,
-  }));
-});
 </script>
