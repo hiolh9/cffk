@@ -173,6 +173,12 @@ export const adminPages = {
     pageTitle: "站点配置",
     description: "站点名称、公告与页脚。",
   },
+  risk: {
+    title: "风控看板",
+    path: "/system/risk",
+    pageTitle: "风控看板",
+    description: "行为分、设备观测、硬指纹与黑名单。",
+  },
   security: {
     title: "安全配置",
     path: "/system/security",
@@ -213,7 +219,7 @@ export const adminNavigation = {
   },
   system: {
     title: "系统配置",
-    items: [adminPages.payments, adminPages.media, adminPages.settings, adminPages.security, adminPages.tasks],
+    items: [adminPages.payments, adminPages.media, adminPages.settings, adminPages.risk, adminPages.security, adminPages.tasks],
   },
 } as const satisfies Record<string, AdminPageMeta | AdminNavigationGroup>;
 
