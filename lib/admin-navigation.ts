@@ -107,6 +107,18 @@ export const adminPages = {
     pageTitle: "用户管理",
     description: "查看已注册用户的基础资料、验证状态与双因素认证状态。",
   },
+  blog: {
+    title: "文章列表",
+    path: "/blog",
+    pageTitle: "博客文章",
+    description: "撰写、发布博客文章，配置 SEO Title/Description、Schema 与 FAQ。",
+  },
+  blogEdit: {
+    title: "编辑文章",
+    path: "/blog/edit",
+    pageTitle: "编辑文章",
+    description: "编辑正文 HTML、SEO 字段与 JSON-LD Schema。",
+  },
   pushConfig: {
     title: "推送配置",
     path: "/push/config",
@@ -206,6 +218,7 @@ export const adminNavigation = {
     items: [adminPages.supplierAccounts, adminPages.supplierProducts, adminPages.supplierOrders],
   },
   users: adminPages.users,
+  blog: adminPages.blog,
   push: {
     title: "推送管理",
     items: [
@@ -235,7 +248,8 @@ const allAdminPages = Object.values(adminPages) as readonly AdminPageMeta[];
 export function getAdminPageMeta(pathname: string, basePath: string) {
   const routePath = pathname.slice(basePath.length).replace(/\/$/, "") || "/";
   return allAdminPages.find((page) => page.path === routePath)
-    ?? (routePath.startsWith("/catalog/products/") ? adminPages.productEdit : undefined);
+    ?? (routePath.startsWith("/catalog/products/") ? adminPages.productEdit : undefined)
+    ?? (routePath.startsWith("/blog/edit") ? adminPages.blogEdit : undefined);
 }
 
 export function isAdminNavigationItemActive(pathname: string, basePath: string, item: AdminNavigationItem) {
@@ -255,7 +269,15 @@ export function getAdminBreadcrumb(pathname: string, basePath: string) {
     }
   }
 
-  const standaloneItems = [adminNavigation.dashboard, adminNavigation.orders, adminNavigation.accounting, adminNavigation.users, adminPages.account];
+  const standaloneItems = [
+    adminNavigation.dashboard,
+    adminNavigation.orders,
+    adminNavigation.accounting,
+    adminNavigation.users,
+    adminNavigation.blog,
+    adminPages.blogEdit,
+    adminPages.account,
+  ];
   const standalone = standaloneItems.find((item) => isAdminNavigationItemActive(pathname, basePath, item));
   if (standalone) return { titles: [standalone.title] };
 
