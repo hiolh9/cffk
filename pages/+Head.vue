@@ -15,9 +15,7 @@
     <meta name="twitter:description" :content="seo.description" />
     <meta v-if="seo.imageUrl" name="twitter:image" :content="seo.imageUrl" />
   </template>
-  <!-- Product + BreadcrumbList (+ AggregateRating when configured) -->
   <script v-if="productJsonLd" type="application/ld+json" v-text="productJsonLd" />
-  <!-- Homepage Organization + WebSite -->
   <script v-if="siteJsonLd" type="application/ld+json" v-text="siteJsonLd" />
 </template>
 
@@ -35,7 +33,7 @@ type Site = {
   logoIcon?: string | null;
 };
 
-type ProductSku = { price: string; availableStock?: number | null };
+type ProductSku = { price: string; currency?: string; availableStock?: number | null };
 
 type ProductData = {
   name?: string;
@@ -45,6 +43,7 @@ type ProductData = {
   coverImage?: string | null;
   categoryName?: string | null;
   price?: string;
+  currency?: string;
   availableStock?: number | null;
   ratingValue?: string | number | null;
   reviewCount?: number | null;
@@ -134,6 +133,8 @@ const productJsonLd = computed(() => {
     availableStock = stockValues.reduce<number>((sum, s) => sum + (typeof s === "number" ? s : 0), 0);
   }
 
+  const offerCurrency = product.currency || product.skus?.[0]?.currency || "MYR";
+
   const nodes = buildProductJsonLd({
     name: product.name,
     slug: product.slug,
@@ -147,7 +148,7 @@ const productJsonLd = computed(() => {
     availableStock,
     ratingValue: product.ratingValue,
     reviewCount: product.reviewCount,
-    currency: "MYR",
+    currency: offerCurrency,
     siteName: pageContext.site?.name || "Sparkpay",
     siteUrl: origin,
     productUrl,
