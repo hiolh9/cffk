@@ -11,6 +11,8 @@ import { assertCheckoutAccount } from "@/server/ops/risk-limits";
 import { appError } from "@/lib/app-error";
 import { requirePaymentFlowService } from "./flow-service";
 import type { PaymentCreateInput } from "./types";
+import { claimOrderIdempotency, completeOrderIdempotency, normalizeOrderIdempotencyKey } from "./order-idempotency";
+import { paymentRepository } from "./repository";
 
 const DEVICE_ID_RE = /^[a-zA-Z0-9_-]{8,64}$/;
 const FP_HASH_RE = /^[a-f0-9]{16,64}$/i;
@@ -94,7 +96,26 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
   });
 
   // deviceId / deviceFp are risk-only fields; flow service ignores them for createOrder.
-  return requirePaymentFlowService().create(input, user.id);
+  const rawKey = normalizeOrderIdempotencyKey(input.idempotencyKey);
+  if (!rawKey) appError("IDEMPOTENCY_KEY_REQUIRED");
+  const claim = await claimOrderIdempotency(database, { userId: user.id, key: rawKey });
+  if (claim && "orderNo" in claim) {
+    const existing = await paymentRepository(database).findOrder(claim.orderNo);
+    if (existing && existing.ownerUserId === user.id) {
+      if (existing.paymentStatus === "PAID") {
+        return { orderNo: existing.orderNo, amount: existing.amount, paymentStatus: "PAID" as const, payment: null };
+      }
+      return requirePaymentFlowService().resume(claim.orderNo, user.id);
+    }
+  }
+  const result = await requirePaymentFlowService().create(input, user.id);
+  if (claim && "isNew" in claim && "keyHash" in claim) {
+    const created = await paymentRepository(database).findOrder(result.orderNo);
+    if (created) {
+      await completeOrderIdempotency(database, { keyHash: claim.keyHash, orderNo: result.orderNo, orderId: created.id });
+    }
+  }
+  return result;
 }
 
 export const onCreatePayment = telefuncAction(internalOnCreatePayment);
