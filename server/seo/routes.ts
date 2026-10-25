@@ -7,13 +7,14 @@ type AppBindings = { Bindings: Record<string, unknown> & { DB: D1Database } };
 
 const STATIC_PATHS = ["/", "/privacy", "/terms", "/sales"] as const;
 
+/** Escape XML special chars using numeric entities (avoids &-entity corruption). */
 function escapeXml(value: string) {
   return value
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """)
-    .replace(/'/g, "'");
+    .replace(/&/g, "&#38;")
+    .replace(/</g, "&#60;")
+    .replace(/>/g, "&#62;")
+    .replace(/"/g, "&#34;")
+    .replace(/'/g, "&#39;");
 }
 
 async function resolvePublicOrigin(context: Context<AppBindings>): Promise<string> {
