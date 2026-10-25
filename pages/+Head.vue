@@ -57,13 +57,21 @@ type SeoPageContext = {
   site?: Site;
   data?: ProductData;
   urlPathname?: string;
+  urlLocale?: "en" | null;
   routeParams?: { adminPath?: string };
   urlParsed?: { origin?: string };
 };
 
 const pageContext = usePageContext() as SeoPageContext;
 
-const pathInfo = computed(() => stripLocalePrefix(pageContext.urlPathname || "/"));
+const pathInfo = computed(() => {
+  const stripped = stripLocalePrefix(pageContext.urlPathname || "/");
+  // After Hono /en rewrite, urlPathname is unprefixed; restore locale from pageContext
+  if (!stripped.locale && pageContext.urlLocale === "en") {
+    return { locale: "en" as const, path: stripped.path };
+  }
+  return stripped;
+});
 
 const isPrivatePage = computed(() => {
   const pathname = pathInfo.value.path;
@@ -97,8 +105,8 @@ const seo = computed(() => {
     ? product?.subtitle?.trim() || toPlainText(product?.description) || pageContext.site?.subtitle || "Digital top-up store in Malaysia. Pay in MYR."
     : pageContext.site?.subtitle || "Digital top-up store in Malaysia. Pay in MYR.";
 
-  // Canonical follows the URL the user is on (including /en when applicable)
-  const canonicalPath = pageContext.urlPathname || "/";
+  const isEnglish = pathInfo.value.locale === "en";
+  const canonicalPath = isEnglish ? withLocalePrefix(pathname, "en-US") : pathname;
   const canonicalUrl =
     !isPrivatePage.value && siteUrl.value
       ? new URL(canonicalPath, `${siteUrl.value}/`).toString()
@@ -109,8 +117,6 @@ const seo = computed(() => {
         siteUrl.value,
       )
     : null;
-
-  const isEnglish = pathInfo.value.locale === "en";
 
   return {
     title,
@@ -144,7 +150,8 @@ const productJsonLd = computed(() => {
   if (isPrivatePage.value || !siteUrl.value) return null;
 
   const origin = siteUrl.value.replace(/\/$/, "");
-  const productPath = pageContext.urlPathname || pathname;
+  const productPath =
+    pathInfo.value.locale === "en" ? withLocalePrefix(pathname, "en-US") : pathname;
   const productUrl = new URL(productPath, `${origin}/`).toString();
   const prices = (product.skus?.map((s) => s.price).filter(Boolean) as string[]) || [];
   if (product.price) prices.push(product.price);
