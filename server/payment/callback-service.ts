@@ -1,5 +1,4 @@
 
-
 import { reportUnexpectedServerError } from "@/server/error-handling";
 import { getPaymentProvider } from "./config";
 import { PaymentFlowService } from "./flow-service";
@@ -7,6 +6,7 @@ import { PaymentLogService } from "./log-service";
 import { paymentRepository } from "./repository";
 import { getProviderDefinition } from "./registry";
 import type { PaymentProviderKind } from "./registry";
+import { claimPaymentWebhookEvent } from "./webhook-events";
 
 export function paymentCallbackResponse(ok: boolean) {
   return { body: ok ? "success" : "fail", contentType: "text/plain", status: ok ? 200 : 400 };
@@ -56,6 +56,30 @@ export class PaymentCallbackService {
     }
     if (!record || !result.orderNo || result.amount === undefined) return this.response(provider, false, input);
     const orderNo = result.orderNo;
+
+    // Event-level idempotency: duplicate webhooks ack success without re-confirming.
+    const isFirstEvent = await claimPaymentWebhookEvent(this.database, {
+      provider,
+      orderNo,
+      orderId: record.id,
+      paymentOrderNo: result.paymentOrderNo,
+      status: result.status,
+      amount: result.amount,
+      headers: input.headers,
+    });
+    if (!isFirstEvent) {
+      await logs.writeBestEffort({
+        orderId: record.id,
+        provider,
+        orderNo,
+        paymentOrderNo: result.paymentOrderNo,
+        eventType: "NOTIFY",
+        verifyStatus: "VERIFIED",
+        message: "WEBHOOK_EVENT_DUPLICATE",
+        payload: input.payload,
+      });
+      return this.response(provider, true, input);
+    }
 
     try {
       const outcome = await new PaymentFlowService(this.database, this.runtime).confirm(orderNo, "CALLBACK", result.amount, attempt!.id);
