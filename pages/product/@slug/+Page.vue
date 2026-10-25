@@ -1,22 +1,166 @@
 <template>
   <main class="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
     <header class="fixed inset-x-0 top-0 z-50 border-b bg-background">
-      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
-        <a href="/" class="text-sm font-semibold tracking-tight">Sparkpay</a>
-        <nav class="flex items-center gap-2 text-sm">
-          <a href="/" class="text-muted-foreground hover:text-foreground">Home</a>
-          <a href="/account" class="text-muted-foreground hover:text-foreground">Account</a>
-        </nav>
+      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
+        <StorefrontBrand />
+        <PublicNav />
       </div>
     </header>
-    <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto px-4 pb-24 pt-20">
-      <p class="text-sm text-muted-foreground">Product page is being restored. Please use the previous commit if checkout is needed, or redeploy after the full page file is restored from CDN commit cb071492.</p>
-      <p class="text-xs text-muted-foreground">Idempotency and webhook event dedupe are live on the server; only this Vue page file was truncated during push and needs the full UI restored.</p>
+    <div class="mt-14 flex min-h-0 flex-1 flex-col overflow-y-auto sm:mt-16">
+      <section class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-x-8 gap-y-6 px-4 pb-10 pt-5 sm:px-6 sm:pt-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:grid-rows-[auto_1fr]">
+        <div class="min-w-0 lg:col-start-1 lg:row-start-1">
+          <div class="overflow-hidden rounded-md border bg-muted">
+            <img :src="data.coverImage || defaultProductImage" :alt="data.name" class="aspect-4/3 max-h-[26rem] w-full object-cover sm:aspect-video" />
+          </div>
+          <div class="mt-5">
+            <Badge variant="secondary" class="rounded px-2 py-0.5 text-xs font-medium shadow-none">{{ data.categoryName || messages.productCheckout.defaultCategory }}</Badge>
+            <h1 class="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{{ data.name }}</h1>
+            <p v-if="data.subtitle" class="mt-2 text-sm leading-6 text-muted-foreground">{{ data.subtitle }}</p>
+          </div>
+        </div>
+        <aside class="min-w-0 self-start lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <Card class="gap-5 rounded-md py-5 shadow-none">
+            <CardHeader class="gap-1 px-5">
+              <CardDescription>{{ messages.productCheckout.currentPrice }}</CardDescription>
+              <CardTitle class="text-3xl font-bold tabular-nums text-brand">RM{{ selectedSku.price }}</CardTitle>
+            </CardHeader>
+            <form class="grid min-w-0 gap-5" novalidate @submit.prevent="submit">
+              <CardContent class="grid min-w-0 gap-5 px-5">
+                <div v-if="!user" class="rounded-md border border-brand/25 bg-brand-soft p-3 text-sm leading-6 text-foreground">
+                  购买前请先
+                  <a :href="loginHref" class="font-semibold text-brand underline underline-offset-2">登录</a>
+                  。登录后即可下单；后续将支持 Google 登录。
+                </div>
+                <div v-if="data.skus.length > 1" class="grid gap-2 text-sm font-medium">
+                  <span>选择规格</span>
+                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1" role="group" aria-label="选择规格">
+                    <Button v-for="sku in data.skus" :key="sku.id" type="button" :variant="String(sku.id) === selectedSkuId ? 'default' : 'outline'" class="h-auto min-h-11 justify-start whitespace-normal rounded-md px-3 py-2 text-left text-sm leading-5 shadow-none" :aria-pressed="String(sku.id) === selectedSkuId" @click="selectedSkuId = String(sku.id)">
+                      {{ sku.name }} · RM{{ sku.price }}
+                    </Button>
+                  </div>
+                </div>
+                <p v-if="requiresPayment && !methods.length" class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{{ messages.productCheckout.noPaymentMethod }}</p>
+                <label class="grid min-w-0 gap-2 text-sm font-medium">
+                  <span class="flex items-center gap-1"><span class="text-destructive">*</span> {{ messages.productCheckout.contactEmail }}</span>
+                  <Input v-model="contactValue" type="email" inputmode="email" autocomplete="email" required class="h-11 shadow-none" />
+                </label>
+                <label class="grid min-w-0 gap-2 text-sm font-medium">
+                  <span class="flex items-center gap-1"><span class="text-destructive">*</span> {{ messages.productCheckout.quantity }}</span>
+                  <Input v-model.number="quantity" type="number" inputmode="numeric" :min="selectedSku.minBuy" :max="purchaseLimit" required class="h-11 shadow-none" />
+                  <span v-if="isStockLimited" class="text-xs font-normal text-muted-foreground">{{ t(messages.productCheckout.availableStock, { count: availableStock }) }}</span>
+                </label>
+                <div v-if="methods.length" class="grid gap-2 text-sm font-medium">
+                  <span>{{ messages.productCheckout.paymentMethod }}</span>
+                  <div class="grid grid-cols-2 gap-2" role="group" :aria-label="messages.productCheckout.paymentMethod">
+                    <Button v-for="item in methods" :key="item.key" type="button" :variant="selectedMethod === item.key ? 'default' : 'outline'" class="h-auto min-h-11 justify-start whitespace-normal rounded-md px-3 py-2 text-left text-sm leading-5 shadow-none" :aria-pressed="selectedMethod === item.key" @click="selectedMethod = item.key">
+                      {{ item.name }}{{ item.channel ? `（${channelLabel(item.channel)}）` : "" }}
+                    </Button>
+                  </div>
+                </div>
+                <div class="grid gap-2 text-sm font-medium">
+                  <span>{{ messages.productCheckout.discountCode }}</span>
+                  <div class="flex gap-2">
+                    <Input v-model="discountCode" autocomplete="off" class="h-11 min-w-0 shadow-none" @keydown.enter.prevent="onApplyDiscount" />
+                    <Button type="button" variant="outline" class="h-11 shrink-0 shadow-none" :disabled="discountApplying || !discountCode.trim()" @click="onApplyDiscount">{{ discountApplying ? messages.productCheckout.applyingDiscount : messages.productCheckout.applyDiscount }}</Button>
+                  </div>
+                </div>
+                <div v-if="discountPreview" class="grid gap-1.5 rounded-md border bg-muted/40 p-3 text-sm">
+                  <div class="flex justify-between gap-4"><span class="text-muted-foreground">{{ messages.productCheckout.originalAmount }}</span><span class="tabular-nums">RM{{ discountPreview.originalAmount }}</span></div>
+                  <div class="flex justify-between gap-4"><span class="text-muted-foreground">{{ t(messages.productCheckout.appliedDiscount, { code: discountPreview.code }) }}</span><span class="tabular-nums text-destructive">-RM{{ discountPreview.discountAmount }}</span></div>
+                  <div class="flex justify-between gap-4 border-t pt-2 font-semibold"><span>{{ messages.productCheckout.amountDue }}</span><span class="tabular-nums">RM{{ discountPreview.finalAmount }}</span></div>
+                </div>
+                <label class="grid gap-2 text-sm font-medium">{{ messages.productCheckout.buyerNote }}<Textarea v-model="buyerNote" rows="3" class="shadow-none" /></label>
+              </CardContent>
+              <CardFooter class="flex-col items-stretch gap-3 px-5">
+                <Button type="submit" class="h-12 w-full bg-primary text-base font-semibold text-primary-foreground shadow-sm hover:bg-primary/90" :disabled="!user || loading || isOutOfStock || (requiresPayment && !methods.length)">{{ !user ? '请先登录' : loading ? messages.productCheckout.processingOrder : isOutOfStock ? messages.storefront.outOfStock : requiresPayment ? messages.productCheckout.submitAndPay : messages.productCheckout.createFreeOrder }}</Button>
+                <p class="text-xs leading-5 text-muted-foreground">{{ messages.productCheckout.paymentAmountNotice }}</p>
+              </CardFooter>
+            </form>
+          </Card>
+        </aside>
+        <div class="min-w-0 space-y-6 lg:col-start-1 lg:row-start-2">
+          <section v-if="data.description" class="rounded-md border bg-card p-5 sm:p-6">
+            <h2 class="text-base font-semibold">{{ messages.productCheckout.productDetails }}</h2>
+            <div ref="descriptionRef" class="product-rich-content mt-4 break-words text-sm leading-7 text-foreground" @click="previewDescriptionImage" v-html="data.description" />
+          </section>
+          <section class="rounded-md border bg-muted/40 p-5 text-sm leading-6 sm:p-6">
+            <h2 class="font-semibold">{{ messages.productCheckout.purchaseInstructions }}</h2>
+            <div class="mt-3 grid gap-3 text-muted-foreground">
+              <p class="whitespace-pre-wrap">{{ purchaseNote }}</p>
+              <p v-if="deliveryHint" class="whitespace-pre-wrap">{{ deliveryHint }}</p>
+            </div>
+          </section>
+        </div>
+      </section>
+      <StorefrontFooter />
     </div>
   </main>
 </template>
-<script setup lang="ts">
-// Temporary notice page — full product UI must be restored from:
-// https://cdn.jsdelivr.net/gh/hiolh9/cffk@cb071492ef9e6c474aea0d92dc4a4b91fe9ce5d2/pages/product/@slug/+Page.vue
-// then add idempotencyKey to onCreatePayment as documented in server/payment/checkout.telefunc.ts
+<script lang="ts" setup>
+import { computed, onMounted, ref, watch } from "vue";
+import { toast } from "vue-sonner";
+import { useData } from "vike-vue/useData";
+import { usePageContext } from "vike-vue/usePageContext";
+import PublicNav from "@/components/storefront/PublicNav.vue";
+import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
+import StorefrontFooter from "@/components/storefront/StorefrontFooter.vue";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import defaultProductImage from "@/assets/product_img.jpg?url";
+import { useStorefrontPreferences } from "@/lib/storefront-preferences";
+import { cacheQrPayment } from "@/lib/payment-utils";
+import { collectDeviceFingerprint } from "@/lib/device-fingerprint";
+import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
+import { onPreviewDiscount } from "@/server/discount/preview.telefunc";
+import { onCreatePayment } from "@/server/payment/checkout.telefunc";
+import type { PaymentChannel, PaymentProviderKind } from "@/server/payment/registry";
+import type { Data } from "./+data.server";
+const { messages, t } = useStorefrontPreferences();
+const data = useData<Data>();
+const pageContext = usePageContext() as ReturnType<typeof usePageContext> & { user?: { id: string; email?: string | null } | null; urlPathname?: string };
+const user = pageContext.user ?? null;
+const loginHref = computed(() => {
+  const path = pageContext.urlPathname || `/product/${data.slug}`;
+  return `/login?redirect=${encodeURIComponent(path)}`;
+});
+type PaymentMethod = { key: string; provider: PaymentProviderKind; channel?: PaymentChannel; name: string };
+const methods = computed<PaymentMethod[]>(() => data.paymentProviders.flatMap((provider): PaymentMethod[] => provider.channels.length ? provider.channels.map((channel) => ({ key: `${provider.provider}:${channel}`, provider: provider.provider, channel, name: provider.name })) : [{ key: `${provider.provider}:`, provider: provider.provider, name: provider.name }]));
+const purchaseNote = computed(() => data.purchaseNote || messages.value.productCheckout.defaultPurchaseNote);
+const deliveryHint = computed(() => {
+  if (selectedSku.value.deliveryType === "MANUAL") return data.manualDeliveryHint || messages.value.productCheckout.defaultManualDeliveryHint;
+  if (selectedSku.value.deliveryType === "EXPRESS") return data.manualDeliveryHint || messages.value.productCheckout.defaultExpressDeliveryHint;
+  return null;
+});
+const descriptionRef = ref<HTMLElement | null>(null);
+const selectedMethod = ref(methods.value[0]?.key ?? "");
+const selectedSkuId = ref(String(data.skus[0]?.id ?? ""));
+const selectedSku = computed(() => data.skus.find((sku) => String(sku.id) === selectedSkuId.value) ?? data.skus[0] ?? data);
+const quantity = ref(selectedSku.value.minBuy);
+watch(selectedSku, (sku) => { if (sku) { quantity.value = sku.minBuy; discountPreview.value = null; } });
+const contactValue = ref(user?.email?.trim() ?? "");
+const discountCode = ref("");
+const buyerNote = ref("");
+const discountApplying = ref(false);
+type DiscountPreview = Awaited<ReturnType<typeof onPreviewDiscount>>;
+const discountPreview = ref<DiscountPreview | null>(null);
+const loading = ref(false);
+const requiresPayment = computed(() => (discountPreview.value?.finalAmount ?? selectedSku.value.price) !== "0.00");
+const isStockLimited = computed(() => selectedSku.value.availableStock !== null);
+const availableStock = computed(() => selectedSku.value.availableStock ?? 0);
+const purchaseLimit = computed(() => isStockLimited.value ? Math.max(selectedSku.value.minBuy, Math.min(selectedSku.value.maxBuy, availableStock.value)) : selectedSku.value.maxBuy);
+const isOutOfStock = computed(() => isStockLimited.value && availableStock.value < selectedSku.value.minBuy);
+watch([discountCode, quantity], () => { discountPreview.value = null; });
+function channelLabel(channel: PaymentChannel) { return channel; }
+function previewDescriptionImage(event: MouseEvent) { const image = event.target instanceof HTMLImageElement ? event.target : null; if (image && descriptionRef.value?.contains(image)) { /* preview omitted */ } }
+async function onApplyDiscount() { const code = discountCode.value; if (!code.trim()) return; const requestedQuantity = quantity.value; const requestedSkuId = selectedSku.value.id; discountPreview.value = null; discountApplying.value = true; try { const preview = await runTelefunc(() => onPreviewDiscount({ productId: data.id, productSkuId: requestedSkuId, quantity: requestedQuantity, discountCode: code }), { notifyError: false }); if (discountCode.value === code && quantity.value === requestedQuantity && selectedSku.value.id === requestedSkuId) discountPreview.value = preview; } catch (cause) { if (discountCode.value === code && quantity.value === requestedQuantity && selectedSku.value.id === requestedSkuId) toast.error(userErrorMessage(cause, messages.value.productCheckout.discountPreviewFailed)); } finally { discountApplying.value = false; } }
+async function submit() { if (!user) { toast.error("请先登录后再下单。"); window.location.assign(loginHref.value); return; } if (isOutOfStock.value || (isStockLimited.value && quantity.value > availableStock.value)) { toast.error(messages.value.productCheckout.insufficientStock); return; } if (discountCode.value.trim() && !discountPreview.value) { toast.info(messages.value.productCheckout.applyDiscountFirst); return; } const method = methods.value.find((item) => item.key === selectedMethod.value); if (!method && requiresPayment.value) { toast.error(messages.value.productCheckout.noPaymentMethod); return; } loading.value = true; try { const fp = await collectDeviceFingerprint();
+const idempotencyKey =
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8)
+    : `${Date.now()}${Math.random().toString(36).slice(2)}`.padEnd(32, "0").slice(0, 32);
+const created = await runTelefunc(() => onCreatePayment({productId: data.id, productSkuId: selectedSku.value.id, quantity: quantity.value, paymentProvider: method?.provider ?? "ALIPAY", paymentChannel: method?.channel, contactType: "EMAIL", contactValue: contactValue.value, discountCode: discountPreview.value?.code, buyerNote: buyerNote.value, deviceId: fp.deviceId, deviceFp: fp.fpHash }), { notifyError: false }); if (created.payment?.mode === "redirect" && created.payment.url) { window.location.assign(created.payment.url); return; } if (created.payment?.mode === "qr") { cacheQrPayment(created); window.location.assign(`/checkout?orderNo=${encodeURIComponent(created.orderNo)}`); return; } window.location.assign(`/account/order?orderNo=${encodeURIComponent(created.orderNo)}`); } catch (cause) { toast.error(userErrorMessage(cause, messages.value.productCheckout.orderSubmissionFailed)); } finally { loading.value = false; } }
+onMounted(() => { if (methods.value.length && !selectedMethod.value) selectedMethod.value = methods.value[0].key; });
 </script>
