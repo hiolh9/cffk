@@ -90,6 +90,12 @@
             </SidebarMenuItem>
 
             <SidebarMenuItem>
+              <SidebarMenuButton as-child :is-active="isItemActive(adminNavigation.blog)">
+                <a :href="basePath + adminNavigation.blog.path"><NewspaperIcon /><span>{{ adminNavigation.blog.title }}</span></a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
               <Collapsible default-open class="group/collapsible">
                 <CollapsibleTrigger as-child>
                   <SidebarMenuButton :is-active="isGroupActive(adminNavigation.push)">
@@ -179,7 +185,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
 import { adminNavigation, adminPages, isAdminNavigationItemActive, type AdminNavigationGroup, type AdminNavigationItem } from "@/lib/admin-navigation";
-import { BellIcon, ChevronRightIcon, ChevronUpIcon, ChevronsUpDownIcon, ClipboardListIcon, ExternalLinkIcon, InfoIcon, KeyRoundIcon, LayoutDashboardIcon, LogOutIcon, PackageIcon, SettingsIcon, UserRoundCogIcon, UsersIcon } from "@lucide/vue";
+import { BellIcon, ChevronRightIcon, ChevronUpIcon, ChevronsUpDownIcon, ClipboardListIcon, ExternalLinkIcon, InfoIcon, KeyRoundIcon, LayoutDashboardIcon, LogOutIcon, NewspaperIcon, PackageIcon, SettingsIcon, UserRoundCogIcon, UsersIcon } from "@lucide/vue";
 import logoUrl from "@/assets/logo.svg?url";
 import { navigate } from "vike/client/router";
 import { computed, ref } from "vue";
@@ -231,7 +237,6 @@ function compareVersions(current: string, latest: string) {
 function isItemActive(item: AdminNavigationItem) {
   return isAdminNavigationItemActive(pageContext.urlPathname, basePath.value, item);
 }
-
 
 function isGroupActive(group: AdminNavigationGroup) {
   return group.items.some((item) => isItemActive(item));
