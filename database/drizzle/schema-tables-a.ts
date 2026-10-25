@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const createdAt = integer("createdAt", { mode: "timestamp_ms" }).notNull();
 export const updatedAt = integer("updatedAt", { mode: "timestamp_ms" }).notNull();
@@ -125,6 +125,10 @@ export const siteSetting = sqliteTable("siteSetting", {
   behaviorScoreReview: integer("behaviorScoreReview").notNull().default(50),
   behaviorScoreBlock: integer("behaviorScoreBlock").notNull().default(80),
   timezone: text("timezone").notNull().default("Asia/Shanghai"),
+  /** Default list/charge currency when no regional price is set (MYR). */
+  defaultCurrency: text("defaultCurrency").notNull().default("MYR"),
+  /** Optional JSON array of enabled store currencies, e.g. ["MYR","SGD"]. null = all. */
+  enabledCurrenciesJson: text("enabledCurrenciesJson"),
   createdAt,
   updatedAt,
 });
@@ -179,7 +183,10 @@ export const productSku = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     productId: integer("productId").notNull().references(() => productV2.id),
     name: text("name").notNull(),
+    /** Minor units in site default currency (MYR cents). */
     price: integer("price").notNull(),
+    /** Optional regional list prices as JSON minor units, e.g. {"SGD":1500,"USD":400}. Not required. */
+    regionalPricesJson: text("regionalPricesJson"),
     status: text("status", { enum: ["ACTIVE", "INACTIVE"] }).notNull().default("ACTIVE"),
     fulfillmentSource: text("fulfillmentSource", { enum: ["LOCAL", "SUPPLIER"] }).notNull().default("LOCAL"),
     deliveryType: text("deliveryType", {
@@ -250,6 +257,8 @@ export const order = sqliteTable(
     unitPrice: integer("unitPrice").notNull(),
     quantity: integer("quantity").notNull(),
     amount: integer("amount").notNull(),
+    /** ISO currency of unitPrice/amount (MYR default). */
+    currency: text("currency").notNull().default("MYR"),
     contactType: text("contactType", { enum: ["EMAIL", "QQ", "TELEGRAM", "OTHER"] }).notNull().default("EMAIL"),
     contactValue: text("contactValue"),
     contactEmailNormalized: text("contactEmailNormalized"),
