@@ -1,11 +1,12 @@
 import type { Context, Hono } from "hono";
 import { getPublicCatalog } from "@/server/catalog/public";
+import { listPublishedBlogPosts } from "@/server/blog/public";
 import { getSiteSettings } from "@/server/site/public-settings";
 import { env } from "@/server/env";
 
 type AppBindings = { Bindings: Record<string, unknown> & { DB: D1Database } };
 
-const STATIC_PATHS = ["/", "/privacy", "/terms", "/sales"] as const;
+const STATIC_PATHS = ["/", "/blog", "/privacy", "/terms", "/sales"] as const;
 
 function escapeXml(value: string) {
   return value
@@ -81,14 +82,14 @@ export function registerSeoRoutes(app: Hono<AppBindings>) {
       urls.push({
         loc,
         lastmod: now,
-        changefreq: path === "/" ? "daily" : "monthly",
-        priority: path === "/" ? "1.0" : "0.5",
+        changefreq: path === "/" || path === "/blog" ? "daily" : "monthly",
+        priority: path === "/" ? "1.0" : path === "/blog" ? "0.7" : "0.5",
       });
       urls.push({
         loc: `${origin}${enPath(path)}`,
         lastmod: now,
-        changefreq: path === "/" ? "daily" : "monthly",
-        priority: path === "/" ? "0.9" : "0.5",
+        changefreq: path === "/" || path === "/blog" ? "daily" : "monthly",
+        priority: path === "/" ? "0.9" : path === "/blog" ? "0.65" : "0.5",
       });
     }
 
@@ -112,6 +113,32 @@ export function registerSeoRoutes(app: Hono<AppBindings>) {
       }
     } catch {
       /* still return static URLs */
+    }
+
+    try {
+      const posts = await listPublishedBlogPosts(context.env.DB, 100);
+      for (const post of posts) {
+        if (!post.slug) continue;
+        const blogPath = `/blog/${encodeURIComponent(post.slug)}`;
+        const lastmod =
+          post.publishedAt instanceof Date && !Number.isNaN(post.publishedAt.getTime())
+            ? post.publishedAt.toISOString()
+            : now;
+        urls.push({
+          loc: `${origin}${blogPath}`,
+          lastmod,
+          changefreq: "weekly",
+          priority: "0.6",
+        });
+        urls.push({
+          loc: `${origin}${enPath(blogPath)}`,
+          lastmod,
+          changefreq: "weekly",
+          priority: "0.6",
+        });
+      }
+    } catch {
+      /* ignore blog errors in sitemap */
     }
 
     const body = [
