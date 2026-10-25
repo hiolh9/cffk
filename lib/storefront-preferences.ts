@@ -46,7 +46,6 @@ export function detectBrowserLocale(browserLocales: readonly string[]): Storefro
     if (normalizedLocale.startsWith("en")) return "en-US";
     if (normalizedLocale.startsWith("zh")) return "zh-CN";
   }
-
   return "zh-CN";
 }
 
@@ -81,7 +80,6 @@ function initialize() {
   if (isStoreCurrency(savedCurrency)) {
     currency.value = savedCurrency;
   } else {
-    // Prefer server hint from SSR (data-cf-country on html) if present, else MYR
     const cfCountry = document.documentElement.dataset.cfCountry || "";
     currency.value = currencyFromCountry(cfCountry);
     window.localStorage.setItem(CURRENCY_STORAGE_KEY, currency.value);
@@ -126,11 +124,13 @@ export function useStorefrontPreferences(): {
   }
 
   function setCurrency(next: StoreCurrency) {
+    if (currency.value === next) return;
     currency.value = next;
     if (typeof window === "undefined") return;
     window.localStorage.setItem(CURRENCY_STORAGE_KEY, next);
     writeCurrencyCookie(next);
     applyDocumentPreferences();
+    window.location.reload();
   }
 
   function t(value: string, params: Record<string, string | number> = {}) {
