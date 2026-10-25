@@ -1,12 +1,14 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
 import { card, category, productV2, productSku } from "@/database/drizzle/schema";
+import { DEFAULT_STORE_CURRENCY, resolveListPrice, type StoreCurrency } from "@/lib/currency";
 import { formatCentsAsYuan } from "@/lib/payment-utils";
 
 export type PublicSku = {
   id: number;
   name: string;
   price: string;
+  currency: StoreCurrency;
   deliveryType: "CARD_AUTO" | "FIXED_CARD" | "MANUAL" | "EXPRESS" | "SUPPLIER";
   physicalStock: number | null;
   availableStock: number | null;
@@ -30,6 +32,7 @@ export type PublicCatalog = {
     subtitle: string | null;
     coverImage: string | null;
     price: string;
+    currency: StoreCurrency;
     deliveryType: "CARD_AUTO" | "FIXED_CARD" | "MANUAL" | "EXPRESS" | "SUPPLIER";
     physicalStock: number | null;
     availableStock: number | null;
@@ -47,7 +50,20 @@ export type PublicProductDetail = PublicCatalog["products"][number] & {
   skus: PublicSku[];
 };
 
-export async function getPublicProductDetail(database: D1Database, slug: string): Promise<PublicProductDetail | null> {
+function resolveSkuPrice(baseMinor: number, regionalPricesJson: string | null | undefined, preferred: StoreCurrency) {
+  return resolveListPrice({
+    preferredCurrency: preferred,
+    baseMinor,
+    defaultCurrency: DEFAULT_STORE_CURRENCY,
+    regionalPricesJson,
+  });
+}
+
+export async function getPublicProductDetail(
+  database: D1Database,
+  slug: string,
+  preferredCurrency: StoreCurrency = DEFAULT_STORE_CURRENCY,
+): Promise<PublicProductDetail | null> {
   const normalizedSlug = slug.trim().toLowerCase();
   if (!normalizedSlug) return null;
 
@@ -73,13 +89,48 @@ export async function getPublicProductDetail(database: D1Database, slug: string)
     .limit(1);
   if (!item) return null;
 
-  const skuRows = await db.select({ id: productSku.id, name: productSku.name, price: productSku.price, deliveryType: productSku.deliveryType, physicalStock: productSku.physicalStock, minBuy: productSku.minBuy, maxBuy: productSku.maxBuy }).from(productSku).where(and(eq(productSku.productId, item.id), eq(productSku.status, "ACTIVE"))).orderBy(asc(productSku.sort), asc(productSku.id));
-  const skus = await Promise.all(skuRows.map(async (sku) => ({ ...sku, price: formatCentsAsYuan(sku.price), availableStock: sku.deliveryType === "CARD_AUTO" ? await countAvailableCardStockBySku(db, sku.id) : sku.deliveryType === "SUPPLIER" ? null : sku.physicalStock })));
+  const skuRows = await db
+    .select({
+      id: productSku.id,
+      name: productSku.name,
+      price: productSku.price,
+      regionalPricesJson: productSku.regionalPricesJson,
+      deliveryType: productSku.deliveryType,
+      physicalStock: productSku.physicalStock,
+      minBuy: productSku.minBuy,
+      maxBuy: productSku.maxBuy,
+    })
+    .from(productSku)
+    .where(and(eq(productSku.productId, item.id), eq(productSku.status, "ACTIVE")))
+    .orderBy(asc(productSku.sort), asc(productSku.id));
+
+  const skus = await Promise.all(
+    skuRows.map(async (sku) => {
+      const resolved = resolveSkuPrice(sku.price, sku.regionalPricesJson, preferredCurrency);
+      return {
+        id: sku.id,
+        name: sku.name,
+        price: resolved.price,
+        currency: resolved.currency,
+        deliveryType: sku.deliveryType,
+        physicalStock: sku.physicalStock,
+        minBuy: sku.minBuy,
+        maxBuy: sku.maxBuy,
+        availableStock:
+          sku.deliveryType === "CARD_AUTO"
+            ? await countAvailableCardStockBySku(db, sku.id)
+            : sku.deliveryType === "SUPPLIER"
+              ? null
+              : sku.physicalStock,
+      };
+    }),
+  );
   const primary = skus[0];
   if (!primary) return null;
   return {
     ...item,
     price: primary.price,
+    currency: primary.currency,
     deliveryType: primary.deliveryType,
     physicalStock: primary.physicalStock,
     availableStock: primary.availableStock,
@@ -94,7 +145,10 @@ async function countAvailableCardStockBySku(db: ReturnType<typeof createDrizzleD
   return result?.count ?? 0;
 }
 
-export async function getPublicCatalog(database: D1Database): Promise<PublicCatalog> {
+export async function getPublicCatalog(
+  database: D1Database,
+  preferredCurrency: StoreCurrency = DEFAULT_STORE_CURRENCY,
+): Promise<PublicCatalog> {
   const db = createDrizzleDb(database);
   const [categories, products] = await Promise.all([
     db
@@ -132,15 +186,31 @@ export async function getPublicCatalog(database: D1Database): Promise<PublicCata
   const categoryNameById = new Map(categoryNames.map((item) => [item.id, item.name]));
   const itemIds = products.map((item) => item.id);
   const skuRows = itemIds.length
-    ? await db.select({ productId: productSku.productId, id: productSku.id, price: productSku.price, deliveryType: productSku.deliveryType, physicalStock: productSku.physicalStock, minBuy: productSku.minBuy, maxBuy: productSku.maxBuy })
-      .from(productSku)
-      .where(and(inArray(productSku.productId, itemIds), eq(productSku.status, "ACTIVE")))
-      .orderBy(asc(productSku.sort), asc(productSku.id))
+    ? await db
+        .select({
+          productId: productSku.productId,
+          id: productSku.id,
+          price: productSku.price,
+          regionalPricesJson: productSku.regionalPricesJson,
+          deliveryType: productSku.deliveryType,
+          physicalStock: productSku.physicalStock,
+          minBuy: productSku.minBuy,
+          maxBuy: productSku.maxBuy,
+        })
+        .from(productSku)
+        .where(and(inArray(productSku.productId, itemIds), eq(productSku.status, "ACTIVE")))
+        .orderBy(asc(productSku.sort), asc(productSku.id))
     : [];
-  const primaryByProduct = new Map<number, typeof skuRows[number]>();
+  const primaryByProduct = new Map<number, (typeof skuRows)[number]>();
   for (const sku of skuRows) if (!primaryByProduct.has(sku.productId)) primaryByProduct.set(sku.productId, sku);
   const cardSkuIds = skuRows.filter((sku) => sku.deliveryType === "CARD_AUTO").map((sku) => sku.id);
-  const cardStockRows = cardSkuIds.length ? await db.select({ productSkuId: card.productSkuId, availableStock: sql<number>`count(*)` }).from(card).where(and(inArray(card.productSkuId, cardSkuIds), eq(card.status, "UNUSED"))).groupBy(card.productSkuId) : [];
+  const cardStockRows = cardSkuIds.length
+    ? await db
+        .select({ productSkuId: card.productSkuId, availableStock: sql<number>`count(*)` })
+        .from(card)
+        .where(and(inArray(card.productSkuId, cardSkuIds), eq(card.status, "UNUSED")))
+        .groupBy(card.productSkuId)
+    : [];
   const cardStockBySkuId = new Map(cardStockRows.map((item) => [item.productSkuId, item.availableStock]));
 
   return {
@@ -148,7 +218,28 @@ export async function getPublicCatalog(database: D1Database): Promise<PublicCata
     products: products.flatMap((item) => {
       const sku = primaryByProduct.get(item.id);
       if (!sku) return [];
-      return [{ ...item, price: formatCentsAsYuan(sku.price), deliveryType: sku.deliveryType, physicalStock: sku.physicalStock, availableStock: sku.deliveryType === "CARD_AUTO" ? cardStockBySkuId.get(sku.id) ?? 0 : sku.deliveryType === "SUPPLIER" ? null : sku.physicalStock, minBuy: sku.minBuy, maxBuy: sku.maxBuy, categoryName: item.categoryId === null ? null : categoryNameById.get(item.categoryId) ?? null }];
+      const resolved = resolveSkuPrice(sku.price, sku.regionalPricesJson, preferredCurrency);
+      return [
+        {
+          ...item,
+          price: resolved.price,
+          currency: resolved.currency,
+          deliveryType: sku.deliveryType,
+          physicalStock: sku.physicalStock,
+          availableStock:
+            sku.deliveryType === "CARD_AUTO"
+              ? cardStockBySkuId.get(sku.id) ?? 0
+              : sku.deliveryType === "SUPPLIER"
+                ? null
+                : sku.physicalStock,
+          minBuy: sku.minBuy,
+          maxBuy: sku.maxBuy,
+          categoryName: item.categoryId === null ? null : categoryNameById.get(item.categoryId) ?? null,
+        },
+      ];
     }),
   };
 }
+
+// Keep legacy helper available for non-catalog formatting if needed
+void formatCentsAsYuan;

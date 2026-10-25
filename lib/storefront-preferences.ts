@@ -1,5 +1,15 @@
 import { computed, onMounted, ref, type ComputedRef } from "vue";
 
+import {
+  CURRENCY_COOKIE,
+  CURRENCY_STORAGE_KEY,
+  CURRENCY_META,
+  DEFAULT_STORE_CURRENCY,
+  STORE_CURRENCIES,
+  currencyFromCountry,
+  isStoreCurrency,
+  type StoreCurrency,
+} from "@/lib/currency";
 import enUS from "@/lib/i18n/en-US";
 import zhCN from "@/lib/i18n/zh-CN";
 import zhTW from "@/lib/i18n/zh-TW";
@@ -18,6 +28,7 @@ const localeStorageKey = "storefront-locale";
 const themeStorageKey = "storefront-theme";
 const locale = ref<StorefrontLocale>("zh-CN");
 const theme = ref<StorefrontTheme>("light");
+const currency = ref<StoreCurrency>(DEFAULT_STORE_CURRENCY);
 let initialized = false;
 
 function isLocale(value: string | null): value is StorefrontLocale {
@@ -39,9 +50,16 @@ export function detectBrowserLocale(browserLocales: readonly string[]): Storefro
   return "zh-CN";
 }
 
+function writeCurrencyCookie(next: StoreCurrency) {
+  if (typeof document === "undefined") return;
+  const maxAge = 60 * 60 * 24 * 365;
+  document.cookie = `${CURRENCY_COOKIE}=${encodeURIComponent(next)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
 function applyDocumentPreferences() {
   document.documentElement.classList.toggle("dark", theme.value === "dark");
   document.documentElement.lang = locale.value;
+  document.documentElement.dataset.currency = currency.value;
 }
 
 function initialize() {
@@ -50,6 +68,8 @@ function initialize() {
 
   const savedLocale = window.localStorage.getItem(localeStorageKey);
   const savedTheme = window.localStorage.getItem(themeStorageKey);
+  const savedCurrency = window.localStorage.getItem(CURRENCY_STORAGE_KEY);
+
   if (isLocale(savedLocale)) {
     locale.value = savedLocale;
   } else {
@@ -57,6 +77,16 @@ function initialize() {
     window.localStorage.setItem(localeStorageKey, locale.value);
   }
   if (isTheme(savedTheme)) theme.value = savedTheme;
+
+  if (isStoreCurrency(savedCurrency)) {
+    currency.value = savedCurrency;
+  } else {
+    // Prefer server hint from SSR (data-cf-country on html) if present, else MYR
+    const cfCountry = document.documentElement.dataset.cfCountry || "";
+    currency.value = currencyFromCountry(cfCountry);
+    window.localStorage.setItem(CURRENCY_STORAGE_KEY, currency.value);
+  }
+  writeCurrencyCookie(currency.value);
   applyDocumentPreferences();
 }
 
@@ -67,14 +97,19 @@ function replaceParams(value: string, params: Record<string, string | number>) {
 export function useStorefrontPreferences(): {
   locale: typeof locale;
   theme: typeof theme;
+  currency: typeof currency;
+  currencyMeta: ComputedRef<(typeof CURRENCY_META)[StoreCurrency]>;
+  currencies: typeof STORE_CURRENCIES;
   messages: ComputedRef<Messages>;
   setLocale: (nextLocale: StorefrontLocale) => void;
   setTheme: (nextTheme: StorefrontTheme) => void;
+  setCurrency: (next: StoreCurrency) => void;
   t: (value: string, params?: Record<string, string | number>) => string;
 } {
   onMounted(initialize);
 
   const messages = computed(() => locales[locale.value]);
+  const currencyMeta = computed(() => CURRENCY_META[currency.value]);
 
   function setLocale(nextLocale: StorefrontLocale) {
     locale.value = nextLocale;
@@ -90,9 +125,28 @@ export function useStorefrontPreferences(): {
     applyDocumentPreferences();
   }
 
+  function setCurrency(next: StoreCurrency) {
+    currency.value = next;
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(CURRENCY_STORAGE_KEY, next);
+    writeCurrencyCookie(next);
+    applyDocumentPreferences();
+  }
+
   function t(value: string, params: Record<string, string | number> = {}) {
     return replaceParams(value, params);
   }
 
-  return { locale, theme, messages, setLocale, setTheme, t };
+  return {
+    locale,
+    theme,
+    currency,
+    currencyMeta,
+    currencies: STORE_CURRENCIES,
+    messages,
+    setLocale,
+    setTheme,
+    setCurrency,
+    t,
+  };
 }
