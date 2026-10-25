@@ -10,6 +10,7 @@ import {
   isStoreCurrency,
   type StoreCurrency,
 } from "@/lib/currency";
+import { LOCALE_COOKIE, withLocalePrefix } from "@/lib/i18n/locale-path";
 import enUS from "@/lib/i18n/en-US";
 import zhCN from "@/lib/i18n/zh-CN";
 import zhTW from "@/lib/i18n/zh-TW";
@@ -26,7 +27,8 @@ type Messages = (typeof locales)[StorefrontLocale];
 
 const localeStorageKey = "storefront-locale";
 const themeStorageKey = "storefront-theme";
-const locale = ref<StorefrontLocale>("zh-CN");
+/** Default storefront language: English */
+const locale = ref<StorefrontLocale>("en-US");
 const theme = ref<StorefrontTheme>("light");
 const currency = ref<StoreCurrency>(DEFAULT_STORE_CURRENCY);
 let initialized = false;
@@ -46,7 +48,13 @@ export function detectBrowserLocale(browserLocales: readonly string[]): Storefro
     if (normalizedLocale.startsWith("en")) return "en-US";
     if (normalizedLocale.startsWith("zh")) return "zh-CN";
   }
-  return "zh-CN";
+  return "en-US";
+}
+
+function writeLocaleCookie(next: StorefrontLocale) {
+  if (typeof document === "undefined") return;
+  const maxAge = 60 * 60 * 24 * 365;
+  document.cookie = `${LOCALE_COOKIE}=${encodeURIComponent(next)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
 }
 
 function writeCurrencyCookie(next: StoreCurrency) {
@@ -55,9 +63,22 @@ function writeCurrencyCookie(next: StoreCurrency) {
   document.cookie = `${CURRENCY_COOKIE}=${encodeURIComponent(next)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
 }
 
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const parts = document.cookie.split(";");
+  for (const part of parts) {
+    const idx = part.indexOf("=");
+    if (idx <= 0) continue;
+    const key = part.slice(0, idx).trim();
+    if (key !== name) continue;
+    return decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return null;
+}
+
 function applyDocumentPreferences() {
   document.documentElement.classList.toggle("dark", theme.value === "dark");
-  document.documentElement.lang = locale.value;
+  document.documentElement.lang = locale.value === "en-US" ? "en" : locale.value === "zh-TW" ? "zh-Hant" : "zh-Hans";
   document.documentElement.dataset.currency = currency.value;
 }
 
@@ -65,16 +86,26 @@ function initialize() {
   if (initialized || typeof window === "undefined") return;
   initialized = true;
 
+  const path = window.location.pathname || "/";
+  const onEnglishPath = path === "/en" || path.startsWith("/en/");
+
   const savedLocale = window.localStorage.getItem(localeStorageKey);
+  const cookieLocale = readCookie(LOCALE_COOKIE);
   const savedTheme = window.localStorage.getItem(themeStorageKey);
   const savedCurrency = window.localStorage.getItem(CURRENCY_STORAGE_KEY);
 
-  if (isLocale(savedLocale)) {
+  if (onEnglishPath) {
+    locale.value = "en-US";
+  } else if (isLocale(cookieLocale)) {
+    locale.value = cookieLocale;
+  } else if (isLocale(savedLocale)) {
     locale.value = savedLocale;
   } else {
     locale.value = detectBrowserLocale(navigator.languages.length > 0 ? navigator.languages : [navigator.language]);
-    window.localStorage.setItem(localeStorageKey, locale.value);
   }
+  window.localStorage.setItem(localeStorageKey, locale.value);
+  writeLocaleCookie(locale.value);
+
   if (isTheme(savedTheme)) theme.value = savedTheme;
 
   if (isStoreCurrency(savedCurrency)) {
@@ -110,10 +141,19 @@ export function useStorefrontPreferences(): {
   const currencyMeta = computed(() => CURRENCY_META[currency.value]);
 
   function setLocale(nextLocale: StorefrontLocale) {
+    const prev = locale.value;
     locale.value = nextLocale;
     if (typeof window === "undefined") return;
     window.localStorage.setItem(localeStorageKey, nextLocale);
+    writeLocaleCookie(nextLocale);
     applyDocumentPreferences();
+
+    // English uses /en prefix for SEO; other locales use unprefixed paths
+    const target = withLocalePrefix(window.location.pathname + window.location.search, nextLocale);
+    const current = window.location.pathname + window.location.search;
+    if (target !== current || prev !== nextLocale) {
+      window.location.assign(target);
+    }
   }
 
   function setTheme(nextTheme: StorefrontTheme) {

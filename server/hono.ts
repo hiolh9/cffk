@@ -4,6 +4,7 @@ import { MAX_PAYMENT_CALLBACK_BYTES, normalizePaymentCallbackPayload } from "./p
 import { reportUnexpectedRequestError } from "./error-handling";
 import { registerMediaRoutes } from "./media/routes";
 import { registerSeoRoutes } from "./seo/routes";
+import { registerEnglishLocaleRewrite } from "./i18n/locale-middleware";
 import { telefuncHandler } from "./telefunc-handler";
 import vike from "@vikejs/hono";
 import { Hono, type Context } from "hono";
@@ -16,6 +17,10 @@ import { handleDujiaoSupplierCallback } from "./supplier/callback";
 
 function getApp() {
   const app = new Hono<{ Bindings: Record<string, unknown> & { DB: D1Database } }>();
+
+  // English SEO prefix must run before page routes
+  registerEnglishLocaleRewrite(app);
+
   app.use("*", async (context, next) => {
     await next();
     applySecurityHeaders(context.res.headers);
