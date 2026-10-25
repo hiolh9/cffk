@@ -4,9 +4,8 @@ import vikeVue from "vike-vue/config";
 const config: Config = {
   title: "CFFK-Shop",
   description: "",
-  passToClient: ["user", "site", "rootInitialized", "registrationEnabled"],
-  // Needed so data() can read Cookie / CF-IPCountry for currency preference
-  headers: ["cookie", "cf-ipcountry"],
+  passToClient: ["user", "site", "rootInitialized", "registrationEnabled", "urlLocale"],
+  headers: ["cookie", "cf-ipcountry", "x-storefront-locale"],
   extends: [vikeVue],
 };
 
