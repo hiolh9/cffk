@@ -17,13 +17,15 @@
   </template>
   <!-- Product + BreadcrumbList (+ AggregateRating when configured) -->
   <script v-if="productJsonLd" type="application/ld+json" v-text="productJsonLd" />
+  <!-- Homepage Organization + WebSite -->
+  <script v-if="siteJsonLd" type="application/ld+json" v-text="siteJsonLd" />
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import { usePageContext } from "vike-vue/usePageContext";
 import defaultLogoUrl from "@/assets/logo.svg?url";
-import { buildProductJsonLd, stringifyJsonLd } from "@/lib/seo/json-ld";
+import { buildProductJsonLd, buildSiteJsonLd, stringifyJsonLd } from "@/lib/seo/json-ld";
 
 type Site = {
   name?: string;
@@ -67,6 +69,11 @@ const isPrivatePage = computed(() => {
     || pathname === "/order"
     || pathname === "/checkout"
     || pathname === "/payment-result"
+    || pathname === "/two-factor"
+    || pathname === "/login"
+    || pathname === "/signup"
+    || pathname.startsWith("/account")
+    || pathname.startsWith("/auth/")
     || pathname.startsWith("/_error")
   );
 });
@@ -82,8 +89,8 @@ const seo = computed(() => {
   const isProductPage = Boolean(product?.name && (pageContext.urlPathname || "").startsWith("/product/"));
   const title = isProductPage ? `${product?.name} - ${siteName}` : siteName;
   const description = isProductPage
-    ? product?.subtitle?.trim() || toPlainText(product?.description) || pageContext.site?.subtitle || "Digital top-up store"
-    : pageContext.site?.subtitle || "Digital top-up store";
+    ? product?.subtitle?.trim() || toPlainText(product?.description) || pageContext.site?.subtitle || "Digital top-up store in Malaysia. Pay in MYR."
+    : pageContext.site?.subtitle || "Digital top-up store in Malaysia. Pay in MYR.";
   const canonicalUrl =
     !isPrivatePage.value && siteUrl.value
       ? new URL(pageContext.urlPathname || "/", `${siteUrl.value}/`).toString()
@@ -146,6 +153,19 @@ const productJsonLd = computed(() => {
     productUrl,
   });
 
+  return stringifyJsonLd(nodes);
+});
+
+const siteJsonLd = computed(() => {
+  const pathname = pageContext.urlPathname || "/";
+  if (pathname !== "/" || isPrivatePage.value || !siteUrl.value) return null;
+  const origin = siteUrl.value.replace(/\/$/, "");
+  const nodes = buildSiteJsonLd({
+    siteName: pageContext.site?.name || "Sparkpay",
+    siteUrl: origin,
+    description: pageContext.site?.subtitle || "Digital top-up store in Malaysia. Pay in MYR.",
+    logoUrl: pageContext.site?.logoIcon || pageContext.site?.logo || null,
+  });
   return stringifyJsonLd(nodes);
 });
 

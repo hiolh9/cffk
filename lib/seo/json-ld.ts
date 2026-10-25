@@ -23,6 +23,13 @@ export type ProductJsonLdInput = {
   productUrl: string;
 };
 
+export type OrganizationJsonLdInput = {
+  siteName: string;
+  siteUrl: string;
+  description?: string | null;
+  logoUrl?: string | null;
+};
+
 function toPlainText(value: string | null | undefined, max = 5000) {
   if (!value) return "";
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
@@ -49,6 +56,34 @@ function parseRating(value: string | number | null | undefined): number | null {
   return Math.round(n * 10) / 10;
 }
 
+/** Homepage Organization + WebSite graph. */
+export function buildSiteJsonLd(input: OrganizationJsonLdInput): object[] {
+  const origin = input.siteUrl.replace(/\/$/, "");
+  const logo = absoluteUrl(input.logoUrl, origin);
+  const organization: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${origin}/#organization`,
+    name: input.siteName,
+    url: `${origin}/`,
+  };
+  if (logo) organization.logo = logo;
+  if (input.description) organization.description = toPlainText(input.description, 300);
+
+  const website: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${origin}/#website`,
+    name: input.siteName,
+    url: `${origin}/`,
+    publisher: { "@id": `${origin}/#organization` },
+    inLanguage: ["en", "ms"],
+  };
+  if (input.description) website.description = toPlainText(input.description, 300);
+
+  return [organization, website];
+}
+
 /** Build Schema.org Product (+ optional AggregateRating) and BreadcrumbList. */
 export function buildProductJsonLd(input: ProductJsonLdInput): object[] {
   const origin = input.siteUrl.replace(/\/$/, "");
@@ -67,7 +102,7 @@ export function buildProductJsonLd(input: ProductJsonLdInput): object[] {
   };
 
   if (input.lowPrice && input.highPrice && input.lowPrice !== input.highPrice) {
-    offer.price = undefined;
+    delete offer.price;
     offer.priceSpecification = {
       "@type": "PriceSpecification",
       priceCurrency: currency,

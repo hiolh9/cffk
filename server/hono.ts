@@ -3,6 +3,7 @@ import { PaymentCallbackService } from "./payment/callback-service";
 import { MAX_PAYMENT_CALLBACK_BYTES, normalizePaymentCallbackPayload } from "./payment/callback-payload";
 import { reportUnexpectedRequestError } from "./error-handling";
 import { registerMediaRoutes } from "./media/routes";
+import { registerSeoRoutes } from "./seo/routes";
 import { telefuncHandler } from "./telefunc-handler";
 import vike from "@vikejs/hono";
 import { Hono, type Context } from "hono";
@@ -49,6 +50,7 @@ function getApp() {
   }
   app.post("/api/suppliers/dujiao-next/callback/:accountId", async (context) => handleDujiaoSupplierCallback(context.env.DB, context.req.param("accountId"), context.req.raw));
   registerMediaRoutes(app);
+  registerSeoRoutes(app);
   app.get("/api/security/turnstile", (context) => {
     const config = getTurnstileConfig(env);
     return context.json({ enabled: config.enabled, siteKey: config.enabled ? config.siteKey : null });
