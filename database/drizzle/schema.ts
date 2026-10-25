@@ -3,6 +3,7 @@ export * from "./schema-tables-a";
 export * from "./schema-tables-b1";
 export * from "./schema-tables-b2";
 export { riskBlacklist, riskDeviceSighting, riskUserScore } from "./schema-risk";
+export { blogPost } from "./schema-blog";
 
 import {
   user, session, account, verification, twoFactor, adminBootstrap, siteSetting,
@@ -18,6 +19,7 @@ import {
 } from "./schema-tables-b2";
 import { auditLog, invoiceSequence, accountingArchive } from "./schema-accounting";
 import { riskBlacklist, riskDeviceSighting, riskUserScore } from "./schema-risk";
+import { blogPost } from "./schema-blog";
 
 export const schema = {
   user, session, account, verification, twoFactor, adminBootstrap, siteSetting, riskBlacklist, riskDeviceSighting, riskUserScore,
@@ -27,4 +29,5 @@ export const schema = {
   emailTemplate, pushPolicy, pushLog, pushRetry, orderIdempotency, paymentWebhookEvent, scheduledTaskRun,
   supplierAccount, supplierBinding, supplierOrder, supplierSyncSettings, s3Config, media,
   auditLog, invoiceSequence, accountingArchive,
+  blogPost,
 };
