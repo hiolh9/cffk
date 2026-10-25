@@ -11,7 +11,7 @@ import {
 import {
   card, orderDelivery, paymentAttempt, automaticDeliveryJob, orderEvent, transactionGuard,
   paymentProvider, paymentLog, pushChannelConfig, orderRequestRateLimit, guestOrderRecoveryChallenge,
-  emailTemplate, pushPolicy, pushLog, pushRetry,
+  emailTemplate, pushPolicy, pushLog, pushRetry, orderIdempotency, paymentWebhookEvent,
 } from "./schema-tables-b1";
 import {
   scheduledTaskRun, supplierAccount, supplierBinding, supplierOrder, supplierSyncSettings, s3Config, media,
@@ -24,7 +24,7 @@ export const schema = {
   category, productV2, productSku, discountCode, order, customerAddress,
   card, orderDelivery, paymentAttempt, automaticDeliveryJob, orderEvent, transactionGuard,
   paymentProvider, paymentLog, pushChannelConfig, orderRequestRateLimit, guestOrderRecoveryChallenge,
-  emailTemplate, pushPolicy, pushLog, pushRetry, scheduledTaskRun,
+  emailTemplate, pushPolicy, pushLog, pushRetry, orderIdempotency, paymentWebhookEvent, scheduledTaskRun,
   supplierAccount, supplierBinding, supplierOrder, supplierSyncSettings, s3Config, media,
   auditLog, invoiceSequence, accountingArchive,
 };

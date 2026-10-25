@@ -93,8 +93,8 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
     userId: user.id,
   });
 
-  const { deviceId: _d, deviceFp: _f, ...orderInput } = input;
-  return requirePaymentFlowService().create(orderInput, user.id);
+  // deviceId / deviceFp are risk-only fields; flow service ignores them for createOrder.
+  return requirePaymentFlowService().create(input, user.id);
 }
 
 export const onCreatePayment = telefuncAction(internalOnCreatePayment);

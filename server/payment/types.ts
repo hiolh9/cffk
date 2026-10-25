@@ -32,6 +32,8 @@ export type PaymentCreateInput = {
   deviceId?: string;
   /** Hard fingerprint hash (canvas/webgl/…). */
   deviceFp?: string;
+  /** Client idempotency key (16–64 chars); same key within 5 min returns the same order. */
+  idempotencyKey?: string;
 };
 
 export type PaymentResult = {
