@@ -7,7 +7,6 @@ type AppBindings = { Bindings: Record<string, unknown> & { DB: D1Database } };
 
 const STATIC_PATHS = ["/", "/privacy", "/terms", "/sales"] as const;
 
-/** Escape XML special chars using numeric entities (avoids &-entity corruption). */
 function escapeXml(value: string) {
   return value
     .replace(/&/g, "&#38;")
@@ -40,6 +39,11 @@ function adminDisallowPath(): string | null {
   return `/${raw}`;
 }
 
+function enPath(path: string): string {
+  if (path === "/") return "/en";
+  return `/en${path}`;
+}
+
 export function registerSeoRoutes(app: Hono<AppBindings>) {
   app.get("/robots.txt", async (context) => {
     const origin = await resolvePublicOrigin(context);
@@ -70,21 +74,37 @@ export function registerSeoRoutes(app: Hono<AppBindings>) {
   app.get("/sitemap.xml", async (context) => {
     const origin = (await resolvePublicOrigin(context)).replace(/\/$/, "");
     const now = new Date().toISOString();
-    const urls: Array<{ loc: string; lastmod?: string; changefreq?: string; priority?: string }> = STATIC_PATHS.map(
-      (path) => ({
-        loc: path === "/" ? `${origin}/` : `${origin}${path}`,
+    const urls: Array<{ loc: string; lastmod?: string; changefreq?: string; priority?: string }> = [];
+
+    for (const path of STATIC_PATHS) {
+      const loc = path === "/" ? `${origin}/` : `${origin}${path}`;
+      urls.push({
+        loc,
         lastmod: now,
         changefreq: path === "/" ? "daily" : "monthly",
         priority: path === "/" ? "1.0" : "0.5",
-      }),
-    );
+      });
+      urls.push({
+        loc: `${origin}${enPath(path)}`,
+        lastmod: now,
+        changefreq: path === "/" ? "daily" : "monthly",
+        priority: path === "/" ? "0.9" : "0.5",
+      });
+    }
 
     try {
       const catalog = await getPublicCatalog(context.env.DB);
       for (const product of catalog.products) {
         if (!product.slug) continue;
+        const productPath = `/product/${encodeURIComponent(product.slug)}`;
         urls.push({
-          loc: `${origin}/product/${encodeURIComponent(product.slug)}`,
+          loc: `${origin}${productPath}`,
+          lastmod: now,
+          changefreq: "daily",
+          priority: "0.8",
+        });
+        urls.push({
+          loc: `${origin}${enPath(productPath)}`,
           lastmod: now,
           changefreq: "daily",
           priority: "0.8",
