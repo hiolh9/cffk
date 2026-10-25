@@ -40,6 +40,30 @@
       </DropdownMenuContent>
     </DropdownMenu>
 
+    <DropdownMenu>
+      <DropdownMenuTrigger as-child>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          class="h-9 px-2 text-xs font-semibold tabular-nums text-muted-foreground shadow-none hover:text-foreground"
+          aria-label="Currency"
+          title="Currency"
+        >
+          {{ currency }}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" :side-offset="8" class="w-44 shadow-md">
+        <DropdownMenuLabel>Currency</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem v-for="code in currencies" :key="code" @select="setCurrency(code)">
+            {{ code }}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+
     <Button
       type="button"
       variant="ghost"
@@ -120,7 +144,7 @@ const user = pageContext.user ?? null;
 const currentUserName = computed(() => user?.name?.trim() || user?.email || messages.value.nav.account);
 const userInitials = computed(() => currentUserName.value.slice(0, 1).toUpperCase());
 const signingOut = ref(false);
-const { messages, setLocale, setTheme, t, theme } = useStorefrontPreferences();
+const { messages, setLocale, setTheme, setCurrency, currency, currencies, t, theme } = useStorefrontPreferences();
 
 async function signOut() {
   if (signingOut.value) return;
