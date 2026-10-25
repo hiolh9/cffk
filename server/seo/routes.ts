@@ -9,21 +9,11 @@ const STATIC_PATHS = ["/", "/privacy", "/terms", "/sales"] as const;
 
 function escapeXml(value: string) {
   return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function resolveOrigin(context: Context<AppBindings>): string {
-  try {
-    const configured = context.req.url ? null : null;
-    void configured;
-  } catch {
-    /* ignore */
-  }
-  return "";
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """)
+    .replace(/'/g, "'");
 }
 
 async function resolvePublicOrigin(context: Context<AppBindings>): Promise<string> {
@@ -123,7 +113,4 @@ export function registerSeoRoutes(app: Hono<AppBindings>) {
       "cache-control": "public, max-age=300",
     });
   });
-
-  // silence unused helper in some bundlers
-  void resolveOrigin;
 }
