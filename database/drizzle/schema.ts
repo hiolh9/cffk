@@ -10,6 +10,8 @@ export {
   acctSettlement,
   acctSettlementOrder,
   acctAdjustment,
+  acctGeneralLedger,
+  acctPnLSnapshot,
 } from "./schema-settlement";
 
 import {
@@ -29,6 +31,7 @@ import { riskBlacklist, riskDeviceSighting, riskUserScore } from "./schema-risk"
 import { blogPost } from "./schema-blog";
 import {
   fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder, acctAdjustment,
+  acctGeneralLedger, acctPnLSnapshot,
 } from "./schema-settlement";
 
 export const schema = {
@@ -41,4 +44,5 @@ export const schema = {
   auditLog, invoiceSequence, accountingArchive,
   blogPost,
   fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder, acctAdjustment,
+  acctGeneralLedger, acctPnLSnapshot,
 };
