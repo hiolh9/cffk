@@ -7,6 +7,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Resource-Policy": "same-origin",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+  // script-src keeps unsafe-inline for SSR hydration; avoid third-party checkout scripts
   "Content-Security-Policy": [
     "default-src 'self'",
     "base-uri 'self'",
@@ -19,6 +20,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
     "connect-src 'self' https://challenges.cloudflare.com",
     "frame-src https://challenges.cloudflare.com",
+    "worker-src 'self' blob:",
     "upgrade-insecure-requests",
   ].join("; "),
 };
@@ -26,6 +28,10 @@ export const SECURITY_HEADERS: Record<string, string> = {
 export function applySecurityHeaders(headers: Headers) {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     if (!headers.has(key)) headers.set(key, value);
+  }
+  // Never reflect arbitrary ACAO
+  if (!headers.has("Access-Control-Allow-Origin")) {
+    headers.set("Vary", "Origin");
   }
 }
 
