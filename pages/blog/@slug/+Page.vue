@@ -49,58 +49,21 @@
     </article>
 
     <StorefrontFooter />
-
-    <script v-if="jsonLd" type="application/ld+json" v-text="jsonLd" />
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import { useData } from "vike-vue/useData";
-import { usePageContext } from "vike-vue/usePageContext";
 import PublicNav from "@/components/storefront/PublicNav.vue";
 import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
 import StorefrontFooter from "@/components/storefront/StorefrontFooter.vue";
-import { buildBlogJsonLd, parseFaqJson, stringifyJsonLd } from "@/lib/blog/seo";
+import { parseFaqJson } from "@/lib/blog/seo";
 import type { Data } from "./+data.server";
 
 const data = useData<Data>();
 const post = computed(() => data.value.post);
-const pageContext = usePageContext() as {
-  site?: { name?: string; siteUrl?: string | null };
-  urlPathname?: string;
-  urlParsed?: { origin?: string };
-};
-
 const faqs = computed(() => parseFaqJson(post.value.faqJson));
-
-const jsonLd = computed(() => {
-  const origin =
-    normalizeOrigin(pageContext.site?.siteUrl)
-    || normalizeOrigin(pageContext.urlParsed?.origin)
-    || "";
-  if (!origin) return null;
-  const pageUrl = new URL(pageContext.urlPathname || `/blog/${post.value.slug}`, `${origin}/`).toString();
-  const nodes = buildBlogJsonLd({
-    title: post.value.title,
-    slug: post.value.slug,
-    excerpt: post.value.excerpt,
-    contentHtml: post.value.contentHtml,
-    coverImage: post.value.coverImage,
-    seoTitle: post.value.seoTitle,
-    seoDescription: post.value.seoDescription,
-    schemaType: post.value.schemaType,
-    faqJson: post.value.faqJson,
-    customSchemaJson: post.value.customSchemaJson,
-    authorName: post.value.authorName,
-    publishedAt: post.value.publishedAt,
-    updatedAt: post.value.updatedAt,
-    siteName: pageContext.site?.name || "Sparkpay",
-    siteUrl: origin,
-    pageUrl,
-  });
-  return stringifyJsonLd(nodes);
-});
 
 function toIso(value: Date | string | number) {
   const d = value instanceof Date ? value : new Date(value);
@@ -111,16 +74,6 @@ function formatDate(value: Date | string | number) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString("en-MY", { year: "numeric", month: "short", day: "numeric" });
-}
-
-function normalizeOrigin(value: string | null | undefined) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : null;
-  } catch {
-    return null;
-  }
 }
 </script>
 

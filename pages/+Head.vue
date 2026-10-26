@@ -17,8 +17,10 @@
     <meta name="twitter:description" :content="seo.description" />
     <meta v-if="seo.imageUrl" name="twitter:image" :content="seo.imageUrl" />
   </template>
+  <!-- JSON-LD only in +Head (allowed); never put <script> inside page body templates -->
   <script v-if="productJsonLd" type="application/ld+json" v-text="productJsonLd" />
   <script v-if="siteJsonLd" type="application/ld+json" v-text="siteJsonLd" />
+  <script v-if="blogJsonLd" type="application/ld+json" v-text="blogJsonLd" />
 </template>
 
 <script setup lang="ts">
@@ -26,6 +28,7 @@ import { computed } from "vue";
 import { usePageContext } from "vike-vue/usePageContext";
 import defaultLogoUrl from "@/assets/logo.svg?url";
 import { stripLocalePrefix, withLocalePrefix } from "@/lib/i18n/locale-path";
+import { buildBlogJsonLd, stringifyJsonLd as stringifyBlogJsonLd } from "@/lib/blog/seo";
 import { buildProductJsonLd, buildSiteJsonLd, stringifyJsonLd } from "@/lib/seo/json-ld";
 
 type Site = {
@@ -53,9 +56,27 @@ type ProductData = {
   skus?: ProductSku[];
 };
 
+type BlogPostData = {
+  title?: string;
+  slug?: string;
+  excerpt?: string | null;
+  contentHtml?: string;
+  coverImage?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  schemaType?: "BlogPosting" | "Article" | "FAQPage";
+  faqJson?: string | null;
+  customSchemaJson?: string | null;
+  authorName?: string | null;
+  publishedAt?: Date | string | number | null;
+  updatedAt?: Date | string | number | null;
+};
+
+type PageData = ProductData & { post?: BlogPostData; posts?: unknown[] };
+
 type SeoPageContext = {
   site?: Site;
-  data?: ProductData;
+  data?: PageData;
   urlPathname?: string;
   urlLocale?: "en" | null;
   routeParams?: { adminPath?: string };
@@ -66,7 +87,6 @@ const pageContext = usePageContext() as SeoPageContext;
 
 const pathInfo = computed(() => {
   const stripped = stripLocalePrefix(pageContext.urlPathname || "/");
-  // After Hono /en rewrite, urlPathname is unprefixed; restore locale from pageContext
   if (!stripped.locale && pageContext.urlLocale === "en") {
     return { locale: "en" as const, path: stripped.path };
   }
@@ -95,15 +115,42 @@ const siteUrl = computed(
 );
 const iconUrl = computed(() => pageContext.site?.logoIcon || pageContext.site?.logo || defaultLogoUrl);
 
+const blogPost = computed(() => {
+  const data = pageContext.data;
+  const post = data?.post;
+  if (post?.title && post?.slug && post?.contentHtml != null) return post;
+  return null;
+});
+
 const seo = computed(() => {
   const siteName = pageContext.site?.name || "Sparkpay";
   const product = pageContext.data;
   const pathname = pathInfo.value.path;
   const isProductPage = Boolean(product?.name && pathname.startsWith("/product/"));
-  const title = isProductPage ? `${product?.name} - ${siteName}` : siteName;
-  const description = isProductPage
-    ? product?.subtitle?.trim() || toPlainText(product?.description) || pageContext.site?.subtitle || "Digital top-up store in Malaysia. Pay in MYR."
-    : pageContext.site?.subtitle || "Digital top-up store in Malaysia. Pay in MYR.";
+  const isBlogPost = Boolean(blogPost.value && pathname.startsWith("/blog/"));
+  const isBlogIndex = pathname === "/blog";
+
+  let title = siteName;
+  let description = pageContext.site?.subtitle || "Digital top-up store in Malaysia. Pay in MYR.";
+  let ogType = "website";
+  let imageSource: string | null | undefined = pageContext.site?.logoIcon || pageContext.site?.logo || defaultLogoUrl;
+
+  if (isProductPage && product?.name) {
+    title = `${product.name} - ${siteName}`;
+    description =
+      product.subtitle?.trim() || toPlainText(product.description) || description;
+    ogType = "product";
+    imageSource = product.coverImage || imageSource;
+  } else if (isBlogPost && blogPost.value) {
+    const p = blogPost.value;
+    title = `${p.seoTitle?.trim() || p.title} - ${siteName}`;
+    description = p.seoDescription?.trim() || p.excerpt?.trim() || toPlainText(p.contentHtml) || description;
+    ogType = "article";
+    imageSource = p.coverImage || imageSource;
+  } else if (isBlogIndex) {
+    title = `Blog - ${siteName}`;
+    description = "Guides, updates, and product tips.";
+  }
 
   const isEnglish = pathInfo.value.locale === "en";
   const canonicalPath = isEnglish ? withLocalePrefix(pathname, "en-US") : pathname;
@@ -111,12 +158,7 @@ const seo = computed(() => {
     !isPrivatePage.value && siteUrl.value
       ? new URL(canonicalPath, `${siteUrl.value}/`).toString()
       : null;
-  const imageUrl = !isPrivatePage.value
-    ? toAbsoluteUrl(
-        product?.coverImage || pageContext.site?.logoIcon || pageContext.site?.logo || defaultLogoUrl,
-        siteUrl.value,
-      )
-    : null;
+  const imageUrl = !isPrivatePage.value ? toAbsoluteUrl(imageSource, siteUrl.value) : null;
 
   return {
     title,
@@ -124,7 +166,7 @@ const seo = computed(() => {
     siteName,
     canonicalUrl,
     imageUrl,
-    ogType: isProductPage ? "product" : "website",
+    ogType,
     ogLocale: isEnglish ? "en_US" : "zh_CN",
     robots: isPrivatePage.value ? "noindex,nofollow,noarchive" : null,
   };
@@ -147,6 +189,7 @@ const productJsonLd = computed(() => {
   const product = pageContext.data;
   const pathname = pathInfo.value.path;
   if (!product?.name || !product.slug || !pathname.startsWith("/product/")) return null;
+  if (blogPost.value) return null;
   if (isPrivatePage.value || !siteUrl.value) return null;
 
   const origin = siteUrl.value.replace(/\/$/, "");
@@ -201,6 +244,35 @@ const siteJsonLd = computed(() => {
     logoUrl: pageContext.site?.logoIcon || pageContext.site?.logo || null,
   });
   return stringifyJsonLd(nodes);
+});
+
+const blogJsonLd = computed(() => {
+  const post = blogPost.value;
+  if (!post || isPrivatePage.value || !siteUrl.value) return null;
+  const origin = siteUrl.value.replace(/\/$/, "");
+  const pathname = pathInfo.value.path;
+  const pagePath =
+    pathInfo.value.locale === "en" ? withLocalePrefix(pathname, "en-US") : pathname;
+  const pageUrl = new URL(pagePath, `${origin}/`).toString();
+  const nodes = buildBlogJsonLd({
+    title: post.title!,
+    slug: post.slug!,
+    excerpt: post.excerpt ?? null,
+    contentHtml: post.contentHtml || "",
+    coverImage: post.coverImage ?? null,
+    seoTitle: post.seoTitle ?? null,
+    seoDescription: post.seoDescription ?? null,
+    schemaType: post.schemaType || "BlogPosting",
+    faqJson: post.faqJson ?? null,
+    customSchemaJson: post.customSchemaJson ?? null,
+    authorName: post.authorName ?? null,
+    publishedAt: post.publishedAt ?? null,
+    updatedAt: post.updatedAt ?? null,
+    siteName: pageContext.site?.name || "Sparkpay",
+    siteUrl: origin,
+    pageUrl,
+  });
+  return stringifyBlogJsonLd(nodes);
 });
 
 function toPlainText(value: string | null | undefined) {
