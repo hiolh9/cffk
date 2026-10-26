@@ -1,4 +1,4 @@
-import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /** BNM (or manual) monthly average: 1 unit of currency → MYR */
 export const fxMonthlyRate = sqliteTable(
@@ -10,7 +10,7 @@ export const fxMonthlyRate = sqliteTable(
     source: text("source").notNull().default("BNM"),
     fetchedAt: integer("fetchedAt", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("fxMonthlyRate_pk_proxy").on(table.yearMonth, table.currency)],
+  (table) => [primaryKey({ columns: [table.yearMonth, table.currency] })],
 );
 
 /** Accounting sale line — revenue locked on transaction date */
@@ -69,6 +69,7 @@ export const acctSettlementOrder = sqliteTable(
       .references(() => acctSale.orderId, { onDelete: "restrict" }),
   },
   (table) => [
+    primaryKey({ columns: [table.settlementId, table.orderId] }),
     uniqueIndex("acctSettlementOrder_order_once").on(table.orderId),
     index("acctSettlementOrder_settlementId_idx").on(table.settlementId),
   ],
