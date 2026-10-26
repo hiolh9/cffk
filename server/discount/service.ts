@@ -32,13 +32,21 @@ export type ValidatedDiscount = {
   finalAmount: number;
 };
 
+/** Minimum payable after discount (cent). Blocks free / negative orders via stacking. */
+export const MIN_PAYABLE_CENTS = 1;
+
 export function positiveInteger(value: number, field: string) {
   if (!Number.isFinite(value) || value < 1) appError(`${field}_INVALID`);
   return Math.floor(value);
 }
 
 export function calculateDiscount(type: "FIXED" | "PERCENT", value: number, amount: number) {
-  return type === "FIXED" ? Math.min(value, amount) : Math.floor(amount * value / 100);
+  if (!Number.isFinite(amount) || amount < 0) return 0;
+  if (!Number.isFinite(value) || value < 0) return 0;
+  if (type === "FIXED") return Math.min(Math.floor(value), amount);
+  // Percent: clamp 0–100 so 999% cannot zero-out via bug
+  const pct = Math.min(100, Math.max(0, value));
+  return Math.min(amount, Math.floor((amount * pct) / 100));
 }
 
 export function discountAllowsProduct(productIds: string | null, productId: number) {
@@ -47,33 +55,67 @@ export function discountAllowsProduct(productIds: string | null, productId: numb
   return allowed.length === 0 || allowed.includes(productId);
 }
 
-export function validateDiscountCandidate(candidate: DiscountCandidate, productId: number, amount: number, now = Date.now()): ValidatedDiscount {
+export function validateDiscountCandidate(
+  candidate: DiscountCandidate,
+  productId: number,
+  amount: number,
+  now = Date.now(),
+): ValidatedDiscount {
   if (!candidate.isActive) appError("DISCOUNT_CODE_DISABLED");
   if (candidate.expiresAt && candidate.expiresAt.getTime() <= now) appError("DISCOUNT_CODE_EXPIRED");
-  if (candidate.maxUses !== null && candidate.usedCount + candidate.reservedCount >= candidate.maxUses) appError("DISCOUNT_CODE_EXHAUSTED");
+  if (candidate.maxUses !== null && candidate.usedCount + candidate.reservedCount >= candidate.maxUses) {
+    appError("DISCOUNT_CODE_EXHAUSTED");
+  }
   if (candidate.minAmount !== null && amount < candidate.minAmount) appError("DISCOUNT_CODE_MIN_AMOUNT");
   if (!discountAllowsProduct(candidate.productIds, productId)) appError("DISCOUNT_CODE_PRODUCT_NOT_ALLOWED");
 
   const discountAmount = calculateDiscount(candidate.type, candidate.value, amount);
-  return { id: candidate.id, code: candidate.code, discountAmount, finalAmount: Math.max(0, amount - discountAmount) };
+  const finalAmount = Math.max(0, amount - discountAmount);
+  // Never allow zero/negative checkout via coupon alone (prevents free-order abuse)
+  if (finalAmount < MIN_PAYABLE_CENTS) appError("DISCOUNT_CODE_RESULT_TOO_LOW");
+  return { id: candidate.id, code: candidate.code, discountAmount, finalAmount };
 }
 
-
-export async function validateDiscountForItem(database: ReturnType<typeof createDrizzleDb>, item: PurchasableProduct, quantity: number, rawCode: string) {
+export async function validateDiscountForItem(
+  database: ReturnType<typeof createDrizzleDb>,
+  item: PurchasableProduct,
+  quantity: number,
+  rawCode: string,
+) {
   const code = rawCode.trim().toUpperCase();
-  if (!code) appError("DISCOUNT_CODE_NOT_FOUND");
+  if (!code) appError("DISCOUNT_CODE_REQUIRED");
   const originalAmount = item.price * quantity;
   const [candidate] = await database.select().from(discountCode).where(eq(discountCode.code, code)).limit(1);
   if (!candidate) appError("DISCOUNT_CODE_NOT_FOUND");
-  return { originalAmount, ...validateDiscountCandidate(candidate, item.id, originalAmount) };
+  return { originalAmount, ...validateDiscountCandidate(candidate as DiscountCandidate, item.id, originalAmount) };
 }
 
-export async function previewDiscount(database: D1Database, input: { productId: number; productSkuId: number; quantity: number; discountCode: string }) {
+export async function previewDiscount(
+  database: D1Database,
+  input: { productId: number; productSkuId: number; quantity: number; discountCode: string },
+) {
   const productId = positiveInteger(input.productId, "PRODUCT_ID");
   const productSkuId = positiveInteger(input.productSkuId, "PRODUCT_SKU_ID");
   const requestedQuantity = positiveInteger(input.quantity, "QUANTITY");
   const db = createDrizzleDb(database);
-  const [item] = await db.select({ id: productSku.productId, price: productSku.price, minBuy: productSku.minBuy, maxBuy: productSku.maxBuy }).from(productSku).innerJoin(productV2, eq(productSku.productId, productV2.id)).where(and(eq(productSku.id, productSkuId), eq(productSku.productId, productId), eq(productSku.status, "ACTIVE"), eq(productV2.status, "ACTIVE"))).limit(1);
+  const [item] = await db
+    .select({
+      id: productSku.productId,
+      price: productSku.price,
+      minBuy: productSku.minBuy,
+      maxBuy: productSku.maxBuy,
+    })
+    .from(productSku)
+    .innerJoin(productV2, eq(productSku.productId, productV2.id))
+    .where(
+      and(
+        eq(productSku.id, productSkuId),
+        eq(productSku.productId, productId),
+        eq(productSku.status, "ACTIVE"),
+        eq(productV2.status, "ACTIVE"),
+      ),
+    )
+    .limit(1);
   if (!item) appError("PRODUCT_NOT_AVAILABLE");
 
   const quantity = Math.max(item.minBuy, Math.min(item.maxBuy, requestedQuantity));
