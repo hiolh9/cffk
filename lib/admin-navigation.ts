@@ -101,6 +101,12 @@ export const adminPages = {
     pageTitle: "账本对账",
     description: "Gross/Fee/Net/COGS 账本、CSV 导出、银行直转手动开单与审计。",
   },
+  settlements: {
+    title: "网关结算",
+    path: "/accounting/settlements",
+    pageTitle: "网关批量结算",
+    description: "按交易日月均汇率确认收入，按结算日录入银行到账并计算已实现汇兑损益。",
+  },
   users: {
     title: "用户管理",
     path: "/users",
@@ -213,6 +219,7 @@ export const adminNavigation = {
   },
   orders: adminPages.orders,
   accounting: adminPages.accounting,
+  settlements: adminPages.settlements,
   suppliers: {
     title: "供应商管理",
     items: [adminPages.supplierAccounts, adminPages.supplierProducts, adminPages.supplierOrders],
@@ -273,6 +280,7 @@ export function getAdminBreadcrumb(pathname: string, basePath: string) {
     adminNavigation.dashboard,
     adminNavigation.orders,
     adminNavigation.accounting,
+    adminNavigation.settlements,
     adminNavigation.users,
     adminNavigation.blog,
     adminPages.blogEdit,
