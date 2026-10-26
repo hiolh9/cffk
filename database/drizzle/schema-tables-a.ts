@@ -22,3 +22,18 @@ export const user = sqliteTable(
   },
   (table) => [uniqueIndex("user_email_lower_unique").on(sql`lower(${table.email})`)],
 );
+
+export const session = sqliteTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
+    token: text("token").notNull().unique(),
+    createdAt,
+    updatedAt,
+    ipAddress: text("ipAddress"),
+    userAgent: text("userAgent"),
+    userId: text("userId").notNull().references(() => user.id),
+  },
+  (table) => [index("session_userId_idx").on(table.userId)],
+);
