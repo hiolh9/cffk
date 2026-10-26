@@ -11,6 +11,7 @@ import {
   type GlType,
 } from "./pnl";
 import { writeAuditLog } from "./audit";
+import { buildMonthlyExportPack } from "./monthly-export";
 
 export const onListGlEntries = telefuncAction(async () => {
   const { db } = requireAdmin();
@@ -76,4 +77,25 @@ export const onGenerateMonthlyPnL = telefuncAction(async (input: { yearMonth: st
     });
   }
   return { pnl, csv: pnlToCsv(pnl) };
+});
+
+/** One-click: all monthly tables with standard CFFK-YYYY-MM-NN_name.csv filenames */
+export const onExportMonthlyPack = telefuncAction(async (input: { yearMonth: string }) => {
+  const { database, adminUserId } = requireAdmin();
+  if (!/^\d{4}-\d{2}$/.test(input.yearMonth)) appError("DATE_INVALID");
+  try {
+    const pack = await buildMonthlyExportPack(database, input.yearMonth);
+    await writeAuditLog(database, {
+      actorUserId: adminUserId,
+      action: "MONTHLY_EXPORT_PACK",
+      entityType: "accountingArchive",
+      entityId: input.yearMonth,
+      after: { files: pack.files.map((f) => ({ name: f.filename, rows: f.rowCount })) },
+    });
+    return pack;
+  } catch (cause) {
+    const msg = cause instanceof Error ? cause.message : "";
+    if (msg === "YEAR_MONTH_INVALID") appError("DATE_INVALID");
+    throw cause;
+  }
 });

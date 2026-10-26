@@ -40,9 +40,9 @@
       </div>
 
       <div class="rounded-xl border bg-card p-4">
-        <h2 class="text-sm font-semibold">月度 P&amp;L</h2>
+        <h2 class="text-sm font-semibold">月度 P&amp;L 与一键归档</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          收入/COGS 来自会计销售；费用 = 可抵扣 GL Expense + 结算网关费；汇兑来自结算。
+          收入/COGS 来自会计销售；费用 = 可抵扣 GL + 网关费。一键导出规范文件名全表 CSV。
         </p>
         <div class="mt-4 flex flex-wrap items-end gap-2">
           <div class="space-y-1">
@@ -50,7 +50,10 @@
             <Input v-model="yearMonth" class="w-36" placeholder="2026-10" />
           </div>
           <Button :disabled="running" @click="runPnL">{{ running ? "计算中..." : "生成本月 P&L" }}</Button>
-          <Button v-if="csv" variant="outline" @click="downloadCsv">下载 CSV</Button>
+          <Button v-if="csv" variant="outline" @click="downloadCsv">下载 P&L CSV</Button>
+          <Button :disabled="exporting" variant="secondary" @click="exportPack">
+            {{ exporting ? "打包中..." : "一键导出当月全表" }}
+          </Button>
         </div>
 
         <table v-if="pnl" class="mt-4 w-full text-sm">
@@ -68,6 +71,7 @@
         <div v-if="pnl" class="mt-4 rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
           <p>不进 P&amp;L：提款 {{ fmt(pnl.excluded.ownerDrawingsMyr) }} · 预存款 {{ fmt(pnl.excluded.prepaymentsMyr) }} · 注资 {{ fmt(pnl.excluded.capitalInjectionMyr) }}</p>
         </div>
+        <p v-if="lastExportNote" class="mt-2 text-xs text-muted-foreground">{{ lastExportNote }}</p>
       </div>
     </div>
 
@@ -114,6 +118,7 @@ import { Input } from "@/components/ui/input";
 import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
 import {
   onCreateGlEntry,
+  onExportMonthlyPack,
   onGenerateMonthlyPnL,
   onListGlEntries,
 } from "@/server/accounting/pnl.admin.telefunc";
@@ -121,6 +126,8 @@ import {
 const loading = ref(false);
 const savingGl = ref(false);
 const running = ref(false);
+const exporting = ref(false);
+const lastExportNote = ref("");
 const entries = ref<
   Array<{
     entryId: string;
@@ -159,6 +166,16 @@ const gl = reactive({
 
 function fmt(n: number) {
   return Number(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function downloadText(filename: string, content: string, mime = "text/csv;charset=utf-8") {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function load() {
@@ -213,13 +230,26 @@ async function runPnL() {
 
 function downloadCsv() {
   if (!csv.value) return;
-  const blob = new Blob([csv.value], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `pnl-${yearMonth.value}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadText(`pnl-${yearMonth.value}.csv`, csv.value);
+}
+
+async function exportPack() {
+  exporting.value = true;
+  try {
+    const pack = await runTelefunc(() => onExportMonthlyPack({ yearMonth: yearMonth.value.trim() }));
+    for (const file of pack.files) {
+      const mime = file.filename.endsWith(".txt") ? "text/plain;charset=utf-8" : "text/csv;charset=utf-8";
+      downloadText(file.filename, file.content, mime);
+      // slight gap so browsers don't block multi-download
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    lastExportNote.value = `已导出 ${pack.files.length} 个文件（CFFK-${pack.yearMonth}-*.csv）`;
+    toast.success(lastExportNote.value);
+  } catch (error) {
+    toast.error(userErrorMessage(error, "导出失败"));
+  } finally {
+    exporting.value = false;
+  }
 }
 
 onMounted(() => {
