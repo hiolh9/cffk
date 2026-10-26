@@ -1,169 +1,242 @@
 <template>
-  <main class="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-    <header class="fixed inset-x-0 top-0 z-50 border-b bg-background">
-      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
-        <StorefrontBrand />
-        <PublicNav />
-      </div>
-    </header>
-    <div class="mt-14 flex min-h-0 flex-1 flex-col overflow-y-auto sm:mt-16">
-      <section class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-x-8 gap-y-6 px-4 pb-10 pt-5 sm:px-6 sm:pt-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:grid-rows-[auto_1fr]">
-        <div class="min-w-0 lg:col-start-1 lg:row-start-1">
-          <div class="overflow-hidden rounded-md border bg-muted">
-            <img :src="data.coverImage || defaultProductImage" :alt="data.name" class="aspect-4/3 max-h-[26rem] w-full object-cover sm:aspect-video" />
-          </div>
-          <div class="mt-5">
-            <Badge variant="secondary" class="rounded px-2 py-0.5 text-xs font-medium shadow-none">{{ data.categoryName || messages.productCheckout.defaultCategory }}</Badge>
-            <h1 class="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{{ data.name }}</h1>
-            <p v-if="data.subtitle" class="mt-2 text-sm leading-6 text-muted-foreground">{{ data.subtitle }}</p>
-          </div>
+  <section class="flex w-full flex-col gap-6">
+    <AdminPageHeader />
+
+
+    <AdminDataTable :columns="columns" :rows="orders" row-key="id" empty-text="没有符合条件的订单。">
+      <template #toolbar>
+        <div class="flex flex-wrap items-center gap-2">
+          <Input v-model="filters.query" class="h-8 w-56" placeholder="按订单号搜索" @keyup.enter="resetAndLoad" />
+          <Select :model-value="filters.status || 'ALL'" @update:model-value="filters.status = $event === 'ALL' ? '' : $event as Order['status']"><SelectTrigger size="sm" class="w-36 shrink-0"><SelectValue placeholder="全部订单状态" /></SelectTrigger><SelectContent><SelectItem value="ALL">全部订单状态</SelectItem><SelectItem value="PENDING">待支付</SelectItem><SelectItem value="PAID">已支付</SelectItem><SelectItem value="DELIVERED">已发货</SelectItem><SelectItem value="CLOSED">已关闭</SelectItem><SelectItem value="FAILED">失败</SelectItem></SelectContent></Select>
+          <Select :model-value="filters.deliveryStatus || 'ALL'" @update:model-value="filters.deliveryStatus = $event === 'ALL' ? '' : $event as Order['deliveryStatus']"><SelectTrigger size="sm" class="w-36 shrink-0"><SelectValue placeholder="全部发货状态" /></SelectTrigger><SelectContent><SelectItem value="ALL">全部发货状态</SelectItem><SelectItem value="NOT_DELIVERED">未发货</SelectItem><SelectItem value="DELIVERING">发货中</SelectItem><SelectItem value="DELIVERED">已发货</SelectItem><SelectItem value="FAILED">发货失败</SelectItem></SelectContent></Select>
+          <div class="w-64 shrink-0"><DateRangePicker v-model="dateRange" /></div>
+          <Button size="sm" @click="resetAndLoad">查询</Button>
+          <Button variant="outline" size="sm" @click="resetFilters">重置</Button>
         </div>
-        <aside class="min-w-0 self-start lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-          <Card class="gap-5 rounded-md py-5 shadow-none">
-            <CardHeader class="gap-1 px-5">
-              <CardDescription>{{ messages.productCheckout.currentPrice }}</CardDescription>
-              <CardTitle class="text-3xl font-bold tabular-nums text-brand">RM{{ selectedSku.price }}</CardTitle>
-            </CardHeader>
-            <form class="grid min-w-0 gap-5" novalidate @submit.prevent="submit">
-              <CardContent class="grid min-w-0 gap-5 px-5">
-                <div v-if="!user" class="rounded-md border border-brand/25 bg-brand-soft p-3 text-sm leading-6 text-foreground">
-                  购买前请先
-                  <a :href="loginHref" class="font-semibold text-brand underline underline-offset-2">登录</a>
-                  。登录后即可下单；后续将支持 Google 登录。
-                </div>
-                <div v-if="data.skus.length > 1" class="grid gap-2 text-sm font-medium">
-                  <span>选择规格</span>
-                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1" role="group" aria-label="选择规格">
-                    <Button v-for="sku in data.skus" :key="sku.id" type="button" :variant="String(sku.id) === selectedSkuId ? 'default' : 'outline'" class="h-auto min-h-11 justify-start whitespace-normal rounded-md px-3 py-2 text-left text-sm leading-5 shadow-none" :aria-pressed="String(sku.id) === selectedSkuId" @click="selectedSkuId = String(sku.id)">
-                      {{ sku.name }} · RM{{ sku.price }}
-                    </Button>
-                  </div>
-                </div>
-                <p v-if="requiresPayment && !methods.length" class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{{ messages.productCheckout.noPaymentMethod }}</p>
-                <label class="grid min-w-0 gap-2 text-sm font-medium">
-                  <span class="flex items-center gap-1"><span class="text-destructive">*</span> {{ messages.productCheckout.contactEmail }}</span>
-                  <Input v-model="contactValue" type="email" inputmode="email" autocomplete="email" required class="h-11 shadow-none" />
-                </label>
-                <label class="grid min-w-0 gap-2 text-sm font-medium">
-                  <span class="flex items-center gap-1"><span class="text-destructive">*</span> {{ messages.productCheckout.quantity }}</span>
-                  <Input v-model.number="quantity" type="number" inputmode="numeric" :min="selectedSku.minBuy" :max="purchaseLimit" required class="h-11 shadow-none" />
-                  <span v-if="isStockLimited" class="text-xs font-normal text-muted-foreground">{{ t(messages.productCheckout.availableStock, { count: availableStock }) }}</span>
-                </label>
-                <div v-if="methods.length" class="grid gap-2 text-sm font-medium">
-                  <span>{{ messages.productCheckout.paymentMethod }}</span>
-                  <div class="grid grid-cols-2 gap-2" role="group" :aria-label="messages.productCheckout.paymentMethod">
-                    <Button v-for="item in methods" :key="item.key" type="button" :variant="selectedMethod === item.key ? 'default' : 'outline'" class="h-auto min-h-11 justify-start whitespace-normal rounded-md px-3 py-2 text-left text-sm leading-5 shadow-none" :aria-pressed="selectedMethod === item.key" @click="selectedMethod = item.key">
-                      {{ item.name }}{{ item.channel ? `（${channelLabel(item.channel)}）` : "" }}
-                    </Button>
-                  </div>
-                </div>
-                <div class="grid gap-2 text-sm font-medium">
-                  <span>{{ messages.productCheckout.discountCode }}</span>
-                  <div class="flex gap-2">
-                    <Input v-model="discountCode" autocomplete="off" class="h-11 min-w-0 shadow-none" @keydown.enter.prevent="onApplyDiscount" />
-                    <Button type="button" variant="outline" class="h-11 shrink-0 shadow-none" :disabled="discountApplying || !discountCode.trim()" @click="onApplyDiscount">{{ discountApplying ? messages.productCheckout.applyingDiscount : messages.productCheckout.applyDiscount }}</Button>
-                  </div>
-                </div>
-                <div v-if="discountPreview" class="grid gap-1.5 rounded-md border bg-muted/40 p-3 text-sm">
-                  <div class="flex justify-between gap-4"><span class="text-muted-foreground">{{ messages.productCheckout.originalAmount }}</span><span class="tabular-nums">RM{{ discountPreview.originalAmount }}</span></div>
-                  <div class="flex justify-between gap-4"><span class="text-muted-foreground">{{ t(messages.productCheckout.appliedDiscount, { code: discountPreview.code }) }}</span><span class="tabular-nums text-destructive">-RM{{ discountPreview.discountAmount }}</span></div>
-                  <div class="flex justify-between gap-4 border-t pt-2 font-semibold"><span>{{ messages.productCheckout.amountDue }}</span><span class="tabular-nums">RM{{ discountPreview.finalAmount }}</span></div>
-                </div>
-                <label class="grid gap-2 text-sm font-medium">{{ messages.productCheckout.buyerNote }}<Textarea v-model="buyerNote" rows="3" class="shadow-none" /></label>
-              </CardContent>
-              <CardFooter class="flex-col items-stretch gap-3 px-5">
-                <Button type="submit" class="h-12 w-full bg-primary text-base font-semibold text-primary-foreground shadow-sm hover:bg-primary/90" :disabled="!user || loading || isOutOfStock || (requiresPayment && !methods.length)">{{ !user ? '请先登录' : loading ? messages.productCheckout.processingOrder : isOutOfStock ? messages.storefront.outOfStock : requiresPayment ? messages.productCheckout.submitAndPay : messages.productCheckout.createFreeOrder }}</Button>
-                <p class="text-xs leading-5 text-muted-foreground">{{ messages.productCheckout.paymentAmountNotice }}</p>
-              </CardFooter>
-            </form>
-          </Card>
-        </aside>
-        <div class="min-w-0 space-y-6 lg:col-start-1 lg:row-start-2">
-          <section v-if="data.description" class="rounded-md border bg-card p-5 sm:p-6">
-            <h2 class="text-base font-semibold">{{ messages.productCheckout.productDetails }}</h2>
-            <div ref="descriptionRef" class="product-rich-content mt-4 break-words text-sm leading-7 text-foreground" @click="previewDescriptionImage" v-html="data.description" />
-          </section>
-          <section class="rounded-md border bg-muted/40 p-5 text-sm leading-6 sm:p-6">
-            <h2 class="font-semibold">{{ messages.productCheckout.purchaseInstructions }}</h2>
-            <div class="mt-3 grid gap-3 text-muted-foreground">
-              <p class="whitespace-pre-wrap">{{ purchaseNote }}</p>
-              <p v-if="deliveryHint" class="whitespace-pre-wrap">{{ deliveryHint }}</p>
+        <Button variant="outline" size="sm" :disabled="loading" aria-label="刷新" title="刷新" @click="loadOrders"><RefreshCwIcon :class="loading ? 'animate-spin' : ''" />刷新</Button>
+      </template>
+      <template #cell-orderNo="{ row }"><span class="font-mono text-xs">{{ row.orderNo }}</span></template>
+      <template #cell-productName="{ value }"><span class="font-medium">{{ value }}</span></template>
+      <template #cell-quantity="{ value }"><span>{{ value }}</span></template>
+      <template #cell-deliveryType="{ value }"><span class="text-sm">{{ deliveryTypeLabel(value) }}</span></template>
+      <template #cell-contactValue="{ value }"><span class="text-sm text-muted-foreground">{{ value || "-" }}</span></template>
+      <template #cell-amount="{ row }">¥{{ row.amount }}</template>
+      <template #cell-payment="{ row }"><Badge :variant="row.paymentStatus === 'PAID' ? 'default' : 'secondary'">{{ paymentLabel(row.paymentStatus) }}</Badge></template>
+      <template #cell-delivery="{ row }"><Badge :variant="row.deliveryStatus === 'FAILED' ? 'destructive' : row.deliveryStatus === 'DELIVERED' ? 'default' : 'secondary'">{{ deliveryLabel(row.deliveryStatus) }}</Badge></template>
+      <template #cell-createdAt="{ row }"><span class="whitespace-nowrap text-xs">{{ formatDate(row.createdAt) }}</span></template>
+      <template #actions="{ row }"><div class="flex min-w-[22rem] justify-end gap-1"><Button variant="ghost" size="sm" @click="showDetail(row.id)">查看</Button><Button v-if="row.status === 'PENDING'" variant="ghost" size="sm" @click="closeOrder(row.id)">关闭</Button><Button v-if="row.paymentStatus === 'UNPAID'" variant="ghost" size="sm" :disabled="replenishingOrderId === row.id" @click="openReplenish(row)">{{ replenishingOrderId === row.id ? '补单中...' : '补单' }}</Button><Button v-if="row.paymentStatus === 'PAID' && row.deliveryStatus !== 'DELIVERED'" variant="ghost" size="sm" @click="row.deliveryType === 'SUPPLIER' ? retrySupplierOrder(row.id) : openDelivery(row.id)">{{ row.deliveryType === 'SUPPLIER' ? '重试供应商发货' : '处理发货' }}</Button><Button v-if="row.paymentStatus === 'PAID' || row.paymentStatus === 'PARTIAL_REFUNDED'" variant="ghost" size="sm" class="text-destructive" @click="refundOrder(row.id)">退款</Button></div></template>
+      <template #pagination><Pagination :total="total" :page="page" :page-size="pageSize" :page-size-options="[10, 20, 50, 100]" @update:page="changePage" @update:page-size="changePageSize" /></template>
+    </AdminDataTable>
+
+    <Dialog v-model:open="detailOpen">
+      <DialogContent class="grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader class="border-b px-5 py-4 pr-16 sm:px-6 sm:py-5 sm:pr-20">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div class="min-w-0">
+              <DialogTitle>订单详情</DialogTitle>
+              <DialogDescription v-if="detail" class="mt-1 break-all font-mono text-xs">{{ detail.order.orderNo }}</DialogDescription>
             </div>
-          </section>
+            <div v-if="detail" class="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+              <Badge :variant="detail.order.paymentStatus === 'PAID' ? 'secondary' : 'outline'">{{ paymentLabel(detail.order.paymentStatus) }}</Badge>
+              <Badge :variant="detail.order.deliveryStatus === 'FAILED' ? 'destructive' : detail.order.deliveryStatus === 'DELIVERED' ? 'secondary' : 'outline'">{{ deliveryLabel(detail.order.deliveryStatus) }}</Badge>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div v-if="detail" class="@container min-h-0 overflow-y-auto bg-muted/20 p-4 sm:p-6">
+          <div class="grid items-start gap-4 @3xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,1fr)] @3xl:gap-6">
+            <div class="grid min-w-0 gap-4">
+              <Card class="gap-0 py-0">
+                <CardHeader class="border-b px-4 py-4 sm:px-5">
+                  <CardTitle class="text-sm">订单信息</CardTitle>
+                </CardHeader>
+                <CardContent class="p-4 sm:p-5">
+                  <dl class="grid gap-x-8 gap-y-5 text-sm sm:grid-cols-[minmax(0,1fr)_8rem]">
+                    <div class="min-w-0">
+                      <dt class="text-xs text-muted-foreground">商品</dt>
+                      <dd class="mt-1 wrap-break-word font-medium">{{ detail.order.productNameSnapshot }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-muted-foreground">数量</dt>
+                      <dd class="mt-1 font-medium">{{ detail.order.quantity }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-muted-foreground">优惠券</dt>
+                      <dd class="mt-1 font-medium">{{ detail.order.discountCodeStr || "未使用" }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-muted-foreground">订单金额</dt>
+                      <dd class="mt-1 text-base font-semibold">¥{{ detail.order.amount }}</dd>
+                    </div>
+                    <div class="min-w-0 sm:col-span-2">
+                      <dt class="text-xs text-muted-foreground">联系方式</dt>
+                      <dd class="mt-1 wrap-break-word">{{ detail.order.contactType }} · {{ detail.order.contactValue || "-" }}</dd>
+                    </div>
+                  </dl>
+                </CardContent>
+              </Card>
+
+              <Card class="gap-0 py-0">
+                <CardHeader class="border-b px-4 py-4 sm:px-5">
+                  <CardTitle class="text-sm">收货信息</CardTitle>
+                </CardHeader>
+                <CardContent class="grid gap-5 p-4 text-sm sm:p-5">
+                  <div v-if="detail.order.addressSnapshot" class="grid gap-4 leading-6 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-6">
+                    <div class="min-w-0">
+                      <p class="text-xs text-muted-foreground">收货人</p>
+                      <p class="mt-1 wrap-break-word font-medium">{{ detail.order.addressSnapshot.recipientName }}</p>
+                      <p class="wrap-break-word text-muted-foreground">{{ detail.order.addressSnapshot.phone }}</p>
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-xs text-muted-foreground">收货地址</p>
+                      <p class="mt-1 wrap-break-word">{{ detail.order.addressSnapshot.country }} {{ detail.order.addressSnapshot.province }} {{ detail.order.addressSnapshot.city }} {{ detail.order.addressSnapshot.district }} {{ detail.order.addressSnapshot.addressLine }}</p>
+                      <p v-if="detail.order.addressSnapshot.postalCode" class="text-xs text-muted-foreground">邮编：{{ detail.order.addressSnapshot.postalCode }}</p>
+                    </div>
+                  </div>
+                  <p v-else class="text-muted-foreground">此订单无需收货地址</p>
+                  <dl class="border-t pt-5">
+                    <div class="min-w-0">
+                      <dt class="text-xs text-muted-foreground">买家备注</dt>
+                      <dd class="mt-1 whitespace-pre-wrap wrap-break-word">{{ detail.order.buyerNote || "无" }}</dd>
+                    </div>
+                  </dl>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div class="grid min-w-0 gap-4">
+              <Card class="gap-0 py-0">
+                <CardHeader class="border-b px-4 py-4 sm:px-5">
+                  <div class="flex items-center justify-between gap-3">
+                    <CardTitle class="text-sm">发货内容</CardTitle>
+                    <Badge variant="outline">{{ deliveryContents.length }} 条</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent class="p-4 sm:p-5">
+                  <div v-if="deliveryContents.length" class="grid max-h-64 gap-2 overflow-y-auto">
+                    <pre v-for="(content, index) in deliveryContents" :key="index" class="whitespace-pre-wrap wrap-break-word rounded-md border bg-muted/40 p-3 font-mono text-xs leading-5">{{ content }}</pre>
+                  </div>
+                  <p v-else class="text-sm text-muted-foreground">暂无成功发货内容</p>
+                </CardContent>
+              </Card>
+
+              <Card class="gap-0 py-0">
+                <CardHeader class="border-b px-4 py-4 sm:px-5">
+                  <div class="flex items-center justify-between gap-3">
+                    <CardTitle class="text-sm">支付日志</CardTitle>
+                    <Badge variant="outline">{{ detail.payments.length }} 条</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent class="p-4 sm:p-5">
+                  <div v-if="detail.payments.length" class="grid max-h-80 gap-3 overflow-y-auto">
+                    <div v-for="item in detail.payments" :key="item.id" class="rounded-md border bg-muted/30 p-3 text-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <time class="text-muted-foreground">{{ formatDate(item.createdAt) }}</time>
+                        <Badge variant="outline" class="font-normal">{{ item.verifyStatus }}</Badge>
+                      </div>
+                      <p class="mt-2 wrap-break-word font-medium leading-5">{{ item.message || item.eventType }}</p>
+                    </div>
+                  </div>
+                  <p v-else class="text-sm text-muted-foreground">暂无支付日志</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
-      </section>
-      <StorefrontFooter />
-    </div>
-  </main>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="deliveryOpen" @update:open="onDeliveryOpenChange">
+      <DialogContent class="grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden p-0" @interact-outside.prevent @escape-key-down.prevent>
+        <DialogHeader class="border-b px-6 py-5 pr-14"><DialogTitle>处理发货</DialogTitle><DialogDescription>人工或物流订单填写发货内容；自动卡密订单执行恢复发货。</DialogDescription></DialogHeader>
+        <div class="min-h-0 overflow-y-auto px-6 py-5"><label class="grid gap-2 text-sm font-medium">发货内容<Textarea v-model="deliveryContent" rows="6" class="min-h-28 w-full" placeholder="人工发货说明、物流单号或物流信息" /></label><p class="mt-3 text-xs text-muted-foreground">标记失败不会占用成功发货快照，修正内容后可再次完成发货。</p></div>
+        <DialogFooter class="flex flex-wrap border-t px-6 py-4"><Button :disabled="delivering" @click="completeDelivery">确认发货</Button><Button variant="outline" :disabled="delivering" @click="retryAutomatic">重试自动发货</Button><Button variant="destructive" :disabled="delivering" @click="markDeliveryFailed">标记发货失败</Button><Button variant="ghost" :disabled="delivering" @click="closeDelivery">取消</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="replenishDialogOpen">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>确认补单</DialogTitle>
+          <DialogDescription>确定将订单 {{ replenishTarget?.orderNo }} 按支付成功处理吗？此操作会触发后续发货和支付成功通知，请先确认已收到款项。</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" :disabled="replenishingOrderId !== null" @click="replenishDialogOpen = false">取消</Button>
+          <Button :disabled="replenishingOrderId !== null" @click="confirmReplenish">{{ replenishingOrderId !== null ? "补单中..." : "确认补单" }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </section>
 </template>
+
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch } from "vue";
-import { toast } from "vue-sonner";
-import { useData } from "vike-vue/useData";
-import { usePageContext } from "vike-vue/usePageContext";
-import PublicNav from "@/components/storefront/PublicNav.vue";
-import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
-import StorefrontFooter from "@/components/storefront/StorefrontFooter.vue";
+import { computed, onMounted, reactive, ref } from "vue";
+import AdminDataTable, { type AdminTableColumn } from "@/components/admin/AdminDataTable.vue";
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import defaultProductImage from "@/assets/product_img.jpg?url";
-import { useStorefrontPreferences } from "@/lib/storefront-preferences";
-import { cacheQrPayment } from "@/lib/payment-utils";
-import { collectDeviceFingerprint } from "@/lib/device-fingerprint";
-import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
-import { onPreviewDiscount } from "@/server/discount/preview.telefunc";
-import { onCreatePayment } from "@/server/payment/checkout.telefunc";
-import type { PaymentChannel, PaymentProviderKind } from "@/server/payment/registry";
-import type { Data } from "./+data.server";
-const { messages, t } = useStorefrontPreferences();
-const data = useData<Data>();
-const pageContext = usePageContext() as ReturnType<typeof usePageContext> & { user?: { id: string; email?: string | null } | null; urlPathname?: string };
-const user = pageContext.user ?? null;
-const loginHref = computed(() => {
-  const path = pageContext.urlPathname || `/product/${data.slug}`;
-  return `/login?redirect=${encodeURIComponent(path)}`;
-});
-type PaymentMethod = { key: string; provider: PaymentProviderKind; channel?: PaymentChannel; name: string };
-const methods = computed<PaymentMethod[]>(() => data.paymentProviders.flatMap((provider): PaymentMethod[] => provider.channels.length ? provider.channels.map((channel) => ({ key: `${provider.provider}:${channel}`, provider: provider.provider, channel, name: provider.name })) : [{ key: `${provider.provider}:`, provider: provider.provider, name: provider.name }]));
-const purchaseNote = computed(() => data.purchaseNote || messages.value.productCheckout.defaultPurchaseNote);
-const deliveryHint = computed(() => {
-  if (selectedSku.value.deliveryType === "MANUAL") return data.manualDeliveryHint || messages.value.productCheckout.defaultManualDeliveryHint;
-  if (selectedSku.value.deliveryType === "EXPRESS") return data.manualDeliveryHint || messages.value.productCheckout.defaultExpressDeliveryHint;
-  return null;
-});
-const descriptionRef = ref<HTMLElement | null>(null);
-const selectedMethod = ref(methods.value[0]?.key ?? "");
-const selectedSkuId = ref(String(data.skus[0]?.id ?? ""));
-const selectedSku = computed(() => data.skus.find((sku) => String(sku.id) === selectedSkuId.value) ?? data.skus[0] ?? data);
-const quantity = ref(selectedSku.value.minBuy);
-watch(selectedSku, (sku) => { if (sku) { quantity.value = sku.minBuy; discountPreview.value = null; } });
-const contactValue = ref(user?.email?.trim() ?? "");
-const discountCode = ref("");
-const buyerNote = ref("");
-const discountApplying = ref(false);
-type DiscountPreview = Awaited<ReturnType<typeof onPreviewDiscount>>;
-const discountPreview = ref<DiscountPreview | null>(null);
-const loading = ref(false);
-const requiresPayment = computed(() => (discountPreview.value?.finalAmount ?? selectedSku.value.price) !== "0.00");
-const isStockLimited = computed(() => selectedSku.value.availableStock !== null);
-const availableStock = computed(() => selectedSku.value.availableStock ?? 0);
-const purchaseLimit = computed(() => isStockLimited.value ? Math.max(selectedSku.value.minBuy, Math.min(selectedSku.value.maxBuy, availableStock.value)) : selectedSku.value.maxBuy);
-const isOutOfStock = computed(() => isStockLimited.value && availableStock.value < selectedSku.value.minBuy);
-watch([discountCode, quantity], () => { discountPreview.value = null; });
-function channelLabel(channel: PaymentChannel) { return channel; }
-function previewDescriptionImage(event: MouseEvent) { const image = event.target instanceof HTMLImageElement ? event.target : null; if (image && descriptionRef.value?.contains(image)) { /* preview omitted */ } }
-async function onApplyDiscount() { const code = discountCode.value; if (!code.trim()) return; const requestedQuantity = quantity.value; const requestedSkuId = selectedSku.value.id; discountPreview.value = null; discountApplying.value = true; try { const preview = await runTelefunc(() => onPreviewDiscount({ productId: data.id, productSkuId: requestedSkuId, quantity: requestedQuantity, discountCode: code }), { notifyError: false }); if (discountCode.value === code && quantity.value === requestedQuantity && selectedSku.value.id === requestedSkuId) discountPreview.value = preview; } catch (cause) { if (discountCode.value === code && quantity.value === requestedQuantity && selectedSku.value.id === requestedSkuId) toast.error(userErrorMessage(cause, messages.value.productCheckout.discountPreviewFailed)); } finally { discountApplying.value = false; } }
-async function submit() { if (!user) { toast.error("请先登录后再下单。"); window.location.assign(loginHref.value); return; } if (isOutOfStock.value || (isStockLimited.value && quantity.value > availableStock.value)) { toast.error(messages.value.productCheckout.insufficientStock); return; } if (discountCode.value.trim() && !discountPreview.value) { toast.info(messages.value.productCheckout.applyDiscountFirst); return; } const method = methods.value.find((item) => item.key === selectedMethod.value); if (!method && requiresPayment.value) { toast.error(messages.value.productCheckout.noPaymentMethod); return; } loading.value = true; try { const fp = await collectDeviceFingerprint();
-const idempotencyKey =
-  typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8)
-    : `${Date.now()}${Math.random().toString(36).slice(2)}`.padEnd(32, "0").slice(0, 32);
-const created = await runTelefunc(() => onCreatePayment({productId: data.id, productSkuId: selectedSku.value.id, quantity: quantity.value, paymentProvider: method?.provider ?? "ALIPAY", paymentChannel: method?.channel, contactType: "EMAIL", contactValue: contactValue.value, discountCode: discountPreview.value?.code, buyerNote: buyerNote.value,  deviceId: fp.deviceId,
-  deviceFp: fp.fpHash,
-  idempotencyKey,
-}), { notifyError: false }); if (created.payment?.mode === "redirect" && created.payment.url) { window.location.assign(created.payment.url); return; } if (created.payment?.mode === "qr") { cacheQrPayment(created); window.location.assign(`/checkout?orderNo=${encodeURIComponent(created.orderNo)}`); return; } window.location.assign(`/account/order?orderNo=${encodeURIComponent(created.orderNo)}`); } catch (cause) { toast.error(userErrorMessage(cause, messages.value.productCheckout.orderSubmissionFailed)); } finally { loading.value = false; } }
-onMounted(() => { if (methods.value.length && !selectedMethod.value) selectedMethod.value = methods.value[0].key; });
+import Pagination from "@/components/ui/pagination/Pagination.vue";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RefreshCwIcon } from "@lucide/vue";
+import { runTelefunc } from "@/lib/telefunc-client";
+import { formatDateInTimezone, useSiteTimezone } from "@/lib/site-timezone";
+import { onCloseAdminOrder, onGetAdminOrderDetail, onGetAdminOrders, onRecordManualDelivery, onReplenishAdminOrder, onRetryAutomaticDelivery } from "@/server/order/admin.telefunc";
+import { onRefundAdminOrder } from "@/server/order/refund.telefunc";
+
+type Order = Awaited<ReturnType<typeof onGetAdminOrders>>["orders"][number];
+const timezone = useSiteTimezone();
+type Detail = Awaited<ReturnType<typeof onGetAdminOrderDetail>>;
+const deliveryContents = computed(() => detail.value?.deliveries.flatMap((item) => {
+  if (!item.contentSnapshot) return [];
+  try {
+    const parsed: unknown = JSON.parse(item.contentSnapshot);
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [item.contentSnapshot];
+  } catch {
+    return [item.contentSnapshot];
+  }
+}) ?? []);
+const columns: AdminTableColumn<Order>[] = [
+  { key: "orderNo", label: "订单" }, { key: "productName", label: "商品" }, { key: "quantity", label: "数量" }, { key: "deliveryType", label: "发货方式" }, { key: "contactValue", label: "联系方式" }, { key: "amount", label: "金额" }, { key: "payment", label: "支付" }, { key: "delivery", label: "发货" }, { key: "createdAt", label: "创建时间" },
+];
+const orders = ref<Order[]>([]); const detail = ref<Detail | null>(null); const detailOpen = ref(false); const loading = ref(false); const delivering = ref(false); const replenishingOrderId = ref<number | null>(null); const replenishDialogOpen = ref(false); const replenishTarget = ref<Order | null>(null); const page = ref(1); const pageSize = ref(10); const total = ref(0); const deliveryOpen = ref(false); const deliveryOrderId = ref<number | null>(null); const deliveryContent = ref("");
+const filters = reactive<{ query: string; status: "" | Order["status"]; deliveryStatus: "" | Order["deliveryStatus"]; startDate: string; endDate: string }>({ query: "", status: "", deliveryStatus: "", startDate: "", endDate: "" });
+const dateRange = computed({ get: () => ({ start: filters.startDate, end: filters.endDate }), set: (value: { start: string; end: string }) => { filters.startDate = value.start; filters.endDate = value.end; } });
+async function loadOrders() { loading.value = true; try { const result = await runTelefunc(() => onGetAdminOrders({ page: page.value, pageSize: pageSize.value, ...(filters.query ? { query: filters.query } : {}), ...(filters.status ? { status: filters.status } : {}), ...(filters.deliveryStatus ? { deliveryStatus: filters.deliveryStatus } : {}), ...(filters.startDate ? { startDate: filters.startDate } : {}), ...(filters.endDate ? { endDate: filters.endDate } : {}) }), { errorMessage: "读取订单失败，请稍后重试。" }); orders.value = result.orders; total.value = result.total; page.value = result.page; } finally { loading.value = false; } }
+async function showDetail(orderId: number) { detail.value = await runTelefunc(() => onGetAdminOrderDetail({ orderId }), { errorMessage: "读取订单详情失败，请稍后重试。" }); detailOpen.value = true; }
+async function closeOrder(orderId: number) { try { await runTelefunc(() => onCloseAdminOrder({ orderId }), { successMessage: "订单已关闭，已释放预占资源。" }); await loadOrders(); if (detail.value?.order.id === orderId) await showDetail(orderId); } catch { /* runTelefunc already displayed the error toast. */ } }
+function openReplenish(order: Order) { if (replenishingOrderId.value !== null) return; replenishTarget.value = order; replenishDialogOpen.value = true; }
+async function confirmReplenish() { const target = replenishTarget.value; if (!target || replenishingOrderId.value !== null) return; replenishingOrderId.value = target.id; try { await runTelefunc(() => onReplenishAdminOrder({ orderId: target.id }), { successMessage: "补单成功，订单已按支付成功处理。" }); replenishDialogOpen.value = false; await loadOrders(); if (detail.value?.order.id === target.id) await showDetail(target.id); } catch { /* runTelefunc already displayed the error toast. */ } finally { replenishingOrderId.value = null; replenishTarget.value = null; } }
+function openDelivery(orderId: number) { deliveryOrderId.value = orderId; deliveryContent.value = ""; deliveryOpen.value = true; }
+function closeDelivery() { deliveryOpen.value = false; deliveryOrderId.value = null; deliveryContent.value = ""; }
+function onDeliveryOpenChange(open: boolean) { if (!open && !delivering.value) closeDelivery(); }
+async function completeDelivery() { if (!deliveryOrderId.value) return; delivering.value = true; try { await runTelefunc(() => onRecordManualDelivery({ orderId: deliveryOrderId.value!, content: deliveryContent.value }), { successMessage: "订单已完成发货。" }); closeDelivery(); await loadOrders(); } catch { /* runTelefunc already displayed the error toast. */ } finally { delivering.value = false; } }
+async function markDeliveryFailed() { if (!deliveryOrderId.value) return; delivering.value = true; try { await runTelefunc(() => onRecordManualDelivery({ orderId: deliveryOrderId.value!, content: deliveryContent.value, failed: true }), { successMessage: "已标记发货失败。" }); closeDelivery(); await loadOrders(); } catch { /* runTelefunc already displayed the error toast. */ } finally { delivering.value = false; } }
+async function retryAutomatic() { if (!deliveryOrderId.value) return; await retrySupplierOrAutomatic(deliveryOrderId.value, "自动发货已完成。", "自动发货尚未完成，请检查订单和卡密库存。"); }
+async function retrySupplierOrder(orderId: number) { await retrySupplierOrAutomatic(orderId, "供应商订单已提交处理。", "供应商订单尚未完成发货，请查看供应商订单详情。"); }
+async function retrySupplierOrAutomatic(orderId: number, successMessage: string, errorMessage: string) { delivering.value = true; try { await runTelefunc(() => onRetryAutomaticDelivery({ orderId }), { successMessage, errorMessage }); closeDelivery(); await loadOrders(); } catch { /* runTelefunc already displayed the error toast. */ } finally { delivering.value = false; } }
+function resetAndLoad() { page.value = 1; void loadOrders(); }
+function resetFilters() { Object.assign(filters, { query: "", status: "", deliveryStatus: "", startDate: "", endDate: "" }); resetAndLoad(); }
+function changePage(value: number) { page.value = value; void loadOrders(); }
+function changePageSize(value: number) { pageSize.value = value; page.value = 1; void loadOrders(); }
+
+function formatDate(value: Date | string | number) { return formatDateInTimezone(value, timezone.value); }
+function paymentLabel(value: Order["paymentStatus"]) { return { UNPAID: "待支付", PAID: "已支付", FAILED: "支付失败", REFUNDED: "已退款", PARTIAL_REFUNDED: "部分退款" }[value] ?? value; }
+async function refundOrder(orderId: number) {
+  if (!confirm("确认全额退款并同步会计账？已发货数字商品请谨慎。")) return;
+  try {
+    await runTelefunc(() => onRefundAdminOrder({ orderId }), { successMessage: "退款已登记（订单+会计）" });
+    await loadOrders();
+  } catch { /* toast */ }
+}
+function deliveryLabel(value: Order["deliveryStatus"]) { return { NOT_DELIVERED: "未发货", DELIVERING: "发货中", DELIVERED: "已发货", FAILED: "发货失败" }[value]; }
+function deliveryTypeLabel(value: unknown) {
+  return { CARD_AUTO: "自动卡密", FIXED_CARD: "固定内容", MANUAL: "人工发货", EXPRESS: "快递发货", SUPPLIER: "供应商履约" }[value as Order["deliveryType"]] ?? "-";
+}
+onMounted(loadOrders);
 </script>
