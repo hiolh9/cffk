@@ -1,83 +1,73 @@
-import { Hono } from "hono";
-import { getApp as vike } from "vike-cloudflare/hono";
-import { betterAuthHandler, betterAuthSessionMiddleware } from "./auth/handler";
-import { telefuncHandler } from "./telefunc-handler";
+import { betterAuthHandler, betterAuthSessionMiddleware } from "./better-auth-handler";
+import { PaymentCallbackService } from "./payment/callback-service";
+import { MAX_PAYMENT_CALLBACK_BYTES, normalizePaymentCallbackPayload } from "./payment/callback-payload";
 import { reportUnexpectedRequestError } from "./error-handling";
-import { applySecurityHeaders } from "./security/headers";
-import { corsRejectResponse, isAllowedBrowserOrigin } from "./security/cors";
-import { PaymentCallbackService, paymentCallbackResponse } from "./payment/callback-service";
-import { handleDujiaoSupplierCallback } from "./supplier/callback";
 import { registerMediaRoutes } from "./media/routes";
 import { registerSeoRoutes } from "./seo/routes";
-import { getTurnstileConfig } from "./security/turnstile";
-import { attachLocaleRewrite } from "./i18n/locale-rewrite";
+import { registerEnglishLocaleRewrite } from "./i18n/locale-middleware";
+import { telefuncHandler } from "./telefunc-handler";
+import vike from "@vikejs/hono";
+import { Hono, type Context } from "hono";
+import type { PaymentProviderKind } from "./payment/registry";
+import { PaymentLogService } from "./payment/log-service";
+import { getTurnstileConfig } from "@/lib/turnstile-config";
+import { applySecurityHeaders } from "./security/headers";
+import { corsRejectResponse, isAllowedBrowserOrigin } from "./security/cors";
+import { env } from "./env";
+import { handleDujiaoSupplierCallback } from "./supplier/callback";
 
 function getApp() {
-  const app = new Hono<{ Bindings: Env }>();
-  attachLocaleRewrite(app);
+  const app = new Hono<{ Bindings: Record<string, unknown> & { DB: D1Database } }>();
 
-  // Block cross-site browser calls to app APIs (payment notify is server-to-server, no Origin or gateway Origin)
+  // English SEO prefix must run before page routes
+  registerEnglishLocaleRewrite(app);
+
   app.use("*", async (context, next) => {
     const path = context.req.path;
     const isBrowserApi =
       path.startsWith("/_telefunc")
-      || path.startsWith("/api/") && !path.startsWith("/api/payments/")
-      && !path.startsWith("/api/supplier/");
+      || (path.startsWith("/api/")
+        && !path.startsWith("/api/payments/")
+        && !path.startsWith("/api/suppliers/"));
     if (isBrowserApi && !isAllowedBrowserOrigin(context.req.raw)) {
       return corsRejectResponse();
     }
     await next();
     applySecurityHeaders(context.res.headers);
   });
-
   app.onError(async (error, context) => {
     await reportUnexpectedRequestError("hono", error, context.req.raw);
     if (context.req.path.startsWith("/api/payments/")) return context.text("failure", 500);
-    if (context.req.path.startsWith("/api/")) {
-      return context.json({ code: "INTERNAL_ERROR", message: "接口异常，请稍后重试。", data: null }, 500);
-    }
+    if (context.req.path.startsWith("/api/")) return context.json({ code: "INTERNAL_ERROR", message: "接口异常，请稍后重试。", data: null }, 500);
     return context.text("Internal Server Error", 500);
   });
-
-  for (const [provider, path] of [
-    ["ALIPAY", "/api/payments/alipay/notify"],
-    ["EPAY", "/api/payments/epay/notify"],
-  ] as const) {
-    app.post(path, async (context) => {
-      const service = new PaymentCallbackService(context.env.DB, context.env as unknown as Record<string, unknown>);
-      const contentType = context.req.header("content-type") ?? "";
-      let payload: Record<string, string> = {};
-      const rawBody = await context.req.text();
-      if (contentType.includes("application/json")) {
-        try {
-          const parsed = JSON.parse(rawBody) as Record<string, unknown>;
-          payload = Object.fromEntries(
-            Object.entries(parsed).map(([k, v]) => [k, v == null ? "" : String(v)]),
-          );
-        } catch {
-          payload = {};
-        }
-      } else {
-        const form = new URLSearchParams(rawBody);
-        payload = Object.fromEntries(form.entries());
+  for (const [provider, path] of [["ALIPAY", "/api/payments/alipay/notify"], ["EPAY", "/api/payments/epay/notify"], ["BEPUSDT", "/api/payments/bepusdt/notify"], ["STRIPE", "/api/payments/stripe/notify"], ["HASHPAY", "/api/payments/hashpay/notify"], ["PERPAY", "/api/payments/perpay/notify"]] as const) {
+    const handlePaymentCallback = async (context: Context<{ Bindings: Record<string, unknown> & { DB: D1Database } }>) => {
+      const contentLength = Number(context.req.header("content-length"));
+      if (Number.isFinite(contentLength) && contentLength > MAX_PAYMENT_CALLBACK_BYTES) {
+        await new PaymentLogService(context.env.DB).writeBestEffort({ provider, eventType: "NOTIFY", verifyStatus: "FAILED", message: "PAYMENT_CALLBACK_TOO_LARGE" });
+        return context.text("failure", 400);
       }
-      const result = await service.handle(provider, {
-        payload,
-        rawBody,
-        headers: context.req.raw.headers,
-      });
-      const response = paymentCallbackResponse(result.ok);
-      return context.body(response.body, response.status, { "content-type": response.contentType });
-    });
+      const rawBodyBytes = provider === "PERPAY" ? new Uint8Array(await context.req.raw.arrayBuffer()) : undefined;
+      const rawBody = rawBodyBytes ? new TextDecoder().decode(rawBodyBytes) : await context.req.text();
+      let payload: Record<string, string>;
+      try {
+        payload = normalizePaymentCallbackPayload(context.req.method, context.req.url, rawBody, provider);
+      } catch (cause) {
+        await new PaymentLogService(context.env.DB).writeBestEffort({ provider, eventType: "NOTIFY", verifyStatus: "FAILED", message: "PAYMENT_CALLBACK_PAYLOAD_INVALID" });
+        throw cause;
+      }
+      const result = await new PaymentCallbackService(context.env.DB, context.env).handle(provider as PaymentProviderKind, { payload, rawBody, rawBodyBytes, headers: context.req.raw.headers });
+      return context.body(result.body, result.status as 200 | 400, { "content-type": result.contentType });
+    };
+    if (provider === "ALIPAY" || provider === "EPAY") app.on(["GET", "POST"], path, handlePaymentCallback);
+    else app.post(path, handlePaymentCallback);
   }
-
-  app.post("/api/supplier/dujiao/:accountId/callback", (context) =>
-    handleDujiaoSupplierCallback(context.env.DB, context.req.param("accountId"), context.req.raw),
-  );
+  app.post("/api/suppliers/dujiao-next/callback/:accountId", async (context) => handleDujiaoSupplierCallback(context.env.DB, context.req.param("accountId"), context.req.raw));
   registerMediaRoutes(app);
   registerSeoRoutes(app);
   app.get("/api/security/turnstile", (context) => {
-    const config = getTurnstileConfig(context.env);
+    const config = getTurnstileConfig(env);
     return context.json({ enabled: config.enabled, siteKey: config.enabled ? config.siteKey : null });
   });
   vike(app, [betterAuthSessionMiddleware, betterAuthHandler, telefuncHandler]);
