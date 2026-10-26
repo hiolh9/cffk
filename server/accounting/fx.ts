@@ -97,9 +97,44 @@ export async function upsertFxRates(
   }
 }
 
+type BnmRateRow = {
+  currency_code?: string;
+  unit?: number;
+  rate?: {
+    middle_rate?: number;
+    middle?: number;
+    buying_rate?: number;
+    selling_rate?: number;
+    buying?: number;
+    selling?: number;
+    date?: string;
+  };
+};
+
+/** Convert BNM quote to MYR per 1 unit of foreign currency */
+function rateToMyrPerUnit(item: BnmRateRow): number | null {
+  const rate = item.rate;
+  if (!rate) return null;
+  const mid =
+    rate.middle_rate
+    ?? rate.middle
+    ?? (rate.buying_rate != null && rate.selling_rate != null
+      ? (Number(rate.buying_rate) + Number(rate.selling_rate)) / 2
+      : null)
+    ?? (rate.buying != null && rate.selling != null
+      ? (Number(rate.buying) + Number(rate.selling)) / 2
+      : null);
+  if (mid == null || !Number.isFinite(Number(mid)) || Number(mid) <= 0) return null;
+  const unit = Number(item.unit);
+  const divisor = Number.isFinite(unit) && unit > 0 ? unit : 1;
+  return Number(mid) / divisor;
+}
+
 /**
- * Fetch daily mid rates from BNM Open API and average for a calendar month.
- * https://api.bnm.gov.my — session required; best-effort.
+ * Fetch BNM exchange rates and average across sample days in the month.
+ * API fields: middle_rate / buying_rate / selling_rate + unit (e.g. JPY unit=100).
+ * Note: some date queries may return the latest published board rate; we still
+ * average successful samples. Prefer manual rates from official monthly stats for audits.
  */
 export async function fetchBnmMonthlyAverageRates(yearMonth: string): Promise<Record<string, number>> {
   const [yStr, mStr] = yearMonth.split("-");
@@ -107,42 +142,48 @@ export async function fetchBnmMonthlyAverageRates(yearMonth: string): Promise<Re
   const month = Number(mStr);
   if (!year || !month) throw new Error("YEAR_MONTH_INVALID");
 
-  const currencies = ["USD", "SGD", "AUD", "JPY", "EUR", "GBP", "CNY"];
+  const currencies = new Set(["USD", "SGD", "AUD", "JPY", "EUR", "GBP", "CNY"]);
   const sums: Record<string, { total: number; n: number }> = {};
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  // Sample several weekdays + last day (Workers time/CPU limits; avoid 30 sequential calls)
+  const sampleDays = [...new Set([1, 5, 8, 12, 15, 19, 22, 26, daysInMonth])].filter(
+    (d) => d >= 1 && d <= daysInMonth,
+  );
+
+  // Always try "latest" once as fallback seed
+  const datesToFetch = [
+    ...sampleDays.map(
+      (day) => `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    ),
+    "",
+  ];
+
+  for (const date of datesToFetch) {
     try {
-      const res = await fetch(`https://api.bnm.gov.my/public/exchange-rate?date=${date}`, {
+      const url = date
+        ? `https://api.bnm.gov.my/public/exchange-rate?date=${date}`
+        : `https://api.bnm.gov.my/public/exchange-rate`;
+      const res = await fetch(url, {
         headers: {
           Accept: "application/vnd.BNM.API.v1+json",
-          "Content-Type": "application/json",
+          "User-Agent": "cffk-fx-sync/1.0",
         },
       });
       if (!res.ok) continue;
-      const body = (await res.json()) as {
-        data?: Array<{ currency_code?: string; rate?: { middle?: number; buying?: number; selling?: number } }>;
-      };
+      const body = (await res.json()) as { data?: BnmRateRow[] };
       for (const item of body.data ?? []) {
         const code = (item.currency_code || "").toUpperCase();
-        if (!currencies.includes(code)) continue;
-        const mid =
-          item.rate?.middle
-          ?? (item.rate?.buying != null && item.rate?.selling != null
-            ? (Number(item.rate.buying) + Number(item.rate.selling)) / 2
-            : null);
-        if (mid == null || !Number.isFinite(mid) || mid <= 0) continue;
-        // BNM quotes unit varies (e.g. JPY often per 100). Heuristic: JPY rates often > 1 for per-100.
-        let rateToMyr = Number(mid);
-        if (code === "JPY" && rateToMyr > 0.5) rateToMyr = rateToMyr / 100;
+        if (!currencies.has(code)) continue;
+        const perUnit = rateToMyrPerUnit(item);
+        if (perUnit == null || perUnit <= 0) continue;
         const bucket = sums[code] ?? { total: 0, n: 0 };
-        bucket.total += rateToMyr;
+        bucket.total += perUnit;
         bucket.n += 1;
         sums[code] = bucket;
       }
     } catch {
-      /* skip day */
+      /* skip */
     }
   }
 
