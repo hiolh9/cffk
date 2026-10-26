@@ -4,7 +4,13 @@ export * from "./schema-tables-b1";
 export * from "./schema-tables-b2";
 export { riskBlacklist, riskDeviceSighting, riskUserScore } from "./schema-risk";
 export { blogPost } from "./schema-blog";
-export { fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder } from "./schema-settlement";
+export {
+  fxMonthlyRate,
+  acctSale,
+  acctSettlement,
+  acctSettlementOrder,
+  acctAdjustment,
+} from "./schema-settlement";
 
 import {
   user, session, account, verification, twoFactor, adminBootstrap, siteSetting,
@@ -21,7 +27,9 @@ import {
 import { auditLog, invoiceSequence, accountingArchive } from "./schema-accounting";
 import { riskBlacklist, riskDeviceSighting, riskUserScore } from "./schema-risk";
 import { blogPost } from "./schema-blog";
-import { fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder } from "./schema-settlement";
+import {
+  fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder, acctAdjustment,
+} from "./schema-settlement";
 
 export const schema = {
   user, session, account, verification, twoFactor, adminBootstrap, siteSetting, riskBlacklist, riskDeviceSighting, riskUserScore,
@@ -32,5 +40,5 @@ export const schema = {
   supplierAccount, supplierBinding, supplierOrder, supplierSyncSettings, s3Config, media,
   auditLog, invoiceSequence, accountingArchive,
   blogPost,
-  fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder,
+  fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder, acctAdjustment,
 };

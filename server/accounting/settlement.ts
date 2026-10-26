@@ -1,7 +1,12 @@
-import { and, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { createDrizzleDb } from "@/database/drizzle";
 import { order } from "@/database/drizzle/schema";
-import { acctSale, acctSettlement, acctSettlementOrder } from "@/database/drizzle/schema-settlement";
+import {
+  acctAdjustment,
+  acctSale,
+  acctSettlement,
+  acctSettlementOrder,
+} from "@/database/drizzle/schema-settlement";
 import { resolveTransactionFxRate, round2 } from "./fx";
 
 export type AcctSaleStatus = "Success" | "Refunded" | "Voided";
@@ -15,7 +20,6 @@ export function computeSettlementTotals(input: {
   const fee = round2(Number(input.gatewayFeeMyr) || 0);
   const bank = round2(Number(input.bankReceivedMyr) || 0);
   if (bank < 0 || fee < 0) throw new Error("SETTLEMENT_AMOUNT_INVALID");
-  // Realised FX = bank + fee − booked revenue (all MYR)
   const realisedFxGainLoss = round2(bank + fee - gross);
   return { grossOrdersMyrTotal: gross, gatewayFeeMyr: fee, bankReceivedMyr: bank, realisedFxGainLoss };
 }
@@ -26,9 +30,14 @@ function majorFromCents(cents: number, currency: string): number {
   return decimals === 0 ? cents : cents / 100;
 }
 
+function csv(value: string) {
+  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
 /**
  * After business order is PAID: lock accounting revenue at monthly avg FX.
- * Idempotent on sourceOrderPk / orderId.
+ * Idempotent on orderId.
  */
 export async function recordAcctSaleFromPaidOrder(database: D1Database, sourceOrderPk: number) {
   const db = createDrizzleDb(database);
@@ -72,13 +81,13 @@ export async function recordAcctSaleFromPaidOrder(database: D1Database, sourceOr
     const resolved = await resolveTransactionFxRate(database, currency, txMs);
     rate = resolved.rate;
   } catch {
-    // If FX missing and not MYR, still book with rate 1 and mark — admin can fix rate table then re-sync
     if (currency !== "MYR") rate = 1;
   }
 
   const revenueMyr = round2(originalAmount * rate);
   const cogsMyr = round2((row.cogsAmountMyrCents ?? 0) / 100);
-  const productDesc = [row.productNameSnapshot, row.productSkuNameSnapshot].filter(Boolean).join(" / ") || "Digital product";
+  const productDesc =
+    [row.productNameSnapshot, row.productSkuNameSnapshot].filter(Boolean).join(" / ") || "Digital product";
   const now = new Date();
 
   await db.insert(acctSale).values({
@@ -95,11 +104,38 @@ export async function recordAcctSaleFromPaidOrder(database: D1Database, sourceOr
     status: "Success",
     gatewayProvider: row.paymentProvider,
     gatewayRef: null,
+    refundMyr: 0,
     createdAt: now,
     updatedAt: now,
   });
 
   return { orderId, revenueMyr, rate, already: false as const };
+}
+
+/** Backfill acctSale for all PAID business orders missing a ledger row */
+export async function backfillAcctSalesFromPaidOrders(database: D1Database, limit = 500) {
+  const db = createDrizzleDb(database);
+  const paid = await db
+    .select({ id: order.id })
+    .from(order)
+    .where(eq(order.paymentStatus, "PAID"))
+    .orderBy(desc(order.paidAt), desc(order.id))
+    .limit(limit);
+
+  let created = 0;
+  let skipped = 0;
+  let failed = 0;
+  for (const row of paid) {
+    try {
+      const result = await recordAcctSaleFromPaidOrder(database, row.id);
+      if (!result) failed += 1;
+      else if (result.already) skipped += 1;
+      else created += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  return { scanned: paid.length, created, skipped, failed };
 }
 
 export async function createAcctSettlement(
@@ -159,11 +195,88 @@ export async function createAcctSettlement(
   return { settlementId, ...totals };
 }
 
+/**
+ * Refund or void an accounting sale.
+ * - Not yet settled: status → Refunded/Voided; excluded from future settlements.
+ * - Already settled: also write acctAdjustment (revenue reversal + optional bank outflow).
+ * Never deletes historical settlement rows (audit-safe).
+ */
+export async function markAcctSaleRefundOrVoid(
+  database: D1Database,
+  input: {
+    orderId: string;
+    type: "REFUND" | "VOID";
+    /** Defaults to full revenueMyr */
+    revenueReversalMyr?: number;
+    /** Cash returned to customer / clawed by gateway (MYR). Default = revenue reversal. */
+    bankImpactMyr?: number;
+    note?: string | null;
+    actorUserId?: string | null;
+  },
+) {
+  const db = createDrizzleDb(database);
+  const orderId = input.orderId.trim();
+  const [sale] = await db.select().from(acctSale).where(eq(acctSale.orderId, orderId)).limit(1);
+  if (!sale) throw new Error("ACCT_SALE_NOT_FOUND");
+  if (sale.status !== "Success") throw new Error("ACCT_SALE_ALREADY_CLOSED");
+
+  const reversal = round2(
+    input.revenueReversalMyr != null ? Number(input.revenueReversalMyr) : Number(sale.revenueMyr),
+  );
+  if (reversal < 0 || reversal > Number(sale.revenueMyr) + 0.001) throw new Error("ACCT_REFUND_AMOUNT_INVALID");
+
+  const bankImpact = round2(
+    input.bankImpactMyr != null ? Number(input.bankImpactMyr) : reversal,
+  );
+  if (bankImpact < 0) throw new Error("ACCT_REFUND_AMOUNT_INVALID");
+
+  const [link] = await db
+    .select()
+    .from(acctSettlementOrder)
+    .where(eq(acctSettlementOrder.orderId, orderId))
+    .limit(1);
+
+  const now = new Date();
+  const status = input.type === "VOID" ? "Voided" : "Refunded";
+
+  await db
+    .update(acctSale)
+    .set({
+      status,
+      refundedAt: now,
+      refundMyr: reversal,
+      refundNote: input.note?.trim() || null,
+      updatedAt: now,
+    })
+    .where(eq(acctSale.orderId, orderId));
+
+  // Always record adjustment for audit; settlementId set when already settled
+  await db.insert(acctAdjustment).values({
+    orderId,
+    settlementId: link?.settlementId ?? null,
+    type: input.type,
+    revenueReversalMyr: reversal,
+    bankImpactMyr: bankImpact,
+    note: input.note?.trim() || null,
+    createdAt: now,
+    createdBy: input.actorUserId ?? null,
+  });
+
+  return {
+    orderId,
+    status,
+    revenueReversalMyr: reversal,
+    bankImpactMyr: bankImpact,
+    wasSettled: Boolean(link),
+    settlementId: link?.settlementId ?? null,
+  };
+}
+
 export async function listUnsettledAcctSales(database: D1Database, limit = 200) {
   const db = createDrizzleDb(database);
   const settled = await db.select({ orderId: acctSettlementOrder.orderId }).from(acctSettlementOrder);
   const settledIds = settled.map((s) => s.orderId);
-  const rows = await db
+  return db
     .select()
     .from(acctSale)
     .where(
@@ -174,7 +287,6 @@ export async function listUnsettledAcctSales(database: D1Database, limit = 200) 
     )
     .orderBy(desc(acctSale.transactionDate))
     .limit(limit);
-  return rows;
 }
 
 export async function listAcctSettlements(database: D1Database, limit = 100) {
@@ -182,13 +294,24 @@ export async function listAcctSettlements(database: D1Database, limit = 100) {
   return db.select().from(acctSettlement).orderBy(desc(acctSettlement.settlementDate)).limit(limit);
 }
 
+export async function listAcctAdjustments(database: D1Database, limit = 100) {
+  const db = createDrizzleDb(database);
+  return db.select().from(acctAdjustment).orderBy(desc(acctAdjustment.createdAt)).limit(limit);
+}
+
 export async function exportAcctSalesCsv(database: D1Database, fromMs: number, toMs: number) {
   const db = createDrizzleDb(database);
   const rows = await db
     .select()
     .from(acctSale)
-    .where(and(sql`${acctSale.transactionDate} >= ${new Date(fromMs)}`, sql`${acctSale.transactionDate} < ${new Date(toMs)}`))
+    .where(
+      and(
+        sql`${acctSale.transactionDate} >= ${new Date(fromMs)}`,
+        sql`${acctSale.transactionDate} < ${new Date(toMs)}`,
+      ),
+    )
     .orderBy(acctSale.transactionDate);
+
   const header = [
     "Order_ID",
     "Transaction_Date",
@@ -200,6 +323,8 @@ export async function exportAcctSalesCsv(database: D1Database, fromMs: number, t
     "Revenue_MYR",
     "COGS_MYR",
     "Status",
+    "Refund_MYR",
+    "Refunded_At",
   ];
   const lines = [header.join(",")];
   for (const r of rows) {
@@ -215,16 +340,90 @@ export async function exportAcctSalesCsv(database: D1Database, fromMs: number, t
         String(r.revenueMyr),
         String(r.cogsMyr),
         csv(r.status),
+        String(r.refundMyr ?? 0),
+        csv(r.refundedAt ? r.refundedAt.toISOString() : ""),
       ].join(","),
     );
   }
   return lines.join("\n");
 }
 
-function csv(value: string) {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+export async function exportAcctSettlementsCsv(database: D1Database, fromMs: number, toMs: number) {
+  const db = createDrizzleDb(database);
+  const rows = await db
+    .select()
+    .from(acctSettlement)
+    .where(
+      and(
+        sql`${acctSettlement.settlementDate} >= ${new Date(fromMs)}`,
+        sql`${acctSettlement.settlementDate} < ${new Date(toMs)}`,
+      ),
+    )
+    .orderBy(acctSettlement.settlementDate);
+
+  const header = [
+    "Settlement_ID",
+    "Settlement_Date",
+    "Gross_Orders_MYR_Total",
+    "Gateway_Fee_MYR",
+    "Bank_Received_MYR",
+    "Realised_FX_Gain_Loss",
+    "Notes",
+  ];
+  const lines = [header.join(",")];
+  for (const r of rows) {
+    lines.push(
+      [
+        csv(r.settlementId),
+        csv(r.settlementDate.toISOString().slice(0, 10)),
+        String(r.grossOrdersMyrTotal),
+        String(r.gatewayFeeMyr),
+        String(r.bankReceivedMyr),
+        String(r.realisedFxGainLoss),
+        csv(r.notes ?? ""),
+      ].join(","),
+    );
+  }
+  return lines.join("\n");
 }
 
-// silence unused
-void isNull;
+export async function exportAcctAdjustmentsCsv(database: D1Database, fromMs: number, toMs: number) {
+  const db = createDrizzleDb(database);
+  const rows = await db
+    .select()
+    .from(acctAdjustment)
+    .where(
+      and(
+        sql`${acctAdjustment.createdAt} >= ${new Date(fromMs)}`,
+        sql`${acctAdjustment.createdAt} < ${new Date(toMs)}`,
+      ),
+    )
+    .orderBy(acctAdjustment.createdAt);
+
+  const header = [
+    "ID",
+    "Order_ID",
+    "Settlement_ID",
+    "Type",
+    "Revenue_Reversal_MYR",
+    "Bank_Impact_MYR",
+    "Note",
+    "Created_At",
+  ];
+  const lines = [header.join(",")];
+  for (const r of rows) {
+    lines.push(
+      [
+        String(r.id),
+        csv(r.orderId),
+        csv(r.settlementId ?? ""),
+        csv(r.type),
+        String(r.revenueReversalMyr),
+        String(r.bankImpactMyr),
+        csv(r.note ?? ""),
+        csv(r.createdAt.toISOString()),
+      ].join(","),
+    );
+  }
+  return lines.join("\n");
+}
