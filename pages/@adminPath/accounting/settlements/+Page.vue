@@ -2,11 +2,20 @@
   <section class="flex w-full flex-col gap-6">
     <AdminPageHeader />
 
+    <div class="flex flex-wrap gap-2">
+      <Button size="sm" variant="outline" :disabled="backfilling" @click="backfill">
+        {{ backfilling ? "回填中..." : "回填已支付订单到会计账" }}
+      </Button>
+      <Button size="sm" variant="outline" @click="exportCsv('sales')">导出销售 CSV</Button>
+      <Button size="sm" variant="outline" @click="exportCsv('settlements')">导出结算 CSV</Button>
+      <Button size="sm" variant="outline" @click="exportCsv('adjustments')">导出退款调整 CSV</Button>
+    </div>
+
     <div class="grid gap-6 lg:grid-cols-2">
       <div class="rounded-xl border bg-card p-4">
         <h2 class="text-sm font-semibold">录入网关结算（MYR）</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          勾选未结算订单，填银行到账与手续费；系统自动汇总 Revenue_MYR 并计算已实现汇兑损益。
+          只勾选 Success 且未结算订单。退款/作废订单不会出现在此列表。
         </p>
         <div class="mt-4 space-y-3">
           <div class="space-y-1">
@@ -28,9 +37,8 @@
             <Input v-model="form.notes" placeholder="可选" />
           </div>
           <p class="text-xs text-muted-foreground">
-            已选 {{ selectedIds.length }} 笔 · 预计 Gross
-            {{ previewGross.toFixed(2) }} MYR · 预计 Realised FX
-            {{ previewRealised.toFixed(2) }} MYR
+            已选 {{ selectedIds.length }} 笔 · Gross {{ previewGross.toFixed(2) }} · Realised FX
+            {{ previewRealised.toFixed(2) }}
           </p>
           <Button :disabled="saving || !selectedIds.length" @click="createSettlement">
             {{ saving ? "提交中..." : "创建结算" }}
@@ -45,7 +53,7 @@
             {{ syncingFx ? "同步中..." : "同步上月 BNM" }}
           </Button>
         </div>
-        <div class="mt-3 max-h-64 overflow-auto text-xs">
+        <div class="mt-3 max-h-48 overflow-auto text-xs">
           <table class="w-full">
             <thead class="text-left text-muted-foreground">
               <tr>
@@ -63,17 +71,31 @@
                 <td>{{ r.source }}</td>
               </tr>
               <tr v-if="!fxRates.length">
-                <td colspan="4" class="py-6 text-center text-muted-foreground">暂无汇率，请先同步或手动录入</td>
+                <td colspan="4" class="py-6 text-center text-muted-foreground">暂无汇率</td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="mt-4 space-y-2 border-t pt-3">
-          <p class="text-xs font-medium">手动录入月均汇率</p>
           <Input v-model="manualYm" placeholder="2026-09" class="h-8" />
-          <Textarea v-model="manualRatesJson" rows="3" class="font-mono text-xs" placeholder='{"USD":4.72,"SGD":3.50,"JPY":0.031}' />
+          <Textarea v-model="manualRatesJson" rows="2" class="font-mono text-xs" placeholder='{"USD":4.72,"SGD":3.50}' />
           <Button size="sm" variant="secondary" :disabled="savingFx" @click="saveManualFx">保存汇率</Button>
         </div>
+      </div>
+    </div>
+
+    <div class="rounded-xl border bg-card p-4">
+      <h2 class="text-sm font-semibold">退款 / 作废（会计）</h2>
+      <p class="mt-1 text-xs text-muted-foreground">
+        未结算：仅改状态，不再进结算。已结算：写调整分录（冲减收入 + 银行流出），不删历史结算。
+      </p>
+      <div class="mt-3 grid gap-3 md:grid-cols-4">
+        <Input v-model="refundForm.orderId" placeholder="Order_ID / INV-..." class="md:col-span-2" />
+        <Input v-model.number="refundForm.revenueReversalMyr" type="number" step="0.01" min="0" placeholder="冲减收入 MYR（空=全额）" />
+        <Input v-model.number="refundForm.bankImpactMyr" type="number" step="0.01" min="0" placeholder="银行流出 MYR（空=同上）" />
+        <Input v-model="refundForm.note" placeholder="备注" class="md:col-span-2" />
+        <Button size="sm" variant="destructive" :disabled="refunding" @click="doRefund('REFUND')">退款</Button>
+        <Button size="sm" variant="outline" :disabled="refunding" @click="doRefund('VOID')">作废</Button>
       </div>
     </div>
 
@@ -90,7 +112,7 @@
               <th class="px-3 py-2">Order_ID</th>
               <th class="px-3 py-2">日期</th>
               <th class="px-3 py-2">币种</th>
-              <th class="px-3 py-2">原币金额</th>
+              <th class="px-3 py-2">原币</th>
               <th class="px-3 py-2">汇率</th>
               <th class="px-3 py-2">Revenue MYR</th>
             </tr>
@@ -115,32 +137,55 @@
       </div>
     </div>
 
-    <div class="rounded-xl border bg-card">
-      <div class="border-b px-4 py-3 text-sm font-semibold">近期结算批次</div>
-      <table class="w-full text-sm">
-        <thead class="text-left text-muted-foreground">
-          <tr>
-            <th class="px-3 py-2">Settlement_ID</th>
-            <th class="px-3 py-2">日期</th>
-            <th class="px-3 py-2">Gross MYR</th>
-            <th class="px-3 py-2">Fee MYR</th>
-            <th class="px-3 py-2">Bank MYR</th>
-            <th class="px-3 py-2">Realised FX</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="s in settlements" :key="s.settlementId" class="border-t">
-            <td class="px-3 py-2 font-mono text-xs">{{ s.settlementId }}</td>
-            <td class="px-3 py-2">{{ s.settlementDate.slice(0, 10) }}</td>
-            <td class="px-3 py-2">{{ s.grossOrdersMyrTotal }}</td>
-            <td class="px-3 py-2">{{ s.gatewayFeeMyr }}</td>
-            <td class="px-3 py-2">{{ s.bankReceivedMyr }}</td>
-            <td class="px-3 py-2" :class="s.realisedFxGainLoss >= 0 ? 'text-emerald-600' : 'text-destructive'">
-              {{ s.realisedFxGainLoss }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="grid gap-6 lg:grid-cols-2">
+      <div class="rounded-xl border bg-card">
+        <div class="border-b px-4 py-3 text-sm font-semibold">近期结算</div>
+        <table class="w-full text-sm">
+          <thead class="text-left text-muted-foreground">
+            <tr>
+              <th class="px-3 py-2">ID</th>
+              <th class="px-3 py-2">日期</th>
+              <th class="px-3 py-2">Bank</th>
+              <th class="px-3 py-2">FX</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in settlements" :key="s.settlementId" class="border-t">
+              <td class="px-3 py-2 font-mono text-xs">{{ s.settlementId }}</td>
+              <td class="px-3 py-2">{{ s.settlementDate.slice(0, 10) }}</td>
+              <td class="px-3 py-2">{{ s.bankReceivedMyr }}</td>
+              <td class="px-3 py-2" :class="s.realisedFxGainLoss >= 0 ? 'text-emerald-600' : 'text-destructive'">
+                {{ s.realisedFxGainLoss }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rounded-xl border bg-card">
+        <div class="border-b px-4 py-3 text-sm font-semibold">退款 / 作废调整</div>
+        <table class="w-full text-sm">
+          <thead class="text-left text-muted-foreground">
+            <tr>
+              <th class="px-3 py-2">Order</th>
+              <th class="px-3 py-2">类型</th>
+              <th class="px-3 py-2">冲收入</th>
+              <th class="px-3 py-2">银行</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="a in adjustments" :key="a.id" class="border-t">
+              <td class="px-3 py-2 font-mono text-xs">{{ a.orderId }}</td>
+              <td class="px-3 py-2">{{ a.type }}</td>
+              <td class="px-3 py-2">{{ a.revenueReversalMyr }}</td>
+              <td class="px-3 py-2">{{ a.bankImpactMyr }}</td>
+            </tr>
+            <tr v-if="!adjustments.length">
+              <td colspan="4" class="px-3 py-8 text-center text-muted-foreground">暂无调整</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 </template>
@@ -154,10 +199,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
 import {
+  onBackfillAcctSales,
   onCreateAcctSettlement,
+  onExportAcctAdjustmentsCsv,
+  onExportAcctSalesCsv,
+  onExportAcctSettlementsCsv,
+  onListAcctAdjustments,
   onListAcctSettlements,
   onListFxRates,
   onListUnsettledAcctSales,
+  onMarkAcctSaleRefundOrVoid,
   onSyncBnmFxRates,
   onUpsertFxRates,
 } from "@/server/accounting/settlement.admin.telefunc";
@@ -182,12 +233,17 @@ const settlements = ref<
     realisedFxGainLoss: number;
   }>
 >([]);
+const adjustments = ref<
+  Array<{ id: number; orderId: string; type: string; revenueReversalMyr: number; bankImpactMyr: number }>
+>([]);
 const fxRates = ref<Array<{ yearMonth: string; currency: string; rateToMyr: number; source: string }>>([]);
 const selectedIds = ref<string[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const syncingFx = ref(false);
 const savingFx = ref(false);
+const backfilling = ref(false);
+const refunding = ref(false);
 const manualYm = ref("");
 const manualRatesJson = ref('{"USD":4.72}');
 
@@ -198,6 +254,13 @@ const form = reactive({
   notes: "",
 });
 
+const refundForm = reactive({
+  orderId: "",
+  revenueReversalMyr: undefined as number | undefined,
+  bankImpactMyr: undefined as number | undefined,
+  note: "",
+});
+
 const previewGross = computed(() =>
   unsettled.value.filter((r) => selectedIds.value.includes(r.orderId)).reduce((s, r) => s + Number(r.revenueMyr), 0),
 );
@@ -205,17 +268,26 @@ const previewRealised = computed(
   () => Number(form.bankReceivedMyr || 0) + Number(form.gatewayFeeMyr || 0) - previewGross.value,
 );
 
+function monthRange() {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
+
 async function load() {
   loading.value = true;
   try {
-    const [a, b, c] = await Promise.all([
+    const [a, b, c, d] = await Promise.all([
       runTelefunc(() => onListUnsettledAcctSales()),
       runTelefunc(() => onListAcctSettlements()),
       runTelefunc(() => onListFxRates()),
+      runTelefunc(() => onListAcctAdjustments()),
     ]);
     unsettled.value = a.items as SaleRow[];
     settlements.value = b.items;
     fxRates.value = c.items;
+    adjustments.value = d.items;
   } catch (error) {
     toast.error(userErrorMessage(error, "加载失败"));
   } finally {
@@ -235,13 +307,77 @@ async function createSettlement() {
         notes: form.notes || undefined,
       }),
     );
-    toast.success(`已创建 ${result.settlementId}，Realised FX ${result.realisedFxGainLoss}`);
+    toast.success(`已创建 ${result.settlementId}`);
     selectedIds.value = [];
     await load();
   } catch (error) {
     toast.error(userErrorMessage(error, "创建结算失败"));
   } finally {
     saving.value = false;
+  }
+}
+
+async function doRefund(type: "REFUND" | "VOID") {
+  if (!refundForm.orderId.trim()) {
+    toast.error("请填写 Order_ID");
+    return;
+  }
+  refunding.value = true;
+  try {
+    const result = await runTelefunc(() =>
+      onMarkAcctSaleRefundOrVoid({
+        orderId: refundForm.orderId.trim(),
+        type,
+        revenueReversalMyr: refundForm.revenueReversalMyr,
+        bankImpactMyr: refundForm.bankImpactMyr,
+        note: refundForm.note || undefined,
+      }),
+    );
+    toast.success(
+      result.wasSettled
+        ? `${type} 完成（已结算，已记调整）`
+        : `${type} 完成（未结算，仅改状态）`,
+    );
+    refundForm.orderId = "";
+    await load();
+  } catch (error) {
+    toast.error(userErrorMessage(error, "操作失败"));
+  } finally {
+    refunding.value = false;
+  }
+}
+
+async function backfill() {
+  backfilling.value = true;
+  try {
+    const result = await runTelefunc(() => onBackfillAcctSales());
+    toast.success(`扫描 ${result.scanned}，新建 ${result.created}，跳过 ${result.skipped}，失败 ${result.failed}`);
+    await load();
+  } catch (error) {
+    toast.error(userErrorMessage(error, "回填失败"));
+  } finally {
+    backfilling.value = false;
+  }
+}
+
+async function exportCsv(kind: "sales" | "settlements" | "adjustments") {
+  try {
+    const range = monthRange();
+    const result =
+      kind === "sales"
+        ? await runTelefunc(() => onExportAcctSalesCsv(range))
+        : kind === "settlements"
+          ? await runTelefunc(() => onExportAcctSettlementsCsv(range))
+          : await runTelefunc(() => onExportAcctAdjustmentsCsv(range));
+    const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `acct-${kind}-${range.startDate.slice(0, 7)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    toast.error(userErrorMessage(error, "导出失败"));
   }
 }
 
@@ -252,7 +388,7 @@ async function syncFx() {
     toast.success(`已同步 ${result.yearMonth}，${result.stored} 个币种`);
     await load();
   } catch (error) {
-    toast.error(userErrorMessage(error, "BNM 同步失败，可手动录入"));
+    toast.error(userErrorMessage(error, "BNM 同步失败"));
   } finally {
     syncingFx.value = false;
   }
