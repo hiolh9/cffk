@@ -32,6 +32,9 @@ export const acctSale = sqliteTable(
       .default("Success"),
     gatewayProvider: text("gatewayProvider"),
     gatewayRef: text("gatewayRef"),
+    refundedAt: integer("refundedAt", { mode: "timestamp_ms" }),
+    refundMyr: real("refundMyr").default(0),
+    refundNote: text("refundNote"),
     createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
   },
@@ -72,5 +75,28 @@ export const acctSettlementOrder = sqliteTable(
     primaryKey({ columns: [table.settlementId, table.orderId] }),
     uniqueIndex("acctSettlementOrder_order_once").on(table.orderId),
     index("acctSettlementOrder_settlementId_idx").on(table.settlementId),
+  ],
+);
+
+/** Post-settlement refund / void / FX correction lines */
+export const acctAdjustment = sqliteTable(
+  "acctAdjustment",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    orderId: text("orderId").notNull(),
+    settlementId: text("settlementId"),
+    type: text("type", { enum: ["REFUND", "VOID", "FX_CORRECTION"] }).notNull(),
+    /** Positive number = revenue reversed (reduces recognised income) */
+    revenueReversalMyr: real("revenueReversalMyr").notNull().default(0),
+    /** Money leaving the bank / clawback (positive = outflow) */
+    bankImpactMyr: real("bankImpactMyr").notNull().default(0),
+    note: text("note"),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    createdBy: text("createdBy"),
+  },
+  (table) => [
+    index("acctAdjustment_orderId_idx").on(table.orderId),
+    index("acctAdjustment_settlementId_idx").on(table.settlementId),
+    index("acctAdjustment_createdAt_idx").on(table.createdAt),
   ],
 );
