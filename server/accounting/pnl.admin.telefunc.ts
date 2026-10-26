@@ -79,7 +79,7 @@ export const onGenerateMonthlyPnL = telefuncAction(async (input: { yearMonth: st
   return { pnl, csv: pnlToCsv(pnl) };
 });
 
-/** One-click: all monthly tables with standard CFFK-YYYY-MM-NN_name.csv filenames */
+/** One-click: Sparkpay-{YYYY-MM}-*.csv pack */
 export const onExportMonthlyPack = telefuncAction(async (input: { yearMonth: string }) => {
   const { database, adminUserId } = requireAdmin();
   if (!/^\d{4}-\d{2}$/.test(input.yearMonth)) appError("DATE_INVALID");

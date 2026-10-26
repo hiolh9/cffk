@@ -1,4 +1,4 @@
-# CFFK 记账与操作手册（LHDN 向）
+# Sparkpay 记账与操作手册（LHDN 向）
 
 > 币种主账本：MYR。外币销售按「交易日月度平均汇率」确认收入；网关打款按「结算日」记已实现汇兑损益。
 > 原则：**不删订单，只改状态；每笔改动留 auditLog。**
@@ -18,7 +18,7 @@
 | `07_audit_logs` | auditLog | 防篡改日志 |
 | `08_pnl` | 计算/快照 | 当月损益表 |
 
-**一键归档文件名：** `CFFK-2026-10-01_acct_sales.csv` …
+**一键归档文件名：** `Sparkpay-2026-10-01_acct_sales.csv` …
 
 后台路径：`/{adminPath}/accounting/pnl` → 选年月 →「一键导出当月全表」。
 
@@ -136,7 +136,7 @@
 2. 确认网关结算批次已录入  
 3. 补齐广告/服务器/预存款/提款等 GL  
 4. 打开 **日记账与P&L** → 选 `YYYY-MM` → **生成本月 P&L** 看 Net Profit  
-5. **一键导出当月全表** → 下载全部 `CFFK-YYYY-MM-*.csv`  
+5. **一键导出当月全表** → 下载全部 `Sparkpay-YYYY-MM-*.csv`  
 6. 存到 Google Drive / R2，保留 ≥7 年  
 
 ---

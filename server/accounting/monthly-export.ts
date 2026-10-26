@@ -35,22 +35,12 @@ function toCsv(headers: string[], rows: unknown[][]): string {
 }
 
 export type MonthlyExportFile = {
-  /** Standard archive name */
   filename: string;
   content: string;
   rowCount: number;
 };
 
-/**
- * One-click monthly pack — fixed filenames for LHDN / bookkeeping archive.
- *
- * Layout (yearMonth = 2026-10):
- *   CFFK-2026-10-01_acct_sales.csv
- *   CFFK-2026-10-02_acct_settlements.csv
- *   ...
- *   CFFK-2026-10-00_MANIFEST.txt
- *   CFFK-2026-10-08_pnl.csv
- */
+/** Sparkpay monthly pack: Sparkpay-{YYYY-MM}-{NN}_{table}.csv */
 export async function buildMonthlyExportPack(
   database: D1Database,
   yearMonth: string,
@@ -58,10 +48,9 @@ export async function buildMonthlyExportPack(
   if (!/^\d{4}-\d{2}$/.test(yearMonth)) throw new Error("YEAR_MONTH_INVALID");
   const db = createDrizzleDb(database);
   const { from, to } = monthBounds(yearMonth);
-  const prefix = `CFFK-${yearMonth}`;
+  const prefix = `Sparkpay-${yearMonth}`;
   const files: MonthlyExportFile[] = [];
 
-  // 01 Sales
   const sales = await db
     .select()
     .from(acctSale)
@@ -72,39 +61,18 @@ export async function buildMonthlyExportPack(
     rowCount: sales.length,
     content: toCsv(
       [
-        "Order_ID",
-        "Transaction_Date",
-        "Customer_ID",
-        "Product_Desc",
-        "Original_Currency",
-        "Original_Amount",
-        "Transaction_FX_Rate",
-        "Revenue_MYR",
-        "COGS_MYR",
-        "Status",
-        "Refund_MYR",
-        "Gateway_Provider",
-        "Gateway_Ref",
+        "Order_ID", "Transaction_Date", "Customer_ID", "Product_Desc",
+        "Original_Currency", "Original_Amount", "Transaction_FX_Rate",
+        "Revenue_MYR", "COGS_MYR", "Status", "Refund_MYR", "Gateway_Provider", "Gateway_Ref",
       ],
       sales.map((r) => [
-        r.orderId,
-        r.transactionDate,
-        r.customerId,
-        r.productDesc,
-        r.originalCurrency,
-        r.originalAmount,
-        r.transactionFxRate,
-        r.revenueMyr,
-        r.cogsMyr,
-        r.status,
-        r.refundMyr,
-        r.gatewayProvider,
-        r.gatewayRef,
+        r.orderId, r.transactionDate, r.customerId, r.productDesc,
+        r.originalCurrency, r.originalAmount, r.transactionFxRate,
+        r.revenueMyr, r.cogsMyr, r.status, r.refundMyr, r.gatewayProvider, r.gatewayRef,
       ]),
     ),
   });
 
-  // 02 Settlements
   const settlements = await db
     .select()
     .from(acctSettlement)
@@ -115,27 +83,16 @@ export async function buildMonthlyExportPack(
     rowCount: settlements.length,
     content: toCsv(
       [
-        "Settlement_ID",
-        "Settlement_Date",
-        "Gross_Orders_MYR_Total",
-        "Gateway_Fee_MYR",
-        "Bank_Received_MYR",
-        "Realised_FX_Gain_Loss",
-        "Notes",
+        "Settlement_ID", "Settlement_Date", "Gross_Orders_MYR_Total",
+        "Gateway_Fee_MYR", "Bank_Received_MYR", "Realised_FX_Gain_Loss", "Notes",
       ],
       settlements.map((r) => [
-        r.settlementId,
-        r.settlementDate,
-        r.grossOrdersMyrTotal,
-        r.gatewayFeeMyr,
-        r.bankReceivedMyr,
-        r.realisedFxGainLoss,
-        r.notes,
+        r.settlementId, r.settlementDate, r.grossOrdersMyrTotal,
+        r.gatewayFeeMyr, r.bankReceivedMyr, r.realisedFxGainLoss, r.notes,
       ]),
     ),
   });
 
-  // 03 Settlement ↔ Order links (for settlements in month)
   const settlementIds = settlements.map((s) => s.settlementId);
   let links: Array<{ settlementId: string; orderId: string }> = [];
   if (settlementIds.length) {
@@ -145,13 +102,9 @@ export async function buildMonthlyExportPack(
   files.push({
     filename: `${prefix}-03_acct_settlement_orders.csv`,
     rowCount: links.length,
-    content: toCsv(
-      ["Settlement_ID", "Order_ID"],
-      links.map((l) => [l.settlementId, l.orderId]),
-    ),
+    content: toCsv(["Settlement_ID", "Order_ID"], links.map((l) => [l.settlementId, l.orderId])),
   });
 
-  // 04 Adjustments created in month
   const adjustments = await db
     .select()
     .from(acctAdjustment)
@@ -163,20 +116,11 @@ export async function buildMonthlyExportPack(
     content: toCsv(
       ["ID", "Order_ID", "Settlement_ID", "Type", "Revenue_Reversal_MYR", "Bank_Impact_MYR", "Note", "Created_At", "Created_By"],
       adjustments.map((r) => [
-        r.id,
-        r.orderId,
-        r.settlementId,
-        r.type,
-        r.revenueReversalMyr,
-        r.bankImpactMyr,
-        r.note,
-        r.createdAt,
-        r.createdBy,
+        r.id, r.orderId, r.settlementId, r.type, r.revenueReversalMyr, r.bankImpactMyr, r.note, r.createdAt, r.createdBy,
       ]),
     ),
   });
 
-  // 05 General ledger
   const gl = await db
     .select()
     .from(acctGeneralLedger)
@@ -188,18 +132,11 @@ export async function buildMonthlyExportPack(
     content: toCsv(
       ["Entry_ID", "Entry_Date", "Type", "Description", "Amount_MYR", "Is_Tax_Deductible", "Created_By"],
       gl.map((r) => [
-        r.entryId,
-        r.entryDate,
-        r.type,
-        r.description,
-        r.amountMyr,
-        r.isTaxDeductible ? 1 : 0,
-        r.createdBy,
+        r.entryId, r.entryDate, r.type, r.description, r.amountMyr, r.isTaxDeductible ? 1 : 0, r.createdBy,
       ]),
     ),
   });
 
-  // 06 FX rates for this month (底稿)
   const fx = await db.select().from(fxMonthlyRate).where(sql`${fxMonthlyRate.yearMonth} = ${yearMonth}`);
   files.push({
     filename: `${prefix}-06_fx_monthly_rates.csv`,
@@ -210,7 +147,6 @@ export async function buildMonthlyExportPack(
     ),
   });
 
-  // 07 Audit logs in month
   const audits = await db
     .select()
     .from(auditLog)
@@ -223,21 +159,11 @@ export async function buildMonthlyExportPack(
     content: toCsv(
       ["Log_ID", "Action_Time", "Action_Type", "Table_Name", "Record_ID", "Old_Value", "New_Value", "User_ID", "User_Email", "Note"],
       audits.map((r) => [
-        r.id,
-        r.createdAt,
-        r.action,
-        r.entityType,
-        r.entityId,
-        r.beforeJson,
-        r.afterJson,
-        r.actorUserId,
-        r.actorEmail,
-        r.note,
+        r.id, r.createdAt, r.action, r.entityType, r.entityId, r.beforeJson, r.afterJson, r.actorUserId, r.actorEmail, r.note,
       ]),
     ),
   });
 
-  // 08 P&L
   const pnl = await computeMonthlyPnL(database, yearMonth);
   files.push({
     filename: `${prefix}-08_pnl.csv`,
@@ -245,14 +171,13 @@ export async function buildMonthlyExportPack(
     content: pnlToCsv(pnl),
   });
 
-  // optional snapshot row
   const [snap] = await db.select().from(acctPnLSnapshot).where(sql`${acctPnLSnapshot.yearMonth} = ${yearMonth}`).limit(1);
 
-  const manifestLines = [
-    `CFFK Monthly Accounting Pack`,
+  const manifest = [
+    `Sparkpay Monthly Accounting Pack`,
     `Period: ${yearMonth}`,
     `Generated_At_UTC: ${new Date().toISOString()}`,
-    `Naming: CFFK-{YYYY-MM}-{NN}_{table}.csv`,
+    `Naming: Sparkpay-{YYYY-MM}-{NN}_{table}.csv`,
     ``,
     `Files:`,
     ...files.map((f) => `  ${f.filename}  rows=${f.rowCount}`),
@@ -265,8 +190,8 @@ export async function buildMonthlyExportPack(
     `- Owner_Drawing and Prepayment never enter P&L.`,
     `- Revenue uses monthly average FX locked at transaction date.`,
     `- Realised FX uses settlement date bank receipt.`,
-  ];
-  const manifest = manifestLines.join("\n");
+  ].join("\n");
+
   files.unshift({
     filename: `${prefix}-00_MANIFEST.txt`,
     rowCount: 0,
