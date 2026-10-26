@@ -1,6 +1,5 @@
 import { eq } from "drizzle-orm";
 import { order } from "@/database/drizzle/schema";
-import { acctSale } from "@/database/drizzle/schema-settlement";
 import { createDrizzleDb } from "@/database/drizzle";
 import { appError } from "@/lib/app-error";
 import { markAcctSaleRefundOrVoid } from "@/server/accounting/settlement";
@@ -57,32 +56,23 @@ export async function refundAdminOrder(
     .where(eq(order.id, record.id));
 
   let accounting: unknown = null;
-  if (!input.skipAccounting) {
+  // Full refund/void: close accounting sale. Partial: order-only until final close.
+  if (!input.skipAccounting && isFull) {
     const orderIdKey = (record.invoiceNo || record.orderNo || "").trim();
     if (orderIdKey) {
       try {
-        const ratio = totalMajor > 0 ? refundMajor / totalMajor : 1;
-        const [sale] = await db.select().from(acctSale).where(eq(acctSale.orderId, orderIdKey)).limit(1);
-        let revenueReversalMyr: number | undefined;
-        if (sale) {
-          const already = Number(sale.refundMyr ?? 0);
-          const remRev = Math.max(0, Number(sale.revenueMyr) - already);
-          revenueReversalMyr = isFull
-            ? remRev
-            : Math.round(Number(sale.revenueMyr) * ratio * 100) / 100;
-          if (revenueReversalMyr > remRev) revenueReversalMyr = remRev;
-        }
         accounting = await markAcctSaleRefundOrVoid(database, {
           orderId: orderIdKey,
-          type: isFull && type === "VOID" ? "VOID" : "REFUND",
-          revenueReversalMyr,
+          type: type === "VOID" ? "VOID" : "REFUND",
           bankImpactMyr: input.bankImpactMyr,
           note: input.reason || `order#${record.id}`,
           actorUserId: input.adminUserId,
         });
       } catch (cause) {
         const msg = cause instanceof Error ? cause.message : "";
-        if (msg !== "ACCT_SALE_NOT_FOUND") console.error("order refund accounting link", msg);
+        if (msg !== "ACCT_SALE_NOT_FOUND" && msg !== "ACCT_SALE_ALREADY_CLOSED") {
+          console.error("order refund accounting link", msg);
+        }
       }
     }
   }
