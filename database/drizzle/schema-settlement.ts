@@ -86,9 +86,7 @@ export const acctAdjustment = sqliteTable(
     orderId: text("orderId").notNull(),
     settlementId: text("settlementId"),
     type: text("type", { enum: ["REFUND", "VOID", "FX_CORRECTION"] }).notNull(),
-    /** Positive number = revenue reversed (reduces recognised income) */
     revenueReversalMyr: real("revenueReversalMyr").notNull().default(0),
-    /** Money leaving the bank / clawback (positive = outflow) */
     bankImpactMyr: real("bankImpactMyr").notNull().default(0),
     note: text("note"),
     createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
@@ -100,3 +98,40 @@ export const acctAdjustment = sqliteTable(
     index("acctAdjustment_createdAt_idx").on(table.createdAt),
   ],
 );
+
+/** Non-order cash movements (drawings, expenses, prepayments, etc.) */
+export const acctGeneralLedger = sqliteTable(
+  "acctGeneralLedger",
+  {
+    entryId: text("entryId").primaryKey(),
+    entryDate: integer("entryDate", { mode: "timestamp_ms" }).notNull(),
+    type: text("type", {
+      enum: ["Owner_Drawing", "Capital_Injection", "Expense", "Prepayment", "Asset_Transfer"],
+    }).notNull(),
+    description: text("description").notNull(),
+    /** Positive = inflow, negative = outflow */
+    amountMyr: real("amountMyr").notNull(),
+    isTaxDeductible: integer("isTaxDeductible", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    createdBy: text("createdBy"),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("acctGeneralLedger_entryDate_idx").on(table.entryDate),
+    index("acctGeneralLedger_type_entryDate_idx").on(table.type, table.entryDate),
+  ],
+);
+
+/** Saved monthly P&L runs */
+export const acctPnLSnapshot = sqliteTable("acctPnLSnapshot", {
+  yearMonth: text("yearMonth").primaryKey(),
+  salesRevenueMyr: real("salesRevenueMyr").notNull().default(0),
+  cogsMyr: real("cogsMyr").notNull().default(0),
+  grossProfitMyr: real("grossProfitMyr").notNull().default(0),
+  gatewayFeesMyr: real("gatewayFeesMyr").notNull().default(0),
+  operatingExpensesMyr: real("operatingExpensesMyr").notNull().default(0),
+  realisedFxGainLossMyr: real("realisedFxGainLossMyr").notNull().default(0),
+  netProfitMyr: real("netProfitMyr").notNull().default(0),
+  detailJson: text("detailJson"),
+  generatedAt: integer("generatedAt", { mode: "timestamp_ms" }).notNull(),
+});
