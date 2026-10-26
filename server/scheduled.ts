@@ -8,6 +8,7 @@ import { processPendingSupplierOrders } from "./supplier/process";
 import { getOpsKillSwitches } from "./ops/kill-switch";
 import { runOpsHealthAlerts } from "./ops/ops-alert";
 import { runSupplierMaintenance } from "./supplier/maintenance";
+import { syncPreviousMonthBnmRates } from "./accounting/fx";
 
 export const ORDER_PAYMENT_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -21,6 +22,7 @@ export async function runScheduledMaintenance(database: D1Database, runtime: Rec
   let pushRetry: Awaited<ReturnType<typeof retryDuePushes>> | null = null;
   let supplierOrders: Awaited<ReturnType<typeof processPendingSupplierOrders>> | null = null;
   let supplierMaintenance: Awaited<ReturnType<typeof runSupplierMaintenance>> | null = null;
+  let fxSync: Awaited<ReturnType<typeof syncPreviousMonthBnmRates>> | null = null;
   const failures: string[] = [];
   let attemptedTasks = 0;
   let failedTasks = 0;
@@ -109,6 +111,27 @@ export async function runScheduledMaintenance(database: D1Database, runtime: Rec
     reportUnexpectedServerError("scheduled-push-retry", cause);
   }
 
+  // Monthly BNM average FX: run once around 01:00–01:05 UTC on day 2 of month (after prior month complete)
+  const klParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const klDay = Number(klParts.find((p) => p.type === "day")?.value ?? 0);
+  const klHour = Number(klParts.find((p) => p.type === "hour")?.value ?? -1);
+  if (klDay === 2 && klHour === 1 && now.getUTCMinutes() < 5) {
+    attemptedTasks += 1;
+    try {
+      fxSync = await syncPreviousMonthBnmRates(database, now);
+      if (fxSync.stored === 0) failures.push(`BNM汇率同步为空: ${fxSync.yearMonth}`);
+    } catch (cause) {
+      failedTasks += 1;
+      failures.push(`BNM汇率同步: ${errorMessage(cause)}`);
+      reportUnexpectedServerError("scheduled-bnm-fx-sync", cause);
+    }
+  }
+
   if (failures.length > 0) {
     try {
       await recordScheduledMaintenanceFailure(database, {
@@ -134,7 +157,7 @@ export async function runScheduledMaintenance(database: D1Database, runtime: Rec
     reportUnexpectedServerError("scheduled-ops-health-alerts", cause);
   }
 
-  return { runFiveMinuteMaintenance, reconciliation, orderCleanup, automaticDelivery, supplierOrders, supplierMaintenance, orderEvents, pushRetry, opsAlerts };
+  return { runFiveMinuteMaintenance, reconciliation, orderCleanup, automaticDelivery, supplierOrders, supplierMaintenance, orderEvents, pushRetry, opsAlerts, fxSync };
 }
 
 function errorMessage(cause: unknown) {

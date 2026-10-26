@@ -67,7 +67,7 @@ export const onCreateAcctSettlement = telefuncAction(async (input: {
       action: "ACCT_SETTLEMENT_CREATE",
       entityType: "acctSettlement",
       entityId: result.settlementId,
-      afterJson: JSON.stringify(result),
+      after: result,
     });
     return result;
   } catch (cause) {
@@ -113,7 +113,7 @@ export const onUpsertFxRates = telefuncAction(async (input: {
     action: "FX_RATE_UPSERT",
     entityType: "fxMonthlyRate",
     entityId: input.yearMonth,
-    afterJson: JSON.stringify(input.rates),
+    after: input.rates,
   });
   return { ok: true as const };
 });
@@ -126,7 +126,7 @@ export const onSyncBnmFxRates = telefuncAction(async () => {
     action: "FX_RATE_BNM_SYNC",
     entityType: "fxMonthlyRate",
     entityId: result.yearMonth,
-    afterJson: JSON.stringify(result.rates),
+    after: result.rates,
   });
   return result;
 });
