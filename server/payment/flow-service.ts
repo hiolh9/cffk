@@ -79,6 +79,14 @@ export class PaymentFlowService {
       }
     }
     const created = await createOrder(this.database, { ...input, paymentChannel: channel, allowPendingPayment: true } as CreateOrderInput, ownerUserId);
+    if (input.formValues && typeof input.formValues === "object" && Object.keys(input.formValues).length) {
+  try {
+    await this.database
+      .prepare("UPDATE `order` SET buyerFormValuesJson = ? WHERE orderNo = ?")
+      .bind(JSON.stringify(input.formValues), created.orderNo)
+      .run();
+  } catch { /* 0020 未跑时忽略 */ }
+}
     const logs = new PaymentLogService(this.database);
     if (created.amount === 0) {
       try {
