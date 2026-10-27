@@ -93,6 +93,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { formatCentsAsYuan } from "@/lib/payment-utils";
 import { runTelefunc } from "@/lib/telefunc-client";
+import BuyerFormEditor from "@/components/admin/BuyerFormEditor.vue";
 import { onDeleteProductSku, onGetCatalogAdminData, onGetProductAdminDetail, onSaveProduct, onSaveProductSku, onSaveSupplierProductPresentation } from "@/server/catalog/admin.telefunc";
 import { defaultProductForm, formToSaveInput, productDetailToForm, productFormSchema, slugifyProductName, type ProductDeliveryType, type ProductForm } from "./product-form";
 
