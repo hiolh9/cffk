@@ -72,7 +72,7 @@ import {
   BellIcon,
   SettingsIcon,
   TruckIcon,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 
 const pageContext = usePageContext() as {
   urlPathname?: string;
@@ -96,6 +96,7 @@ const flatItems = computed(() => {
     orders: ShoppingCartIcon,
     accounting: BookOpenIcon,
     settlements: BookOpenIcon,
+    pnl: BookOpenIcon,
     users: UsersIcon,
     blog: NewspaperIcon,
     push: BellIcon,
@@ -103,10 +104,10 @@ const flatItems = computed(() => {
     suppliers: TruckIcon,
   };
   return Object.entries(nav)
-    .filter(([, v]) => v && typeof v.path === "string")
+    .filter(([, v]) => v && typeof v === "object" && typeof (v as { path?: string }).path === "string")
     .map(([key, v]) => ({
-      title: v.title,
-      path: v.path,
+      title: (v as { title: string }).title,
+      path: (v as { path: string }).path,
       icon: icons[key],
     }));
 });
