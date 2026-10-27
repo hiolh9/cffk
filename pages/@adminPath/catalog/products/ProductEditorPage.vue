@@ -12,7 +12,10 @@
           <FieldSet class="gap-4"><FieldLegend><span class="text-destructive">*</span> 商品详情</FieldLegend><VeeField v-slot="{ errors }" name="description"><Field :data-invalid="errors.length > 0"><ProductRichTextEditor :model-value="values.description" @update:model-value="setFieldValue('description', $event)" /><FieldError v-if="errors.length" :errors="errors" /></Field></VeeField></FieldSet>
           <FieldSeparator />
           <FieldSet class="gap-4"><FieldLegend>购买须知</FieldLegend><VeeField v-slot="{ componentField }" name="purchaseNote"><Field><Textarea v-bind="componentField" rows="3" placeholder="例如：虚拟商品售出后不支持退款，请确认商品信息后购买" aria-label="购买须知" /></Field></VeeField></FieldSet>
-          <FieldSeparator />
+          <VeeField v-slot="{ value, handleChange }" name="buyerFormJson">
+  <BuyerFormEditor :model-value="value || ''" @update:model-value="handleChange" />
+</VeeField>
+            <FieldSeparator />
           <FieldSet v-if="isSupplierProduct" class="gap-2">
             <FieldLegend>履约方式</FieldLegend>
             <FieldDescription>供应商履约。供应商绑定、远程库存和成本限制由供应商管理模块维护。</FieldDescription>
