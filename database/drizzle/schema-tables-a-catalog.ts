@@ -33,6 +33,8 @@ export const productV2 = sqliteTable(
     manualDeliveryHint: text("manualDeliveryHint"),
     sort: integer("sort").notNull().default(0),
     purchaseNote: text("purchaseNote"),
+    /** JSON: { version:1, fields:[{key,label,type,required,...}] } */
+    buyerFormJson: text("buyerFormJson"),
     ratingValue: text("ratingValue"),
     reviewCount: integer("reviewCount"),
     createdAt,
