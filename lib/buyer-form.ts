@@ -22,6 +22,13 @@ export type BuyerFormDefinition = {
 
 const KEY_RE = /^[a-z][a-z0-9_]{0,31}$/;
 
+function isSimpleEmail(value: string) {
+  const at = value.indexOf("@");
+  if (at <= 0 || at !== value.lastIndexOf("@")) return false;
+  const domain = value.slice(at + 1);
+  return domain.includes(".") && !value.includes(" ") && value.length <= 254;
+}
+
 export function parseBuyerFormJson(raw: string | null | undefined): BuyerFormDefinition {
   if (!raw?.trim()) return { version: 1, fields: [] };
   try {
@@ -30,11 +37,15 @@ export function parseBuyerFormJson(raw: string | null | undefined): BuyerFormDef
     return {
       version: 1,
       fields: fields
-        .filter((f): f is BuyerFormField => Boolean(f && typeof f === "object" && typeof (f as BuyerFormField).key === "string"))
+        .filter((f): f is BuyerFormField =>
+          Boolean(f && typeof f === "object" && typeof (f as BuyerFormField).key === "string"),
+        )
         .map((f) => ({
           key: String(f.key).trim(),
           label: String(f.label || f.key).trim(),
-          type: (["text", "email", "textarea", "number", "password"] as const).includes(f.type as BuyerFormFieldType)
+          type: (["text", "email", "textarea", "number", "password"] as const).includes(
+            f.type as BuyerFormFieldType,
+          )
             ? (f.type as BuyerFormFieldType)
             : "text",
           required: Boolean(f.required),
@@ -58,7 +69,9 @@ export type BuyerFormValues = Record<string, string>;
 export function validateBuyerFormValues(
   def: BuyerFormDefinition,
   values: Record<string, unknown> | null | undefined,
-): { ok: true; values: BuyerFormValues } | { ok: false; fieldKey: string; reason: "required" | "invalid" } {
+):
+  | { ok: true; values: BuyerFormValues }
+  | { ok: false; fieldKey: string; reason: "required" | "invalid" } {
   const out: BuyerFormValues = {};
   const src = values && typeof values === "object" ? values : {};
   for (const field of def.fields) {
@@ -68,10 +81,7 @@ export function validateBuyerFormValues(
       if (field.required) return { ok: false, fieldKey: field.key, reason: "required" };
       continue;
     }
-    if (field.type === "email" && !/^[^
-@]+@[^
-@]+\.[^
-@]+$/.test(str)) {
+    if (field.type === "email" && !isSimpleEmail(str)) {
       return { ok: false, fieldKey: field.key, reason: "invalid" };
     }
     if (field.type === "number" && !Number.isFinite(Number(str))) {
@@ -84,7 +94,10 @@ export function validateBuyerFormValues(
 }
 
 /** Subset for supplier API (only passToSupplier fields). */
-export function buyerFormForSupplier(def: BuyerFormDefinition, values: BuyerFormValues): BuyerFormValues {
+export function buyerFormForSupplier(
+  def: BuyerFormDefinition,
+  values: BuyerFormValues,
+): BuyerFormValues {
   const out: BuyerFormValues = {};
   for (const field of def.fields) {
     if (field.passToSupplier === false) continue;
