@@ -95,7 +95,6 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
     userId: user.id,
   });
 
-  // deviceId / deviceFp are risk-only fields; flow service ignores them for createOrder.
   const rawKey = normalizeOrderIdempotencyKey(input.idempotencyKey);
   if (!rawKey) appError("IDEMPOTENCY_KEY_REQUIRED");
   const claim = await claimOrderIdempotency(database, { userId: user.id, key: rawKey });
@@ -108,11 +107,36 @@ async function internalOnCreatePayment(input: PaymentCreateInput) {
       return requirePaymentFlowService().resume(claim.orderNo, user.id);
     }
   }
+  // Validate product custom fields before creating order
+  try {
+    const { createDrizzleDb } = await import("@/database/drizzle");
+    const { productV2 } = await import("@/database/drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const { parseBuyerFormJson, validateBuyerFormValues } = await import("@/lib/buyer-form");
+    const db = createDrizzleDb(database);
+    const [product] = await db
+      .select({ buyerFormJson: productV2.buyerFormJson })
+      .from(productV2)
+      .where(eq(productV2.id, input.productId))
+      .limit(1);
+    const def = parseBuyerFormJson(product?.buyerFormJson);
+    if (def.fields.length) {
+      const checked = validateBuyerFormValues(def, input.formValues);
+      if (!checked.ok) appError(checked.reason === "required" ? "BUYER_FORM_REQUIRED" : "BUYER_FORM_INVALID");
+      input = { ...input, formValues: checked.values };
+    }
+  } catch (cause) {
+    if (cause && typeof cause === "object" && "code" in (cause as object)) throw cause;
+  }
   const result = await requirePaymentFlowService().create(input, user.id);
   if (claim && "isNew" in claim && "keyHash" in claim) {
     const created = await paymentRepository(database).findOrder(result.orderNo);
     if (created) {
-      await completeOrderIdempotency(database, { keyHash: claim.keyHash, orderNo: result.orderNo, orderId: created.id });
+      await completeOrderIdempotency(database, {
+        keyHash: claim.keyHash,
+        orderNo: result.orderNo,
+        orderId: created.id,
+      });
     }
   }
   return result;
