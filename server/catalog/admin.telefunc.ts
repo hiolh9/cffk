@@ -208,10 +208,16 @@ async function internalOnSaveProduct(input: {
   description?: string;
   manualDeliveryHint?: string;
   purchaseNote?: string;
+  
   status: ProductStatus;
   sort: number;
   skus: ProductSkuInput[];
   deliveryType: DeliveryType;
+    buyerFormJson?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoKeywords?: string | null;
+  customSchemaJson?: string | null;
 }) {
   const { db } = getAdminDb();
   if (!input || typeof input !== "object") appError("PRODUCT_INPUT_INVALID");
@@ -257,14 +263,22 @@ async function internalOnSaveProduct(input: {
     slug: resolveSlug(input.slug, name),
     subtitle: optionalText(input.subtitle, 300, "PRODUCT_SUBTITLE_INVALID"),
     coverImage: resolveCoverImage(input.coverImage),
-    description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null),
+        description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null),
     manualDeliveryHint: optionalText(input.manualDeliveryHint, 2_000, "PRODUCT_MANUAL_DELIVERY_HINT_INVALID"),
     purchaseNote: optionalText(input.purchaseNote, 2_000, "PRODUCT_PURCHASE_NOTE_INVALID"),
+    buyerFormJson: input.buyerFormJson != null && String(input.buyerFormJson).trim()
+      ? String(input.buyerFormJson).slice(0, 20_000)
+      : null,
+    seoTitle: optionalText(input.seoTitle, 120, "PRODUCT_SEO_TITLE_INVALID"),
+    seoDescription: optionalText(input.seoDescription, 320, "PRODUCT_SEO_DESCRIPTION_INVALID"),
+    seoKeywords: optionalText(input.seoKeywords, 300, "PRODUCT_SEO_KEYWORDS_INVALID"),
+    customSchemaJson: input.customSchemaJson != null && String(input.customSchemaJson).trim()
+      ? String(input.customSchemaJson).slice(0, 50_000)
+      : null,
     status: input.status,
     sort: nonNegativeInteger(input.sort, "PRODUCT_SORT_INVALID"),
     updatedAt: new Date(),
   };
-
   try {
     const now = new Date();
     const record = input.id
