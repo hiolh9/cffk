@@ -35,14 +35,15 @@
         </div>
         <div class="space-y-2 md:col-span-2">
           <label class="text-sm font-medium">正文 HTML *</label>
+          <BlogHtmlToolbar v-model="form.contentHtml" />
           <Textarea
             v-model="form.contentHtml"
             required
             rows="16"
             class="font-mono text-sm"
-            placeholder="使用 h2/h3/p/ul/li，不要再写 h1。例如：&#10;<h2>步骤</h2>&#10;<p>...</p>&#10;<ul><li>要点一</li></ul>"
+            placeholder="使用 h2/h3/p/ul/li，不要再写 h1"
           />
-          <p class="text-xs text-muted-foreground">标题已作为 H1；正文请从 H2 开始，列表用 ul/li，有利于 SEO。</p>
+          <p class="text-xs text-muted-foreground">标题已作为 H1；正文请从 H2 开始。用工具栏插入图片（必须填 alt）。</p>
         </div>
         <div class="space-y-2">
           <label class="text-sm font-medium">封面图 URL</label>
@@ -85,28 +86,18 @@
             </Select>
           </div>
           <div class="space-y-2 md:col-span-2">
-            <label class="text-sm font-medium">FAQ JSON（FAQPage 或附加问答）</label>
-            <Textarea
-              v-model="form.faqJson"
-              rows="4"
-              class="font-mono text-xs"
-              placeholder='[{"question":"How long?","answer":"Usually under 5 minutes."}]'
-            />
+            <label class="text-sm font-medium">FAQ JSON</label>
+            <Textarea v-model="form.faqJson" rows="4" class="font-mono text-xs" placeholder='[{"question":"...","answer":"..."}]' />
           </div>
           <div class="space-y-2 md:col-span-2">
-            <label class="text-sm font-medium">自定义 Schema JSON（高级，覆盖自动生成）</label>
-            <Textarea
-              v-model="form.customSchemaJson"
-              rows="5"
-              class="font-mono text-xs"
-              placeholder="完整 JSON-LD 对象或数组；留空则用自动 BlogPosting/Article/FAQ"
-            />
+            <label class="text-sm font-medium">自定义 JSON-LD（可选，覆盖自动 schema）</label>
+            <Textarea v-model="form.customSchemaJson" rows="6" class="font-mono text-xs" placeholder='{"@context":"https://schema.org","@type":"BlogPosting",...}' />
           </div>
         </div>
       </div>
 
-      <div class="flex gap-2">
-        <Button type="submit" :disabled="saving">{{ saving ? "保存中..." : "保存" }}</Button>
+      <div class="flex gap-3">
+        <Button type="submit" :disabled="saving">{{ saving ? "保存中…" : "保存" }}</Button>
         <Button type="button" variant="outline" as-child>
           <a :href="`${basePath}/blog`">返回列表</a>
         </Button>
@@ -117,9 +108,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { usePageContext } from "vike-vue/usePageContext";
 import { toast } from "vue-sonner";
+import { usePageContext } from "vike-vue/usePageContext";
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue";
+import BlogHtmlToolbar from "@/components/admin/BlogHtmlToolbar.vue";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,10 +120,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
 import { onCreateBlogPost, onGetBlogPost, onUpdateBlogPost } from "@/server/blog/admin.telefunc";
 
-const pageContext = usePageContext() as ReturnType<typeof usePageContext> & {
-  urlParsed?: { search?: { id?: string } | Record<string, string> };
+const pageContext = usePageContext() as {
+  adminPath?: string;
+  urlParsed?: { search?: { id?: string } };
 };
-const basePath = computed(() => `/${pageContext.routeParams.adminPath}`);
+const basePath = computed(() => {
+  const p = pageContext.adminPath || "";
+  return p.startsWith("/") ? p : `/${p}`;
+});
 const editId = computed(() => {
   const raw = pageContext.urlParsed?.search?.id;
   const n = Number(raw);
