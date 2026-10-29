@@ -54,6 +54,10 @@ type ProductData = {
   ratingValue?: string | number | null;
   reviewCount?: number | null;
   skus?: ProductSku[];
+      seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoKeywords?: string | null;
+  customSchemaJson?: string | null;
 };
 
 type BlogPostData = {
@@ -135,10 +139,14 @@ const seo = computed(() => {
   let ogType = "website";
   let imageSource: string | null | undefined = pageContext.site?.logoIcon || pageContext.site?.logo || defaultLogoUrl;
 
-  if (isProductPage && product?.name) {
-    title = `${product.name} - ${siteName}`;
+   if (isProductPage && product?.name) {
+    title = product.seoTitle?.trim() || `${product.name} - ${siteName}`;
     description =
-      product.subtitle?.trim() || toPlainText(product.description) || description;
+      product.seoDescription?.trim() ||
+      product.subtitle?.trim() ||
+      toPlainText(product.description) ||
+      description;
+    
     ogType = "product";
     imageSource = product.coverImage || imageSource;
   } else if (isBlogPost && blogPost.value) {
@@ -196,6 +204,13 @@ const productJsonLd = computed(() => {
   const productPath =
     pathInfo.value.locale === "en" ? withLocalePrefix(pathname, "en-US") : pathname;
   const productUrl = new URL(productPath, `${origin}/`).toString();
+      if (product.customSchemaJson?.trim()) {
+    try {
+      const parsed = JSON.parse(product.customSchemaJson) as unknown;
+      const nodes = Array.isArray(parsed) ? parsed : [parsed];
+      return stringifyJsonLd(nodes);
+    } catch { /* 用系统默认 schema */ }
+  }
   const prices = (product.skus?.map((s) => s.price).filter(Boolean) as string[]) || [];
   if (product.price) prices.push(product.price);
   const uniquePrices = [...new Set(prices)];
