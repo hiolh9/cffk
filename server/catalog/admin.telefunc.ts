@@ -208,16 +208,15 @@ async function internalOnSaveProduct(input: {
   description?: string;
   manualDeliveryHint?: string;
   purchaseNote?: string;
-  
-  status: ProductStatus;
-  sort: number;
-  skus: ProductSkuInput[];
-  deliveryType: DeliveryType;
-    buyerFormJson?: string | null;
+  buyerFormJson?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
   seoKeywords?: string | null;
   customSchemaJson?: string | null;
+  status: ProductStatus;
+  sort: number;
+  skus: ProductSkuInput[];
+  deliveryType: DeliveryType;
 }) {
   const { db } = getAdminDb();
   if (!input || typeof input !== "object") appError("PRODUCT_INPUT_INVALID");
