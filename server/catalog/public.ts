@@ -43,6 +43,10 @@ export type PublicProductDetail = PublicCatalog["products"][number] & {
   ratingValue: string | null;
   reviewCount: number | null;
   buyerFormJson: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  seoKeywords: string | null;
+  customSchemaJson: string | null;
   skus: PublicSku[];
 };
 
@@ -78,6 +82,10 @@ export async function getPublicProductDetail(
       ratingValue: productV2.ratingValue,
       reviewCount: productV2.reviewCount,
       buyerFormJson: productV2.buyerFormJson,
+      seoTitle: productV2.seoTitle,
+      seoDescription: productV2.seoDescription,
+      seoKeywords: productV2.seoKeywords,
+      customSchemaJson: productV2.customSchemaJson,
       categoryName: category.name,
     })
     .from(productV2)
