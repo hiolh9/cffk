@@ -35,6 +35,10 @@ export const productV2 = sqliteTable(
     purchaseNote: text("purchaseNote"),
     /** JSON: { version:1, fields:[{key,label,type,required,...}] } */
     buyerFormJson: text("buyerFormJson"),
+    seoTitle: text("seoTitle"),
+    seoDescription: text("seoDescription"),
+    seoKeywords: text("seoKeywords"),
+    customSchemaJson: text("customSchemaJson"),
     ratingValue: text("ratingValue"),
     reviewCount: integer("reviewCount"),
     createdAt,
