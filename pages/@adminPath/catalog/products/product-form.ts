@@ -18,6 +18,10 @@ export const productFormSchema = z.object({
   manualDeliveryHint: z.string(),
   purchaseNote: z.string(),
   buyerFormJson: z.string(),
+  seoTitle: z.string(),
+  seoDescription: z.string(),
+  seoKeywords: z.string(),
+  customSchemaJson: z.string(),
   ratingValue: z.string().trim().max(8),
   reviewCount: z.number().int().min(0).max(1_000_000),
   status: z.enum(productStatuses),
@@ -42,6 +46,10 @@ export function defaultProductForm(categoryId: number | null = null): ProductFor
     manualDeliveryHint: "",
     purchaseNote: "",
     buyerFormJson: "",
+    seoTitle: "",
+    seoDescription: "",
+    seoKeywords: "",
+    customSchemaJson: "",
     ratingValue: "",
     reviewCount: 0,
     status: "DRAFT",
@@ -50,6 +58,13 @@ export function defaultProductForm(categoryId: number | null = null): ProductFor
 }
 
 export function productDetailToForm(item: ProductDetail["product"]): ProductForm {
+  const p = item as ProductDetail["product"] & {
+    buyerFormJson?: string | null;
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    seoKeywords?: string | null;
+    customSchemaJson?: string | null;
+  };
   return {
     id: item.id,
     categoryId: item.categoryId ?? 0,
@@ -60,7 +75,11 @@ export function productDetailToForm(item: ProductDetail["product"]): ProductForm
     description: item.description ?? "",
     manualDeliveryHint: item.manualDeliveryHint ?? "",
     purchaseNote: item.purchaseNote,
-    buyerFormJson: (item as { buyerFormJson?: string | null }).buyerFormJson ?? "",
+    buyerFormJson: p.buyerFormJson ?? "",
+    seoTitle: p.seoTitle ?? "",
+    seoDescription: p.seoDescription ?? "",
+    seoKeywords: p.seoKeywords ?? "",
+    customSchemaJson: p.customSchemaJson ?? "",
     ratingValue: item.ratingValue ?? "",
     reviewCount: item.reviewCount ?? 0,
     status: item.status,
@@ -98,6 +117,10 @@ export function formToSaveInput(
     manualDeliveryHint: form.manualDeliveryHint,
     purchaseNote: form.purchaseNote,
     buyerFormJson: form.buyerFormJson || null,
+    seoTitle: form.seoTitle || null,
+    seoDescription: form.seoDescription || null,
+    seoKeywords: form.seoKeywords || null,
+    customSchemaJson: form.customSchemaJson || null,
     ratingValue: form.ratingValue,
     reviewCount: form.reviewCount,
     status: form.status,
