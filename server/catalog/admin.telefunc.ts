@@ -262,7 +262,7 @@ async function internalOnSaveProduct(input: {
     slug: resolveSlug(input.slug, name),
     subtitle: optionalText(input.subtitle, 300, "PRODUCT_SUBTITLE_INVALID"),
     coverImage: resolveCoverImage(input.coverImage),
-        description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null),
+           description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null),
     manualDeliveryHint: optionalText(input.manualDeliveryHint, 2_000, "PRODUCT_MANUAL_DELIVERY_HINT_INVALID"),
     purchaseNote: optionalText(input.purchaseNote, 2_000, "PRODUCT_PURCHASE_NOTE_INVALID"),
     buyerFormJson: input.buyerFormJson != null && String(input.buyerFormJson).trim()
