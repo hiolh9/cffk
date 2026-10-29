@@ -28,8 +28,7 @@
     </div>
 
     <p class="text-xs text-muted-foreground">
-      图片必须带 alt。插入的 HTML 形如
-      <code class="rounded bg-muted px-1"><figure><img src="..." alt="..." loading="lazy" /></figure></code>
+      图片必须带 alt。插入的 HTML 形如 figure + img + alt。
     </p>
   </div>
 </template>
@@ -49,12 +48,13 @@ const imageCaption = ref("");
 
 const canInsertImage = computed(() => Boolean(imageSrc.value.trim() && imageAlt.value.trim()));
 
+/** Escape for HTML attribute values. Concat form avoids entity stripping in some editors. */
 function escapeAttr(value: string) {
   return value
-    .replace(/&/g, "&")
-    .replace(/"/g, """)
-    .replace(/</g, "<")
-    .replace(/>/g, ">");
+    .replace(/&/g, "&" + "amp;")
+    .replace(/"/g, "&" + "quot;")
+    .replace(/</g, "&" + "lt;")
+    .replace(/>/g, "&" + "gt;");
 }
 
 function insertBlock(html: string) {
