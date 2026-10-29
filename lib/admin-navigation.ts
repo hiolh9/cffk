@@ -20,8 +20,6 @@ export function isNavigationModule(item: AdminNavigationItem): item is AdminNavi
   return "items" in item;
 }
 
-const emailDescription = "管理邮件 Provider 和发送统计。";
-
 export const adminPages = {
   account: {
     title: "账户设置",
@@ -133,13 +131,13 @@ export const adminPages = {
   },
   pushConfig: {
     title: "推送总览",
-    path: "/push",
+    path: "/push/config",
     pageTitle: "推送总览",
     description: "查看推送渠道与策略概览。",
   },
   pushLogs: {
     title: "推送日志",
-    path: "/push/logs",
+    path: "/push/history",
     pageTitle: "推送日志",
     description: "查看历史推送记录。",
   },
@@ -157,7 +155,7 @@ export const adminPages = {
   },
   mailPostOffice: {
     title: "邮局",
-    path: "/push/post-office",
+    path: "/push/email/post-office",
     pageTitle: "邮局",
     description: "查看待发与失败邮件。",
   },
@@ -268,7 +266,8 @@ export const adminNavigation = {
     items: [
       adminPages.pushConfig,
       adminPages.mailTemplates,
-      { ...adminPages.email, items: [adminPages.mailPostOffice] },
+      adminPages.email,
+      adminPages.mailPostOffice,
       adminPages.wecom,
       adminPages.telegram,
       adminPages.pushLogs,
