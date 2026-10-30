@@ -1,9 +1,9 @@
 <template>
-  <nav class="flex shrink-0 items-center gap-0.5 sm:gap-1" :aria-label="messages.nav.main">
+  <nav class="flex shrink-0 items-center gap-0 sm:gap-1" :aria-label="messages.nav.main">
     <Button
       size="sm"
       variant="ghost"
-      class="px-2 text-muted-foreground shadow-none hover:text-foreground sm:px-3"
+      class="size-9 px-0 text-muted-foreground shadow-none hover:text-foreground sm:h-9 sm:w-auto sm:px-3"
       as-child
     >
       <a
@@ -46,7 +46,7 @@
           type="button"
           variant="ghost"
           size="sm"
-          class="h-9 px-2 text-xs font-semibold tabular-nums text-muted-foreground shadow-none hover:text-foreground"
+          class="h-9 min-w-9 px-1.5 text-xs font-semibold tabular-nums text-muted-foreground shadow-none hover:text-foreground sm:px-2"
           aria-label="Currency"
           title="Currency"
         >
@@ -78,7 +78,11 @@
     </Button>
 
     <template v-if="!user">
-      <Button size="sm" class="ml-1 border-0 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90" as-child>
+      <Button
+        size="sm"
+        class="ml-0.5 h-8 px-2.5 text-xs shadow-sm sm:ml-1 sm:h-9 sm:px-3 sm:text-sm border-0 bg-primary text-primary-foreground hover:bg-primary/90"
+        as-child
+      >
         <a href="/login">{{ messages.nav.signIn }}</a>
       </Button>
     </template>
