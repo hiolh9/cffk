@@ -29,6 +29,14 @@ function isSimpleEmail(value: string) {
   return domain.includes(".") && !value.includes(" ") && value.length <= 254;
 }
 
+export function isValidBuyerFormKey(key: string) {
+  return KEY_RE.test(key);
+}
+
+/**
+ * Parse for UI editing — keep incomplete rows so backspacing a key/label
+ * does not delete the whole field card.
+ */
 export function parseBuyerFormJson(raw: string | null | undefined): BuyerFormDefinition {
   if (!raw?.trim()) return { version: 1, fields: [] };
   try {
@@ -41,8 +49,8 @@ export function parseBuyerFormJson(raw: string | null | undefined): BuyerFormDef
           Boolean(f && typeof f === "object" && typeof (f as BuyerFormField).key === "string"),
         )
         .map((f) => ({
-          key: String(f.key).trim(),
-          label: String(f.label || f.key).trim(),
+          key: String(f.key ?? "").trim(),
+          label: String(f.label ?? "").trim(),
           type: (["text", "email", "textarea", "number", "password"] as const).includes(
             f.type as BuyerFormFieldType,
           )
@@ -53,15 +61,42 @@ export function parseBuyerFormJson(raw: string | null | undefined): BuyerFormDef
           description: f.description ? String(f.description) : undefined,
           passToSupplier: f.passToSupplier !== false,
         }))
-        .filter((f) => KEY_RE.test(f.key) && f.label),
+        .slice(0, 20),
     };
   } catch {
     return { version: 1, fields: [] };
   }
 }
 
+/** Drop incomplete / invalid keys before persist or checkout validate. */
+export function normalizeBuyerFormForSave(def: BuyerFormDefinition): BuyerFormDefinition {
+  return {
+    version: 1,
+    fields: def.fields
+      .map((f) => ({
+        ...f,
+        key: String(f.key ?? "").trim(),
+        label: String(f.label ?? "").trim() || String(f.key ?? "").trim(),
+      }))
+      .filter((f) => isValidBuyerFormKey(f.key) && f.label)
+      .slice(0, 20),
+  };
+}
+
 export function serializeBuyerForm(def: BuyerFormDefinition): string {
-  return JSON.stringify({ version: 1, fields: def.fields.slice(0, 20) });
+  // Keep draft fields in the JSON while editing (even if key not valid yet).
+  return JSON.stringify({
+    version: 1,
+    fields: def.fields.slice(0, 20).map((f) => ({
+      key: f.key ?? "",
+      label: f.label ?? "",
+      type: f.type || "text",
+      required: Boolean(f.required),
+      placeholder: f.placeholder || undefined,
+      description: f.description || undefined,
+      passToSupplier: f.passToSupplier !== false,
+    })),
+  });
 }
 
 export type BuyerFormValues = Record<string, string>;
@@ -74,7 +109,8 @@ export function validateBuyerFormValues(
   | { ok: false; fieldKey: string; reason: "required" | "invalid" } {
   const out: BuyerFormValues = {};
   const src = values && typeof values === "object" ? values : {};
-  for (const field of def.fields) {
+  const fields = normalizeBuyerFormForSave(def).fields;
+  for (const field of fields) {
     const raw = src[field.key];
     const str = raw == null ? "" : String(raw).trim();
     if (!str) {
@@ -99,7 +135,7 @@ export function buyerFormForSupplier(
   values: BuyerFormValues,
 ): BuyerFormValues {
   const out: BuyerFormValues = {};
-  for (const field of def.fields) {
+  for (const field of normalizeBuyerFormForSave(def).fields) {
     if (field.passToSupplier === false) continue;
     if (values[field.key] != null && values[field.key] !== "") out[field.key] = values[field.key];
   }
