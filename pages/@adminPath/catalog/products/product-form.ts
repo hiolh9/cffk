@@ -1,17 +1,29 @@
 import { z } from "zod";
 
 import { slugify } from "@/lib/slugify";
+import { normalizeBuyerFormForSave, parseBuyerFormJson, serializeBuyerForm } from "@/lib/buyer-form";
 
 import type { onGetProductAdminDetail } from "@/server/catalog/admin.telefunc";
 
 export const deliveryTypes = ["CARD_AUTO", "FIXED_CARD", "MANUAL", "EXPRESS"] as const;
 export const productStatuses = ["DRAFT", "ACTIVE", "INACTIVE"] as const;
 
+const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export const productFormSchema = z.object({
   id: z.number().int().positive().optional(),
-  categoryId: z.number().int().positive("请选择商品分类"),
+  categoryId: z
+    .number({ error: "请选择商品分类" })
+    .int()
+    .refine((n) => n > 0, { message: "请选择商品分类" }),
   name: z.string().trim().min(1, "商品名称不能为空").max(120, "商品名称不能超过 120 个字符"),
-  slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug 只能包含小写英文、数字和连字符"),
+  // Empty slug is OK in the form — we auto-generate from name on submit.
+  slug: z
+    .string()
+    .trim()
+    .refine((s) => s === "" || slugPattern.test(s), {
+      message: "Slug 只能包含小写英文、数字和连字符，或留空自动生成",
+    }),
   subtitle: z.string().max(300, "副标题不能超过 300 个字符"),
   coverImage: z.string(),
   description: z.string().trim().min(1, "商品详情不能为空"),
@@ -106,17 +118,27 @@ export function formToSaveInput(
   skus: ProductSkuDraftInput[],
   deliveryType: ProductDeliveryType,
 ) {
+  const autoSlug = slugifyProductName(form.name) || `product-${Date.now()}`;
+  const slug = form.slug.trim() || autoSlug;
+
+  // Persist only valid buyer-form fields (drop incomplete draft rows)
+  let buyerFormJson: string | null = form.buyerFormJson?.trim() || null;
+  if (buyerFormJson) {
+    const normalized = normalizeBuyerFormForSave(parseBuyerFormJson(buyerFormJson));
+    buyerFormJson = normalized.fields.length ? serializeBuyerForm(normalized) : null;
+  }
+
   return {
     id: form.id,
     categoryId: form.categoryId || null,
     name: form.name,
-    slug: form.slug,
+    slug,
     subtitle: form.subtitle,
     coverImage: form.coverImage,
     description: form.description,
     manualDeliveryHint: form.manualDeliveryHint,
     purchaseNote: form.purchaseNote,
-    buyerFormJson: form.buyerFormJson || null,
+    buyerFormJson,
     seoTitle: form.seoTitle || null,
     seoDescription: form.seoDescription || null,
     seoKeywords: form.seoKeywords || null,
