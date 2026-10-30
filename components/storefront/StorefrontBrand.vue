@@ -1,9 +1,10 @@
 <template>
-  <a href="/" class="group flex min-w-0 items-center gap-2.5 font-semibold" :aria-label="homeLabel">
-    <span class="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+  <a href="/" class="group flex min-w-0 items-center gap-2 font-semibold sm:gap-2.5" :aria-label="homeLabel">
+    <span class="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5 sm:size-9 dark:ring-white/10">
       <img :src="brandLogoUrl" :alt="`${siteName} Logo`" class="size-full object-contain" />
     </span>
-    <span class="truncate text-base font-bold tracking-tight text-brand sm:text-[1.05rem]">{{ siteName }}</span>
+    <!-- Mobile: logo only — avoids crowding the nav -->
+    <span class="hidden truncate text-base font-bold tracking-tight text-brand sm:inline sm:text-[1.05rem]">{{ siteName }}</span>
   </a>
 </template>
 
