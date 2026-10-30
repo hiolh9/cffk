@@ -1,9 +1,9 @@
 <template>
   <main class="flex min-h-screen flex-col bg-background text-foreground">
     <header class="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
-      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
+      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
         <StorefrontBrand />
-        <div class="flex shrink-0 items-center gap-1">
+        <div class="flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-1">
           <PublicNav />
         </div>
       </div>
@@ -98,6 +98,7 @@
                 :src="product.coverImage || defaultProductImage"
                 :alt="product.name"
                 loading="lazy"
+                decoding="async"
                 :class="product.availableStock === 0 ? 'opacity-50 grayscale' : ''"
                 class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
               />
@@ -114,12 +115,15 @@
                 {{ messages.storefront.outOfStock }}
               </span>
             </div>
-            <div class="flex flex-1 flex-col gap-1 p-3 sm:p-3.5">
+            <div class="flex flex-1 flex-col gap-1 p-2.5 sm:p-3.5">
               <h3 class="line-clamp-2 text-sm font-semibold leading-snug group-hover:text-brand">{{ product.name }}</h3>
               <p v-if="product.subtitle" class="line-clamp-1 text-xs text-muted-foreground">{{ product.subtitle }}</p>
-              <div class="mt-auto flex items-end justify-between gap-2 pt-3">
-                <span class="text-lg font-bold tabular-nums leading-none text-brand">RM {{ product.price }}</span>
-                <span :class="stockClass(product)" class="text-[11px] sm:text-xs">{{ stockLabel(product) }}</span>
+              <!-- Mobile: price alone on one line (no wrap), stock below; sm+: side by side -->
+              <div class="mt-auto flex flex-col gap-0.5 pt-2.5 sm:flex-row sm:items-end sm:justify-between sm:gap-2 sm:pt-3">
+                <span class="whitespace-nowrap text-base font-bold tabular-nums leading-none text-brand sm:text-lg">
+                  <span class="mr-0.5 text-[0.75em] font-semibold tracking-tight opacity-90">RM</span>{{ product.price }}
+                </span>
+                <span :class="stockClass(product)" class="text-[11px] leading-tight sm:text-xs">{{ stockLabel(product) }}</span>
               </div>
             </div>
           </a>
