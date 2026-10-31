@@ -35,6 +35,30 @@
           </FieldSet>
           <FieldSeparator />
           <FieldSet class="gap-4">
+            <FieldLegend>English content（/en 路由）</FieldLegend>
+            <FieldDescription>可选。填写后在英文路径 /en/product/... 优先展示；留空则回退到上方默认内容。</FieldDescription>
+            <VeeField v-slot="{ componentField }" name="nameEn">
+              <Field>
+                <FieldLabel for="product-name-en">英文名称</FieldLabel>
+                <Input id="product-name-en" v-bind="componentField" placeholder="e.g. Pro Membership Monthly" />
+              </Field>
+            </VeeField>
+            <VeeField v-slot="{ componentField }" name="subtitleEn">
+              <Field>
+                <FieldLabel for="product-subtitle-en">英文副标题</FieldLabel>
+                <Input id="product-subtitle-en" v-bind="componentField" placeholder="Short English summary" />
+              </Field>
+            </VeeField>
+            <VeeField v-slot="{ errors }" name="descriptionEn">
+              <Field :data-invalid="errors.length > 0">
+                <FieldLabel>英文正文</FieldLabel>
+                <ProductRichTextEditor :model-value="values.descriptionEn || ''" @update:model-value="setFieldValue('descriptionEn', $event)" />
+                <FieldError v-if="errors.length" :errors="errors" />
+              </Field>
+            </VeeField>
+          </FieldSet>
+          <FieldSeparator />
+          <FieldSet class="gap-4">
             <FieldLegend>购买须知</FieldLegend>
             <VeeField v-slot="{ componentField }" name="purchaseNote">
               <Field>
@@ -534,6 +558,11 @@ const submit = handleSubmit(
               subtitle: form.subtitle,
               coverImage: form.coverImage,
               description: form.description,
+              nameEn: form.nameEn || null,
+              subtitleEn: form.subtitleEn || null,
+              descriptionEn: form.descriptionEn || null,
+              seoTitleEn: form.seoTitleEn || null,
+              seoDescriptionEn: form.seoDescriptionEn || null,
               purchaseNote: form.purchaseNote,
               status: form.status,
               sort: form.sort,
