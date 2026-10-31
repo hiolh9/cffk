@@ -23,8 +23,10 @@ export type PublicCatalog = {
     categoryId: number | null;
     categoryName: string | null;
     name: string;
+    nameEn: string | null;
     slug: string;
     subtitle: string | null;
+    subtitleEn: string | null;
     coverImage: string | null;
     price: string;
     currency: StoreCurrency;
@@ -38,13 +40,16 @@ export type PublicCatalog = {
 
 export type PublicProductDetail = PublicCatalog["products"][number] & {
   description: string | null;
+  descriptionEn: string | null;
   purchaseNote: string | null;
   manualDeliveryHint: string | null;
   ratingValue: string | null;
   reviewCount: number | null;
   buyerFormJson: string | null;
   seoTitle: string | null;
+  seoTitleEn: string | null;
   seoDescription: string | null;
+  seoDescriptionEn: string | null;
   seoKeywords: string | null;
   customSchemaJson: string | null;
   skus: PublicSku[];
@@ -73,17 +78,22 @@ export async function getPublicProductDetail(
       id: productV2.id,
       categoryId: productV2.categoryId,
       name: productV2.name,
+      nameEn: productV2.nameEn,
       slug: productV2.slug,
       subtitle: productV2.subtitle,
+      subtitleEn: productV2.subtitleEn,
       coverImage: productV2.coverImage,
       description: productV2.description,
+      descriptionEn: productV2.descriptionEn,
       purchaseNote: productV2.purchaseNote,
       manualDeliveryHint: productV2.manualDeliveryHint,
       ratingValue: productV2.ratingValue,
       reviewCount: productV2.reviewCount,
       buyerFormJson: productV2.buyerFormJson,
       seoTitle: productV2.seoTitle,
+      seoTitleEn: productV2.seoTitleEn,
       seoDescription: productV2.seoDescription,
+      seoDescriptionEn: productV2.seoDescriptionEn,
       seoKeywords: productV2.seoKeywords,
       customSchemaJson: productV2.customSchemaJson,
       categoryName: category.name,
@@ -174,8 +184,10 @@ export async function getPublicCatalog(
       id: productV2.id,
       categoryId: productV2.categoryId,
       name: productV2.name,
+      nameEn: productV2.nameEn,
       slug: productV2.slug,
       subtitle: productV2.subtitle,
+      subtitleEn: productV2.subtitleEn,
       coverImage: productV2.coverImage,
     })
     .from(productV2)
