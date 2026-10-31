@@ -17,7 +17,6 @@ export const productFormSchema = z.object({
     .int()
     .refine((n) => n > 0, { message: "请选择商品分类" }),
   name: z.string().trim().min(1, "商品名称不能为空").max(120, "商品名称不能超过 120 个字符"),
-  // Empty slug is OK in the form — we auto-generate from name on submit.
   slug: z
     .string()
     .trim()
@@ -27,6 +26,11 @@ export const productFormSchema = z.object({
   subtitle: z.string().max(300, "副标题不能超过 300 个字符"),
   coverImage: z.string(),
   description: z.string().trim().min(1, "商品详情不能为空"),
+  nameEn: z.string().max(120, "英文名称不能超过 120 个字符"),
+  subtitleEn: z.string().max(300, "英文副标题不能超过 300 个字符"),
+  descriptionEn: z.string(),
+  seoTitleEn: z.string(),
+  seoDescriptionEn: z.string(),
   manualDeliveryHint: z.string(),
   purchaseNote: z.string(),
   buyerFormJson: z.string(),
@@ -55,6 +59,11 @@ export function defaultProductForm(categoryId: number | null = null): ProductFor
     subtitle: "",
     coverImage: "",
     description: "",
+    nameEn: "",
+    subtitleEn: "",
+    descriptionEn: "",
+    seoTitleEn: "",
+    seoDescriptionEn: "",
     manualDeliveryHint: "",
     purchaseNote: "",
     buyerFormJson: "",
@@ -85,6 +94,11 @@ export function productDetailToForm(item: ProductDetail["product"]): ProductForm
     subtitle: item.subtitle ?? "",
     coverImage: item.coverImage ?? "",
     description: item.description ?? "",
+    nameEn: (item as any).nameEn ?? "",
+    subtitleEn: (item as any).subtitleEn ?? "",
+    descriptionEn: (item as any).descriptionEn ?? "",
+    seoTitleEn: (item as any).seoTitleEn ?? "",
+    seoDescriptionEn: (item as any).seoDescriptionEn ?? "",
     manualDeliveryHint: item.manualDeliveryHint ?? "",
     purchaseNote: item.purchaseNote,
     buyerFormJson: p.buyerFormJson ?? "",
@@ -121,7 +135,6 @@ export function formToSaveInput(
   const autoSlug = slugifyProductName(form.name) || `product-${Date.now()}`;
   const slug = form.slug.trim() || autoSlug;
 
-  // Persist only valid buyer-form fields (drop incomplete draft rows)
   let buyerFormJson: string | null = form.buyerFormJson?.trim() || null;
   if (buyerFormJson) {
     const normalized = normalizeBuyerFormForSave(parseBuyerFormJson(buyerFormJson));
@@ -136,6 +149,11 @@ export function formToSaveInput(
     subtitle: form.subtitle,
     coverImage: form.coverImage,
     description: form.description,
+    nameEn: form.nameEn || null,
+    subtitleEn: form.subtitleEn || null,
+    descriptionEn: form.descriptionEn || null,
+    seoTitleEn: form.seoTitleEn || null,
+    seoDescriptionEn: form.seoDescriptionEn || null,
     manualDeliveryHint: form.manualDeliveryHint,
     purchaseNote: form.purchaseNote,
     buyerFormJson,
