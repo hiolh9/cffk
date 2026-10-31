@@ -312,7 +312,7 @@
                   <Field :data-invalid="errors.length > 0">
                     <FieldLabel for="site-head-code">页头代码（head）</FieldLabel>
                     <Textarea id="site-head-code" v-bind="componentField" rows="6" spellcheck="false" class="min-h-36 font-mono text-xs leading-5" placeholder="&lt;meta name=&quot;...&quot; content=&quot;...&quot;&gt;" :aria-invalid="errors.length > 0" />
-                    <FieldDescription>写入页面 head：验证标签、统计脚本、像素等。支持完整 <script> 标签。</FieldDescription>
+                   <FieldDescription>写入页面 head：验证标签、统计脚本、像素等。支持完整 script 标签（可写完整标签代码）。</FieldDescription>
                     <FieldError v-if="errors.length" :errors="errors" />
                   </Field>
                 </VeeField>
