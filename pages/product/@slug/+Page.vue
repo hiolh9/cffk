@@ -186,7 +186,7 @@ const { messages, t } = useStorefrontPreferences();
 const data = useData<Data>();
 const coverLoaded = ref(false);
 watch(() => data.description, () => { void nextTick(() => enableDescriptionImageLazy()); });
-const pageContext = usePageContext() as ReturnType<typeof usePageContext> & { user?: { id: string;
+const pageContext = usePageContext() as ReturnType<typeof usePageContext> & { user?: { id: string; email?: string | null } | null };
 const preferEn = computed(() => stripLocalePrefix(pageContext.urlPathname || "/").locale === "en");
 const displayName = computed(() => {
   const en = (data as { nameEn?: string | null }).nameEn;
@@ -201,7 +201,7 @@ const displayDescription = computed(() => {
   const en = (data as { descriptionEn?: string | null }).descriptionEn;
   if (preferEn.value && en) return en;
   return data.description;
-}); email?: string | null } | null };
+});
 const user = pageContext.user ?? null;
 const loginHref = computed(() => `/login?redirect=${encodeURIComponent(pageContext.urlOriginal || `/product/${data.slug}`)}`);
 const selectedSkuId = ref(String(data.skus[0]?.id ?? ""));
