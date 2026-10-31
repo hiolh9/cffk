@@ -12,6 +12,9 @@ export type PublicSiteSettings = {
   supportContact: string | null;
   footerText: string | null;
   orderNotice: string | null;
+  /** Admin-configured HTML/scripts injected on public pages */
+  headCode: string | null;
+  footerCode: string | null;
 };
 
 type SiteSettingRecord = typeof siteSetting.$inferSelect;
@@ -24,12 +27,12 @@ type CacheEntry = {
 const CACHE_TTL_MS = 60_000;
 let settingsCache: CacheEntry | null = null;
 
-export const DEFAULT_FOOTER_TEXT = "© 2026 CFFK 基于 GitHub 开源";
-export const DEFAULT_SUPPORT_CONTACT = "TG互助群|https://t.me/edgeKeyGroup";
+export const DEFAULT_FOOTER_TEXT = "© 2026 Sparkpay Digital Services";
+export const DEFAULT_SUPPORT_CONTACT = "WhatsApp|+60109349681";
 
 const defaultSettings: SiteSettingRecord = {
   id: 1,
-  siteName: "CFFK-Shop",
+  siteName: "Sparkpay",
   siteUrl: null,
   siteSubtitle: null,
   logo: null,
@@ -68,7 +71,9 @@ const defaultSettings: SiteSettingRecord = {
   maxIpsPerUser: 5,
   behaviorScoreReview: 50,
   behaviorScoreBlock: 80,
-  timezone: "Asia/Shanghai",
+  timezone: "Asia/Kuala_Lumpur",
+  defaultCurrency: "MYR",
+  enabledCurrenciesJson: null,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 };
@@ -102,5 +107,7 @@ export function toPublicSiteSettings(record: SiteSettingRecord): PublicSiteSetti
     supportContact: record.supportContact?.trim() || DEFAULT_SUPPORT_CONTACT,
     footerText: record.footerText?.trim() || DEFAULT_FOOTER_TEXT,
     orderNotice: record.orderNotice,
+    headCode: record.headCode?.trim() || null,
+    footerCode: record.footerCode?.trim() || null,
   };
 }
