@@ -26,7 +26,7 @@ export async function onBeforeRender(pageContext: PageContextServer) {
       pageContext: {
         urlLocale,
         site: {
-          name: "CFFK-Shop",
+          name: "Sparkpay",
           subtitle: null,
           siteUrl: null,
           logo: null,
@@ -35,6 +35,8 @@ export async function onBeforeRender(pageContext: PageContextServer) {
           supportContact: DEFAULT_SUPPORT_CONTACT,
           footerText: DEFAULT_FOOTER_TEXT,
           orderNotice: null,
+          headCode: null,
+          footerCode: null,
         },
       },
     };
