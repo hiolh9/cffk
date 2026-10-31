@@ -6,8 +6,22 @@
       <div class="rounded-xl border bg-card p-4">
         <h2 class="text-sm font-semibold">录入通用日记账 (General Ledger)</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          老板提款、预存款、广告/服务器费用等非订单流水。Owner Drawing / Prepayment 不进 P&amp;L。
+          广告费、域名、公司邮箱、SST、WHT、服务器费等都可以记。选对<strong>类型</strong>：营业费用用
+          Expense；老板个人拿钱用 Owner Drawing（不进 P&L）；打给供应商预存用 Prepayment（资产，不进当月费用）。
         </p>
+
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <button
+            v-for="preset in expensePresets"
+            :key="preset.label"
+            type="button"
+            class="rounded-full border bg-muted/40 px-2.5 py-1 text-[11px] font-medium hover:border-brand hover:bg-brand-soft hover:text-brand"
+            @click="applyPreset(preset)"
+          >
+            {{ preset.label }}
+          </button>
+        </div>
+
         <div class="mt-4 space-y-3">
           <div class="space-y-1">
             <label class="text-xs font-medium">日期</label>
@@ -16,11 +30,11 @@
           <div class="space-y-1">
             <label class="text-xs font-medium">类型</label>
             <select v-model="gl.type" class="flex h-9 w-full rounded-md border bg-background px-3 text-sm">
-              <option value="Expense">Expense（营业费用）</option>
-              <option value="Owner_Drawing">Owner Drawing（老板提款）</option>
-              <option value="Prepayment">Prepayment（供应商预存款）</option>
+              <option value="Expense">Expense（营业费用：广告/域名/邮箱/SST/WHT/服务器）</option>
+              <option value="Owner_Drawing">Owner Drawing（老板提款，不进 P&L）</option>
+              <option value="Prepayment">Prepayment（供应商预存款，资产）</option>
               <option value="Capital_Injection">Capital Injection（注资）</option>
-              <option value="Asset_Transfer">Asset Transfer</option>
+              <option value="Asset_Transfer">Asset Transfer（资产划转）</option>
             </select>
           </div>
           <div class="space-y-1">
@@ -29,20 +43,20 @@
           </div>
           <div class="space-y-1">
             <label class="text-xs font-medium">描述</label>
-            <Input v-model="gl.description" placeholder="Pay server fee / Owner take money" />
+            <Input v-model="gl.description" placeholder="Facebook ads Oct / Domain renew / SST payment" />
           </div>
           <label class="flex items-center gap-2 text-xs">
             <input v-model="gl.isTaxDeductible" type="checkbox" :disabled="gl.type !== 'Expense'" />
-            可税前扣除（仅 Expense；提款/预存款强制否）
+            可税前扣除（仅 Expense；提款/预存款强制否。SST/WHT 一般勾选并在描述写清税种）
           </label>
           <Button :disabled="savingGl" @click="createGl">{{ savingGl ? "保存中..." : "记一笔" }}</Button>
         </div>
       </div>
 
       <div class="rounded-xl border bg-card p-4">
-        <h2 class="text-sm font-semibold">月度 P&amp;L 与一键归档</h2>
+        <h2 class="text-sm font-semibold">月度 P&L 与一键归档</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          收入/COGS 来自会计销售；费用 = 可抵扣 GL + 网关费。一键导出规范文件名全表 CSV。
+          收入/COGS 来自会计销售；费用 = 可抵扣 GL Expense + 网关费。一键导出规范文件名全表 CSV。
         </p>
         <div class="mt-4 flex flex-wrap items-end gap-2">
           <div class="space-y-1">
@@ -69,7 +83,7 @@
         </table>
 
         <div v-if="pnl" class="mt-4 rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
-          <p>不进 P&amp;L：提款 {{ fmt(pnl.excluded.ownerDrawingsMyr) }} · 预存款 {{ fmt(pnl.excluded.prepaymentsMyr) }} · 注资 {{ fmt(pnl.excluded.capitalInjectionMyr) }}</p>
+          <p>不进 P&L：提款 {{ fmt(pnl.excluded.ownerDrawingsMyr) }} · 预存款 {{ fmt(pnl.excluded.prepaymentsMyr) }} · 注资 {{ fmt(pnl.excluded.capitalInjectionMyr) }}</p>
         </div>
         <p v-if="lastExportNote" class="mt-2 text-xs text-muted-foreground">{{ lastExportNote }}</p>
       </div>
@@ -158,11 +172,36 @@ const csv = ref("");
 
 const gl = reactive({
   entryDate: new Date().toISOString().slice(0, 10),
-  type: "Expense" as const,
+  type: "Expense" as
+    | "Expense"
+    | "Owner_Drawing"
+    | "Prepayment"
+    | "Capital_Injection"
+    | "Asset_Transfer",
   description: "",
-  amountMyr: -0,
+  amountMyr: 0,
   isTaxDeductible: true,
 });
+
+/** Quick-fill common business costs (all as Expense + tax-deductible by default). */
+const expensePresets = [
+  { label: "广告费", description: "Advertising / Meta / Google ads", type: "Expense" as const, deductible: true },
+  { label: "域名", description: "Domain registration / renewal", type: "Expense" as const, deductible: true },
+  { label: "公司邮箱", description: "Business email / Google Workspace", type: "Expense" as const, deductible: true },
+  { label: "服务器/托管", description: "Server / Cloudflare / hosting", type: "Expense" as const, deductible: true },
+  { label: "SST", description: "SST payment (service tax)", type: "Expense" as const, deductible: true },
+  { label: "WHT", description: "Withholding tax payment", type: "Expense" as const, deductible: true },
+  { label: "供应商预存", description: "Supplier prepayment top-up", type: "Prepayment" as const, deductible: false },
+  { label: "老板提款", description: "Owner drawing", type: "Owner_Drawing" as const, deductible: false },
+];
+
+function applyPreset(preset: (typeof expensePresets)[number]) {
+  gl.type = preset.type;
+  gl.description = preset.description;
+  gl.isTaxDeductible = preset.deductible;
+  if (gl.amountMyr === 0) gl.amountMyr = -0;
+  toast.message(`已填：${preset.label}（请改金额后点「记一笔」）`);
+}
 
 function fmt(n: number) {
   return Number(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -240,10 +279,9 @@ async function exportPack() {
     for (const file of pack.files) {
       const mime = file.filename.endsWith(".txt") ? "text/plain;charset=utf-8" : "text/csv;charset=utf-8";
       downloadText(file.filename, file.content, mime);
-      // slight gap so browsers don't block multi-download
       await new Promise((r) => setTimeout(r, 150));
     }
-    lastExportNote.value = `已导出 ${pack.files.length} 个文件（CFFK-${pack.yearMonth}-*.csv）`;
+    lastExportNote.value = `已导出 ${pack.files.length} 个文件（Sparkpay-${pack.yearMonth}-*.csv）`;
     toast.success(lastExportNote.value);
   } catch (error) {
     toast.error(userErrorMessage(error, "导出失败"));
