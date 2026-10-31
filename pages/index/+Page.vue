@@ -1,7 +1,8 @@
 <template>
-  <main class="flex min-h-screen flex-col bg-background text-foreground">
-    <header class="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
-      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
+  <main class="flex min-h-screen flex-col bg-[#f5f7fb] text-foreground dark:bg-background">
+    <!-- Top bar: solid white like marketplace sites -->
+    <header class="fixed inset-x-0 top-0 z-50 border-b border-black/5 bg-white dark:border-border dark:bg-background">
+      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-14 sm:gap-3 sm:px-5">
         <StorefrontBrand />
         <div class="flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-1">
           <PublicNav />
@@ -9,9 +10,10 @@
       </div>
     </header>
 
-    <div v-if="site.notice" class="border-b border-brand/15 bg-brand-soft pt-14 sm:pt-16">
-      <div class="mx-auto flex max-w-6xl items-center gap-2.5 px-4 py-2.5 text-xs text-foreground/80 sm:px-6 sm:text-sm">
-        <InfoIcon class="size-4 shrink-0 text-brand" />
+    <!-- Notice strip -->
+    <div v-if="site.notice" class="border-b border-brand/10 bg-brand-soft pt-14">
+      <div class="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2 text-xs text-foreground/80 sm:px-5 sm:text-sm">
+        <InfoIcon class="size-3.5 shrink-0 text-brand sm:size-4" />
         <div class="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
           <p v-if="!shouldMarqueeNotice" class="m-0 truncate" :title="site.notice">{{ site.notice }}</p>
           <template v-else>
@@ -25,38 +27,38 @@
       </div>
     </div>
 
-    <section :class="site.notice ? '' : 'pt-14 sm:pt-16'" class="relative overflow-hidden border-b">
-      <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#003EAA]/[0.08] via-[#0088EE]/[0.05] to-[#00D0FF]/[0.08]" />
-      <div class="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-[#0088EE]/10 blur-3xl" />
-      <div class="pointer-events-none absolute -bottom-16 -left-16 size-56 rounded-full bg-[#00D0FF]/15 blur-3xl" />
-      <div class="relative mx-auto flex max-w-6xl flex-col gap-5 px-4 py-8 sm:flex-row sm:items-end sm:justify-between sm:gap-8 sm:px-6 sm:py-12">
-        <div class="min-w-0 max-w-xl">
-          <p class="text-xs font-semibold uppercase tracking-wider text-brand">Digital top-up</p>
-          <h1 class="mt-1.5 text-2xl font-bold tracking-tight sm:text-4xl">{{ site.name }}</h1>
-          <p class="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground sm:text-base">
-            {{ site.subtitle || messages.storefront.fallbackSubtitle }}
-          </p>
-        </div>
-        <div class="relative w-full sm:max-w-sm">
-          <SearchIcon class="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            v-model="query"
-            type="search"
-            enterkeyhint="search"
-            class="h-12 rounded-full border-border/80 bg-background/90 pl-10 shadow-sm ring-1 ring-black/5 focus-visible:ring-brand dark:ring-white/10"
-            :placeholder="messages.storefront.searchProducts"
-            :aria-label="messages.storefront.searchProducts"
-          />
+    <!-- Compact search band (SEAGM-style: tools first, not a big marketing hero) -->
+    <section :class="site.notice ? '' : 'pt-14'" class="border-b border-black/5 bg-white dark:border-border dark:bg-background">
+      <div class="mx-auto max-w-6xl px-3 py-4 sm:px-5 sm:py-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div class="min-w-0">
+            <h1 class="truncate text-lg font-bold tracking-tight text-foreground sm:text-xl">{{ site.name }}</h1>
+            <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground sm:text-sm">
+              {{ site.subtitle || messages.storefront.fallbackSubtitle }}
+            </p>
+          </div>
+          <div class="relative w-full sm:max-w-md">
+            <SearchIcon class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              v-model="query"
+              type="search"
+              enterkeyhint="search"
+              class="h-10 rounded-lg border-black/8 bg-[#f5f7fb] pl-9 text-sm shadow-none focus-visible:border-brand focus-visible:ring-brand/30 dark:bg-muted"
+              :placeholder="messages.storefront.searchProducts"
+              :aria-label="messages.storefront.searchProducts"
+            />
+          </div>
         </div>
       </div>
     </section>
 
+    <!-- Category tabs: underline style -->
     <nav
       v-if="data.categories.length"
       :aria-label="messages.storefront.categories"
-      class="sticky top-14 z-40 border-b bg-background/95 backdrop-blur-md sm:top-16"
+      class="sticky top-14 z-40 border-b border-black/5 bg-white/95 backdrop-blur-md dark:border-border dark:bg-background/95"
     >
-      <div class="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div class="mx-auto flex max-w-6xl gap-0 overflow-x-auto px-1 sm:px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           :class="chipClass(selectedCategory === null)"
@@ -78,62 +80,70 @@
       </div>
     </nav>
 
-    <section class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
-      <div class="flex items-baseline justify-between gap-3">
-        <h2 class="text-lg font-semibold tracking-tight sm:text-xl">{{ messages.storefront.products }}</h2>
-        <p v-if="query" class="truncate text-xs text-muted-foreground sm:text-sm">
+    <!-- Product grid -->
+    <section class="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-5 sm:py-6">
+      <div class="mb-3 flex items-baseline justify-between gap-3 sm:mb-4">
+        <h2 class="text-sm font-semibold text-foreground sm:text-base">{{ messages.storefront.products }}</h2>
+        <p class="text-xs tabular-nums text-muted-foreground">
           {{ t(messages.storefront.relatedProducts, { count: visibleProducts.length }) }}
         </p>
       </div>
 
-      <div v-if="visibleProducts.length" class="mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+      <div
+        v-if="visibleProducts.length"
+        class="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+      >
         <article
           v-for="product in visibleProducts"
           :key="product.id"
-          class="group flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm ring-1 ring-black/[0.03] transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md dark:ring-white/5"
+          class="group overflow-hidden rounded-xl border border-black/5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-brand/25 hover:shadow-[0_8px_24px_rgba(0,136,238,0.12)] dark:border-border dark:bg-card"
         >
-          <a :href="`/product/${product.slug}`" class="flex h-full flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
-            <div class="relative aspect-square overflow-hidden bg-muted">
+          <a
+            :href="`/product/${product.slug}`"
+            class="flex h-full flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            <div class="relative aspect-[4/3] overflow-hidden bg-[#eef2f7] dark:bg-muted">
               <img
                 :src="product.coverImage || defaultProductImage"
                 :alt="product.name"
                 loading="lazy"
                 decoding="async"
-                :class="product.availableStock === 0 ? 'opacity-50 grayscale' : ''"
-                class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                :class="product.availableStock === 0 ? 'opacity-45 grayscale' : ''"
+                class="size-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.05]"
               />
-              <Badge
-                variant="secondary"
-                class="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-background/95 px-2 py-0.5 text-[11px] font-medium shadow-sm backdrop-blur"
+              <span
+                v-if="product.categoryName"
+                class="absolute left-1.5 top-1.5 max-w-[70%] truncate rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground/80 shadow-sm backdrop-blur dark:bg-background/90"
               >
-                {{ product.categoryName || messages.storefront.products }}
-              </Badge>
+                {{ product.categoryName }}
+              </span>
               <span
                 v-if="product.availableStock === 0"
-                class="absolute inset-x-2 bottom-2 rounded-full bg-black/70 px-2 py-1 text-center text-[11px] font-medium text-white"
+                class="absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1 text-center text-[10px] font-medium text-white"
               >
                 {{ messages.storefront.outOfStock }}
               </span>
             </div>
-            <div class="flex flex-1 flex-col gap-1 p-2.5 sm:p-3.5">
-              <h3 class="line-clamp-2 text-sm font-semibold leading-snug group-hover:text-brand">{{ product.name }}</h3>
-              <p v-if="product.subtitle" class="line-clamp-1 text-xs text-muted-foreground">{{ product.subtitle }}</p>
-              <!-- Mobile: price alone on one line (no wrap), stock below; sm+: side by side -->
-              <div class="mt-auto flex flex-col gap-0.5 pt-2.5 sm:flex-row sm:items-end sm:justify-between sm:gap-2 sm:pt-3">
-                <span class="whitespace-nowrap text-base font-bold tabular-nums leading-none text-brand sm:text-lg">
-                  <span class="mr-0.5 text-[0.75em] font-semibold tracking-tight opacity-90">RM</span>{{ product.price }}
+            <div class="flex flex-1 flex-col gap-1 p-2.5 sm:p-3">
+              <h3 class="line-clamp-2 min-h-[2.5rem] text-[13px] font-medium leading-snug text-foreground group-hover:text-brand sm:text-sm">
+                {{ product.name }}
+              </h3>
+              <p v-if="product.subtitle" class="line-clamp-1 text-[11px] text-muted-foreground">{{ product.subtitle }}</p>
+              <div class="mt-auto flex flex-col gap-0.5 pt-1.5">
+                <span class="whitespace-nowrap text-[15px] font-bold tabular-nums leading-none text-[#e11d48] sm:text-base">
+                  <span class="mr-0.5 text-[0.7em] font-semibold opacity-90">RM</span>{{ product.price }}
                 </span>
-                <span :class="stockClass(product)" class="text-[11px] leading-tight sm:text-xs">{{ stockLabel(product) }}</span>
+                <span :class="stockClass(product)" class="text-[10px] leading-tight sm:text-[11px]">{{ stockLabel(product) }}</span>
               </div>
             </div>
           </a>
         </article>
       </div>
 
-      <div v-else class="mt-6 rounded-2xl border border-dashed bg-muted/40 px-6 py-16 text-center">
-        <PackageOpenIcon class="mx-auto size-8 text-muted-foreground" />
-        <h3 class="mt-4 text-base font-semibold">{{ messages.storefront.noProducts }}</h3>
-        <p class="mt-2 text-sm text-muted-foreground">{{ messages.storefront.noProductsDescription }}</p>
+      <div v-else class="mt-4 rounded-xl border border-dashed border-black/10 bg-white px-6 py-14 text-center dark:bg-card">
+        <PackageOpenIcon class="mx-auto size-7 text-muted-foreground" />
+        <h3 class="mt-3 text-sm font-semibold">{{ messages.storefront.noProducts }}</h3>
+        <p class="mt-1.5 text-xs text-muted-foreground sm:text-sm">{{ messages.storefront.noProductsDescription }}</p>
       </div>
     </section>
 
@@ -151,7 +161,6 @@ import { usePageContext } from "vike-vue/usePageContext";
 import PublicNav from "@/components/storefront/PublicNav.vue";
 import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
 import StorefrontFooter from "@/components/storefront/StorefrontFooter.vue";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { Data } from "./+data.server";
 import { useStorefrontPreferences } from "@/lib/storefront-preferences";
@@ -183,10 +192,10 @@ const visibleProducts = computed(() => {
 
 function chipClass(active: boolean) {
   return [
-    "shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+    "shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors sm:px-4",
     active
-      ? "bg-primary text-primary-foreground shadow-sm"
-      : "bg-muted text-muted-foreground hover:bg-brand-soft hover:text-brand",
+      ? "border-brand text-brand"
+      : "border-transparent text-muted-foreground hover:border-black/10 hover:text-foreground",
   ];
 }
 function stockLabel(product: Product) {
