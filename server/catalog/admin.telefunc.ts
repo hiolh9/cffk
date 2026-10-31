@@ -206,11 +206,16 @@ async function internalOnSaveProduct(input: {
   subtitle?: string;
   coverImage?: string;
   description?: string;
+  nameEn?: string | null;
+  subtitleEn?: string | null;
+  descriptionEn?: string | null;
   manualDeliveryHint?: string;
   purchaseNote?: string;
   buyerFormJson?: string | null;
   seoTitle?: string | null;
+  seoTitleEn?: string | null;
   seoDescription?: string | null;
+  seoDescriptionEn?: string | null;
   seoKeywords?: string | null;
   customSchemaJson?: string | null;
   status: ProductStatus;
@@ -263,13 +268,20 @@ async function internalOnSaveProduct(input: {
     subtitle: optionalText(input.subtitle, 300, "PRODUCT_SUBTITLE_INVALID"),
     coverImage: resolveCoverImage(input.coverImage),
            description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null),
+    nameEn: optionalText(input.nameEn, 120, "PRODUCT_NAME_EN_INVALID"),
+    subtitleEn: optionalText(input.subtitleEn, 300, "PRODUCT_SUBTITLE_EN_INVALID"),
+    descriptionEn: input.descriptionEn != null && String(input.descriptionEn).trim()
+      ? (sanitizeProductDescription(String(input.descriptionEn).slice(0, 100_000)) ?? null)
+      : null,
     manualDeliveryHint: optionalText(input.manualDeliveryHint, 2_000, "PRODUCT_MANUAL_DELIVERY_HINT_INVALID"),
     purchaseNote: optionalText(input.purchaseNote, 2_000, "PRODUCT_PURCHASE_NOTE_INVALID"),
     buyerFormJson: input.buyerFormJson != null && String(input.buyerFormJson).trim()
       ? String(input.buyerFormJson).slice(0, 20_000)
       : null,
     seoTitle: optionalText(input.seoTitle, 120, "PRODUCT_SEO_TITLE_INVALID"),
+    seoTitleEn: optionalText(input.seoTitleEn, 120, "PRODUCT_SEO_TITLE_EN_INVALID"),
     seoDescription: optionalText(input.seoDescription, 320, "PRODUCT_SEO_DESCRIPTION_INVALID"),
+    seoDescriptionEn: optionalText(input.seoDescriptionEn, 320, "PRODUCT_SEO_DESCRIPTION_EN_INVALID"),
     seoKeywords: optionalText(input.seoKeywords, 300, "PRODUCT_SEO_KEYWORDS_INVALID"),
     customSchemaJson: input.customSchemaJson != null && String(input.customSchemaJson).trim()
       ? String(input.customSchemaJson).slice(0, 50_000)
