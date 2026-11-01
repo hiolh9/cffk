@@ -63,6 +63,12 @@ export const adminPages = {
     pageTitle: "卡密管理",
     description: "管理自动发货商品的卡密库存、批次与发售状态。",
   },
+  tax: {
+  title: "税务中心",
+  path: "/accounting/tax",
+  pageTitle: "税务中心",
+  description: "税种、未报义务、申报批次与到期提醒",
+},
   discounts: {
     title: "优惠券管理",
     path: "/catalog/discounts",
