@@ -17,7 +17,7 @@ import type { PaymentProviderKind } from "@/server/payment/registry";
 import { createSupplierOrder } from "@/server/supplier/purchase";
 import { processSupplierOrder } from "@/server/supplier/process";
 import { assertSupplierSkuOrderable } from "@/server/supplier/eligibility";
-
+import { createObligationsForOrder } from "@/server/accounting/tax-service";
 
 const DELIVERY_LEASE_MS = 5 * 60 * 1000;
 
@@ -260,6 +260,37 @@ export async function confirmOrderPayment(database: D1Database, orderId: number)
   const delivery = await deliverPaidOrder(database, orderId);
   if (delivery.status === "FAILED") return { outcome: "DELIVERY_FAILED", deliveryError: delivery.errorCode };
   if (delivery.status === "PENDING") return { outcome: "DELIVERY_PENDING" };
+   // —— 税务义务：仅 Success/PAID 后生成；无挂税种则内部直接 0 条 ——
+  try {
+    let productId: number | null = (record as { productId?: number | null }).productId ?? null;
+    if (productId == null && record.productSkuId != null) {
+      const [sku] = await db
+        .select({ productId: productSku.productId })
+        .from(productSku)
+        .where(eq(productSku.id, record.productSkuId))
+        .limit(1);
+      productId = sku?.productId ?? null;
+    }
+    if (productId != null) {
+      // amount 若是「分」，先 /100 成 MYR；已是 MYR 主单位则不要除
+      const revenueMyr = Number(record.amount) / 100;
+      const [ord] = await db
+        .select({ orderNo: order.orderNo })
+        .from(order)
+        .where(eq(order.id, orderId))
+        .limit(1);
+      await createObligationsForOrder(database, {
+        orderId: String(ord?.orderNo ?? orderId),
+        productId,
+        transactionDateMs: Date.now(),
+        revenueMyr,
+      });
+    }
+  } catch (err) {
+    console.error("tax obligation create failed", err);
+    // 不阻断支付成功
+  }
+
   return { outcome: "CONFIRMED" };
 }
 
