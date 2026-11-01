@@ -237,6 +237,7 @@ export const adminNavigation = {
   accounting: adminPages.accounting,
   settlements: adminPages.settlements,
   pnl: adminPages.pnl,
+  
   users: adminPages.users,
   blog: adminPages.blog,
   blogEdit: adminPages.blogEdit,
@@ -337,6 +338,7 @@ export function getAdminBreadcrumb(pathname: string, basePath: string) {
     adminNavigation.accounting,
     adminNavigation.settlements,
     adminNavigation.pnl,
+        adminNavigation.tax,
     adminNavigation.users,
     adminNavigation.blog,
     adminPages.blogEdit,
