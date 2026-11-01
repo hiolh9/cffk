@@ -13,6 +13,15 @@ export {
   acctGeneralLedger,
   acctPnLSnapshot,
 } from "./schema-settlement";
+export {
+  taxType,
+  productTax,
+  taxReturnBatch,
+  taxReturnBatchOrder,
+  taxObligation,
+} from "./schema-tax";
+
+
 
 import {
   user, session, account, verification, twoFactor, adminBootstrap, siteSetting,
@@ -33,7 +42,13 @@ import {
   fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder, acctAdjustment,
   acctGeneralLedger, acctPnLSnapshot,
 } from "./schema-settlement";
-
+import {
+  taxType,
+  productTax,
+  taxReturnBatch,
+  taxReturnBatchOrder,
+  taxObligation,
+} from "./schema-tax";
 export const schema = {
   user, session, account, verification, twoFactor, adminBootstrap, siteSetting, riskBlacklist, riskDeviceSighting, riskUserScore,
   category, productV2, productSku, discountCode, order, customerAddress,
@@ -46,10 +61,3 @@ export const schema = {
   fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder, acctAdjustment,
   acctGeneralLedger, acctPnLSnapshot,
 };
-export {
-  taxType,
-  productTax,
-  taxReturnBatch,
-  taxReturnBatchOrder,
-  taxObligation,
-} from "./schema-tax";
