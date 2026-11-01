@@ -70,6 +70,26 @@
             <BuyerFormEditor :model-value="value || ''" @update:model-value="handleChange" />
           </VeeField>
           <FieldSeparator />
+                  <FieldSet class="gap-3">
+            <FieldLegend>涉及税种</FieldLegend>
+            <FieldDescription>勾选后，订单支付成功会生成未报税务义务；不选则不产生。</FieldDescription>
+            <div v-if="taxTypeOptions.length" class="flex flex-col gap-2">
+              <label
+                v-for="t in taxTypeOptions"
+                :key="t.id"
+                class="flex items-center gap-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  class="size-4"
+                  :checked="selectedTaxTypeIds.includes(t.id)"
+                  @change="toggleTaxType(t.id, ($event.target as HTMLInputElement).checked)"
+                />
+                <span>{{ t.code }} · {{ t.name }}（默认 {{ t.defaultRatePercent }}%）</span>
+              </label>
+            </div>
+            <p v-else class="text-sm text-muted-foreground">暂无启用税种，请先到「税务中心」创建。</p>
+          </FieldSet>
           <FieldSet v-if="isSupplierProduct" class="gap-2">
             <FieldLegend>履约方式</FieldLegend>
             <FieldDescription>供应商履约。供应商绑定由供应商管理模块维护。</FieldDescription>
@@ -305,14 +325,15 @@ import {
   type ProductDeliveryType,
   type ProductForm,
 } from "./product-form";
-
+import { onGetProductTaxLinks } from "@/server/accounting/tax.admin.telefunc";
 const ProductRichTextEditor = defineAsyncComponent(() => import("./ProductRichTextEditor.vue"));
 
 const props = defineProps<{ productId?: number }>();
 const pageContext = usePageContext();
 const basePath = `/${pageContext.routeParams.adminPath}`;
 const listPath = `${basePath}/catalog/products`;
-
+const taxTypeOptions = ref<Array<{ id: number; code: string; name: string; defaultRatePercent: number }>>([]);
+const selectedTaxTypeIds = ref<number[]>([]);
 const categories = ref<Array<{ id: number; name: string; status: string }>>([]);
 const cardInventory = ref<{ available: number } | null>(null);
 
@@ -387,7 +408,13 @@ watch(
 function goBack() {
   void navigate(listPath);
 }
-
+function toggleTaxType(id: number, checked: boolean) {
+  if (checked) {
+    if (!selectedTaxTypeIds.value.includes(id)) selectedTaxTypeIds.value = [...selectedTaxTypeIds.value, id];
+  } else {
+    selectedTaxTypeIds.value = selectedTaxTypeIds.value.filter((x) => x !== id);
+  }
+}
 function addSku() {
   skuDrafts.value.push({
     clientKey: crypto.randomUUID(),
@@ -518,6 +545,22 @@ async function load() {
     categories.value = catalog.categories;
     if (props.productId) {
       const detail = await runTelefunc(() => onGetProductAdminDetail({ id: props.productId! }));
+          // 始终拉启用中的税种列表；有商品 id 再拉已勾选
+    try {
+      const taxData = await runTelefunc(() =>
+        onGetProductTaxLinks({ productId: props.productId || 0 }),
+      );
+      taxTypeOptions.value = (taxData.types ?? []).map((t: any) => ({
+        id: t.id,
+        code: t.code,
+        name: t.name,
+        defaultRatePercent: t.defaultRatePercent,
+      }));
+      selectedTaxTypeIds.value = (taxData.links ?? []).map((l: any) => l.taxTypeId);
+    } catch {
+      taxTypeOptions.value = [];
+      selectedTaxTypeIds.value = [];
+    }
       resetForm({ values: productDetailToForm(detail.product) });
       cardInventory.value = detail.cardInventory;
       deliveryType.value =
@@ -576,20 +619,22 @@ const submit = handleSubmit(
             }),
           { successMessage: "供应商商品已保存。" },
         );
-      } else {
+      }else {
+        const base = formToSaveInput(
+          form,
+          skuDrafts.value.map(({ id, productId: _pid, clientKey: _ck, fulfillmentSource: _fs, ...sku }) => ({
+            ...sku,
+            deliveryType: deliveryType.value,
+            ...(editing.value && id ? { id } : {}),
+          })),
+          deliveryType.value,
+        );
         await runTelefunc(
           () =>
-            onSaveProduct(
-              formToSaveInput(
-                form,
-                skuDrafts.value.map(({ id, productId: _pid, clientKey: _ck, fulfillmentSource: _fs, ...sku }) => ({
-                  ...sku,
-                  deliveryType: deliveryType.value,
-                  ...(editing.value && id ? { id } : {}),
-                })),
-                deliveryType.value,
-              ),
-            ),
+            onSaveProduct({
+              ...base,
+              taxLinks: selectedTaxTypeIds.value.map((taxTypeId) => ({ taxTypeId })),
+            }),
           { successMessage: props.productId ? "商品已保存。" : "商品已创建。" },
         );
       }
