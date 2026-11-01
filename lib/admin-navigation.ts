@@ -250,6 +250,7 @@ export const adminNavigation = {
   payments: adminPages.payments,
   paymentLogs: adminPages.paymentLogs,
   media: adminPages.media,
+    tax: adminPages.tax,
   settings: adminPages.settings,
   risk: adminPages.risk,
   security: adminPages.security,
