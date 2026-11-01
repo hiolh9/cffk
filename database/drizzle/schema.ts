@@ -60,4 +60,9 @@ export const schema = {
   blogPost,
   fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder, acctAdjustment,
   acctGeneralLedger, acctPnLSnapshot,
+    taxType,
+  productTax,
+  taxReturnBatch,
+  taxReturnBatchOrder,
+  taxObligation,
 };
