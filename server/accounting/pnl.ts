@@ -12,6 +12,7 @@ export type GlType =
   | "Owner_Drawing"
   | "Capital_Injection"
   | "Expense"
+  | "Other_Income"
   | "Prepayment"
   | "Asset_Transfer";
 
@@ -31,8 +32,13 @@ export type MonthlyPnL = {
   grossProfitMyr: number;
   gatewayFeesMyr: number;
   operatingExpensesMyr: number;
-  /** Expense lines from GL only (tax-deductible), absolute MYR */
+  /**
+   * Tax-deductible GL Expense impact magnitude for display (always >= 0).
+   * Underlying SUM(amountMyr) is signed (outflows negative).
+   */
   glExpensesMyr: number;
+  /** Signed SUM of Type=Other_Income amountMyr (inflows positive). */
+  otherIncomeMyr: number;
   realisedFxGainLossMyr: number;
   netProfitMyr: number;
   excluded: {
@@ -46,9 +52,12 @@ export type MonthlyPnL = {
 /**
  * Monthly P&L (LHDN-oriented):
  * Revenue / COGS from Success acctSale in month
- * OpEx = tax-deductible GL Expense + settlement gateway fees
- * FX = sum realisedFx on settlements in month
- * Owner drawings & prepayments never enter P&L
+ * GL Expense (tax-deductible): SUM(amountMyr) signed — outflows are negative
+ * Other_Income: SUM(amountMyr) signed — inflows positive, added to profit
+ * Gateway fees from settlements (positive cost)
+ * Net = Gross Profit + SUM(Expense deductible) + SUM(Other_Income) - Gateway Fees + FX
+ *   (equiv. 毛利 - 费用 + 其他收入 + 汇兑损益 when expenses are stored as negative)
+ * Owner drawings, prepayments, capital injection, asset transfer never enter P&L
  */
 export async function computeMonthlyPnL(database: D1Database, yearMonth: string): Promise<MonthlyPnL> {
   const db = createDrizzleDb(database);
@@ -88,7 +97,9 @@ export async function computeMonthlyPnL(database: D1Database, yearMonth: string)
     .from(acctGeneralLedger)
     .where(and(gte(acctGeneralLedger.entryDate, from), lt(acctGeneralLedger.entryDate, to)));
 
-  let glExpensesMyr = 0;
+  /** Signed sums so SUM(amountMyr) respects 正=流入 / 负=流出 */
+  let glExpenseSumSigned = 0;
+  let otherIncomeSumSigned = 0;
   let ownerDrawingsMyr = 0;
   let prepaymentsMyr = 0;
   let capitalInjectionMyr = 0;
@@ -96,12 +107,15 @@ export async function computeMonthlyPnL(database: D1Database, yearMonth: string)
 
   for (const row of glRows) {
     const amt = Number(row.amountMyr);
+    if (!Number.isFinite(amt)) continue;
     switch (row.type) {
       case "Expense":
-        if (row.isTaxDeductible) {
-          // expenses are typically negative outflow; P&L uses absolute cost
-          glExpensesMyr += Math.abs(amt);
-        }
+        // Only tax-deductible expenses hit P&L; keep sign (usually negative)
+        if (row.isTaxDeductible) glExpenseSumSigned += amt;
+        break;
+      case "Other_Income":
+        // Extra income (interest, recovery, etc.); keep sign (usually positive)
+        otherIncomeSumSigned += amt;
         break;
       case "Owner_Drawing":
         ownerDrawingsMyr += Math.abs(amt);
@@ -120,10 +134,18 @@ export async function computeMonthlyPnL(database: D1Database, yearMonth: string)
     }
   }
 
-  glExpensesMyr = round2(glExpensesMyr);
+  glExpenseSumSigned = round2(glExpenseSumSigned);
+  otherIncomeSumSigned = round2(otherIncomeSumSigned);
+  // Display line "Less: expenses" as a non-negative magnitude
+  const glExpensesMyr = round2(Math.abs(glExpenseSumSigned));
+  const otherIncomeMyr = otherIncomeSumSigned;
+  // Gateway fees are stored as positive cost on settlements
   const operatingExpensesMyr = round2(glExpensesMyr + gatewayFeesMyr);
+
+  // Net = 毛利 + Σ(费用 signed) + Σ(其他收入 signed) − 网关费 + 汇兑
+  // When expenses are entered as negative outflows, Σ(费用) already reduces profit.
   const netProfitMyr = round2(
-    grossProfitMyr - operatingExpensesMyr + realisedFxGainLossMyr,
+    grossProfitMyr + glExpenseSumSigned + otherIncomeSumSigned - gatewayFeesMyr + realisedFxGainLossMyr,
   );
 
   return {
@@ -134,6 +156,7 @@ export async function computeMonthlyPnL(database: D1Database, yearMonth: string)
     gatewayFeesMyr,
     operatingExpensesMyr,
     glExpensesMyr,
+    otherIncomeMyr,
     realisedFxGainLossMyr,
     netProfitMyr,
     excluded: {
@@ -186,9 +209,10 @@ export function pnlToCsv(pnl: MonthlyPnL): string {
     `Less: Cost of Goods Sold,${-pnl.cogsMyr},acctSale Success COGS_MYR`,
     `Gross Profit,${pnl.grossProfitMyr},Revenue - COGS`,
     `Less: Gateway Fees,${-pnl.gatewayFeesMyr},acctSettlement Gateway_Fee_MYR`,
-    `Less: Operating Expenses (GL),${-pnl.glExpensesMyr},acctGeneralLedger Expense tax-deductible`,
+    `Less: Operating Expenses (GL),${-pnl.glExpensesMyr},acctGeneralLedger Expense tax-deductible (SUM signed amountMyr)`,
+    `Add: Other Income (GL),${pnl.otherIncomeMyr},acctGeneralLedger Other_Income (SUM signed amountMyr)`,
     `Add/Less: Realised FX Gain/Loss,${pnl.realisedFxGainLossMyr},acctSettlement Realised_FX`,
-    `Net Profit,${pnl.netProfitMyr},Form B figure`,
+    `Net Profit,${pnl.netProfitMyr},Gross - Expenses + Other Income + FX`,
     "",
     "Excluded from P&L,Amount_MYR,Note",
     `Owner Drawings,${-pnl.excluded.ownerDrawingsMyr},Not deductible`,
@@ -217,6 +241,7 @@ export async function createGlEntry(
     "Owner_Drawing",
     "Capital_Injection",
     "Expense",
+    "Other_Income",
     "Prepayment",
     "Asset_Transfer",
   ];
@@ -225,12 +250,14 @@ export async function createGlEntry(
   if (!desc) throw new Error("GL_DESCRIPTION_REQUIRED");
   if (!Number.isFinite(input.amountMyr) || input.amountMyr === 0) throw new Error("GL_AMOUNT_INVALID");
 
-  // Defaults: Expense deductible; Owner_Drawing / Prepayment not
+  // Defaults: Expense deductible; Other_Income / drawings / prepayment not
   let deductible = Boolean(input.isTaxDeductible);
   if (input.isTaxDeductible === undefined) {
     deductible = type === "Expense";
   }
-  if (type === "Owner_Drawing" || type === "Prepayment") deductible = false;
+  if (type === "Owner_Drawing" || type === "Prepayment" || type === "Other_Income" || type === "Capital_Injection" || type === "Asset_Transfer") {
+    deductible = false;
+  }
 
   const d = new Date(input.entryDateMs);
   const entryId =
