@@ -46,3 +46,10 @@ export const schema = {
   fxMonthlyRate, acctSale, acctSettlement, acctSettlementOrder, acctAdjustment,
   acctGeneralLedger, acctPnLSnapshot,
 };
+export {
+  taxType,
+  productTax,
+  taxReturnBatch,
+  taxReturnBatchOrder,
+  taxObligation,
+} from "./schema-tax";
