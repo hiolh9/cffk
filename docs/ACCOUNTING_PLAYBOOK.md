@@ -111,12 +111,30 @@
 |------|----------|---------|
 | 银行扣款 | `会计 → 日记账与P&L` | Type=`Expense`，Amount=**负数**（如 `-500`），描述英文/马来文，**可税前扣除=是** |
 
-**P&L：** 进入 Operating Expenses（可抵扣部分）。
+**P&L：** 仅 `Type = Expense` 且 `Is_Tax_Deductible = true` 的行进入费用。系统对 `Amount_MYR` 做 **SUM（保留正负号）**：支出应为负数，SUM 后自动减少利润。
 
 示例：
 
 - 广告 FB：`Expense` / `-500` / `Facebook ads Oct 2026` / 可抵扣
 - Cloudflare：`Expense` / `-20` / `Cloudflare Workers` / 可抵扣
+- SST / WHT：`Expense` / 负数 / 写明税种 / 可抵扣
+
+---
+
+### 5b. 其他收入（Other_Income）
+
+| 步骤 | 在哪操作 | GL 填写 |
+|------|----------|---------|
+| 非销售收入入账（利息、理赔、杂项回收等） | `会计 → 日记账与P&L` | Type=`Other_Income`，Amount=**正数**（流入），可抵扣=**否** |
+
+**P&L：** `SUM(Amount_MYR)` 计入「其他收入」，在净利中与毛利相加。
+
+示例：
+
+- 银行利息：`Other_Income` / `+12.50` / `Bank interest Oct 2026`
+- 供应商赔偿：`Other_Income` / `+100` / `Supplier compensation`
+
+**不要**把客户订单收入记成 Other_Income（订单走 `acctSale`）。
 
 ---
 
@@ -172,18 +190,47 @@
 
 ---
 
+## 二点五、金额正负号（强制）
+
+`acctGeneralLedger.Amount_MYR`：**正数 = 资金流入，负数 = 资金流出**。P&L 对费用与其他收入均使用 SQL/`SUM` 语义下的有符号合计，不在汇总时擅自 `ABS` 掉符号。
+
+---
+
 ## 三、什么进 P&L、什么不进
 
 | 项目 | 进 P&L？ |
 |------|----------|
 | 成功销售 Revenue / COGS | 是 |
 | 网关手续费 | 是（费用） |
-| 可抵扣营业开支（广告、服务器） | 是（费用） |
+| 可抵扣营业开支（`Expense` + `Is_Tax_Deductible=true`） | 是（费用；`SUM(Amount_MYR)` 保留符号） |
+| 其他收入（`Other_Income`） | 是（加项；`SUM(Amount_MYR)` 保留符号） |
 | 已实现汇兑损益 | 是 |
 | 老板提款 | **否** |
 | 供应商预存款充值 | **否**（资产） |
 | 注资 | **否** |
 | 退款后非 Success 销售 | 不计入收入 |
+
+### 净利公式（系统实现）
+
+```text
+Gross Profit = Σ Revenue_MYR − Σ COGS_MYR   （当月 Success 销售）
+
+GL Expense SUM   = Σ Amount_MYR  where Type=Expense AND Is_Tax_Deductible=true
+                   （支出记负数，SUM 为负）
+
+Other Income SUM = Σ Amount_MYR  where Type=Other_Income
+                   （收入记正数，SUM 为正）
+
+Gateway Fees     = Σ Gateway_Fee_MYR  （结算表，正数成本）
+
+FX               = Σ Realised_FX_Gain_Loss
+
+Net Profit = Gross Profit + GL Expense SUM + Other Income SUM − Gateway Fees + FX
+```
+
+等价表述：**毛利 − 费用 + 其他收入 + 汇兑损益**（当费用以负数入账时，`+ GL Expense SUM` 即减去费用绝对值）。
+
+金额约定：**正数 = 流入，负数 = 流出**；不要对可抵扣费用在入库前取绝对值。
 
 ---
 
@@ -205,7 +252,8 @@
 | 银行直转人工单 | 账本/手动开单 | acctSale Fee=0 |
 | 网关打款 | 网关结算 | Settlement |
 | 退款 | 订单 | Refund + Adjustment |
-| 广告/服务器 | 日记账与P&L | Expense 负数 |
+| 广告/服务器/税务开支 | 日记账与P&L | Expense 负数（可抵扣） |
+| 其他收入（利息等） | 日记账与P&L | Other_Income 正数 |
 | 预存款 | 日记账与P&L | Prepayment 负数 |
 | 老板拿钱 | 日记账与P&L | Owner_Drawing 负数 |
 | 注资 | 日记账与P&L | Capital_Injection 正数 |
