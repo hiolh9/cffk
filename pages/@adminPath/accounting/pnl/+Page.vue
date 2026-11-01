@@ -7,7 +7,7 @@
         <h2 class="text-sm font-semibold">录入通用日记账 (General Ledger)</h2>
         <p class="mt-1 text-xs text-muted-foreground">
           广告费、域名、公司邮箱、SST、WHT、服务器费等都可以记。选对<strong>类型</strong>：营业费用用
-          Expense；老板个人拿钱用 Owner Drawing（不进 P&L）；打给供应商预存用 Prepayment（资产，不进当月费用）。
+          Expense（可抵扣才进 P&L）；Other_Income 为额外收入；老板提款用 Owner Drawing（不进 P&L）；预存用 Prepayment（资产）。金额：正=流入，负=流出。
         </p>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
@@ -31,6 +31,7 @@
             <label class="text-xs font-medium">类型</label>
             <select v-model="gl.type" class="flex h-9 w-full rounded-md border bg-background px-3 text-sm">
               <option value="Expense">Expense（营业费用：广告/域名/邮箱/SST/WHT/服务器）</option>
+              <option value="Other_Income">Other Income（其他收入：利息/理赔等，进 P&L）</option>
               <option value="Owner_Drawing">Owner Drawing（老板提款，不进 P&L）</option>
               <option value="Prepayment">Prepayment（供应商预存款，资产）</option>
               <option value="Capital_Injection">Capital Injection（注资）</option>
@@ -56,7 +57,7 @@
       <div class="rounded-xl border bg-card p-4">
         <h2 class="text-sm font-semibold">月度 P&L 与一键归档</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          收入/COGS 来自会计销售；费用 = 可抵扣 GL Expense + 网关费。一键导出规范文件名全表 CSV。
+          收入/COGS 来自会计销售；费用 = 可抵扣 GL Expense（有符号 SUM）+ 网关费；其他收入 = Other_Income。净利 = 毛利 − 费用 + 其他收入 + 汇兑。
         </p>
         <div class="mt-4 flex flex-wrap items-end gap-2">
           <div class="space-y-1">
@@ -160,6 +161,7 @@ const pnl = ref<null | {
   grossProfitMyr: number;
   gatewayFeesMyr: number;
   glExpensesMyr: number;
+  otherIncomeMyr?: number;
   realisedFxGainLossMyr: number;
   netProfitMyr: number;
   excluded: {
@@ -174,6 +176,7 @@ const gl = reactive({
   entryDate: new Date().toISOString().slice(0, 10),
   type: "Expense" as
     | "Expense"
+    | "Other_Income"
     | "Owner_Drawing"
     | "Prepayment"
     | "Capital_Injection"
@@ -192,6 +195,7 @@ const expensePresets = [
   { label: "SST", description: "SST payment (service tax)", type: "Expense" as const, deductible: true },
   { label: "WHT", description: "Withholding tax payment", type: "Expense" as const, deductible: true },
   { label: "供应商预存", description: "Supplier prepayment top-up", type: "Prepayment" as const, deductible: false },
+  { label: "银行利息", description: "Bank interest", type: "Other_Income" as const, deductible: false },
   { label: "老板提款", description: "Owner drawing", type: "Owner_Drawing" as const, deductible: false },
 ];
 
@@ -199,7 +203,7 @@ function applyPreset(preset: (typeof expensePresets)[number]) {
   gl.type = preset.type;
   gl.description = preset.description;
   gl.isTaxDeductible = preset.deductible;
-  if (gl.amountMyr === 0) gl.amountMyr = -0;
+  if (gl.amountMyr === 0) gl.amountMyr = gl.type === "Other_Income" || gl.type === "Capital_Injection" ? 0.01 : -0.01;
   toast.message(`已填：${preset.label}（请改金额后点「记一笔」）`);
 }
 
