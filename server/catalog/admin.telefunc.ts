@@ -222,6 +222,7 @@ async function internalOnSaveProduct(input: {
   sort: number;
   skus: ProductSkuInput[];
   deliveryType: DeliveryType;
+  taxLinks?: Array<{ taxTypeId: number; ratePercentOverride?: number | null }>;
 }) {
   const { db } = getAdminDb();
   if (!input || typeof input !== "object") appError("PRODUCT_INPUT_INVALID");
@@ -256,7 +257,21 @@ async function internalOnSaveProduct(input: {
     return { id: sku.id, name, price: cents, status: sku.status, fulfillmentSource: "LOCAL" as const, deliveryType: sku.deliveryType, fixedDeliveryContent: sku.deliveryType === "FIXED_CARD" ? fixedDeliveryContent : null, physicalStock, minBuy, maxBuy, sort: nonNegativeInteger(sku.sort, "PRODUCT_SORT_INVALID") };
   });
   if (new Set(normalizedSkus.map((sku) => sku.name)).size !== normalizedSkus.length) appError("PRODUCT_SKU_NAME_CONFLICT");
-
+  if (input.taxLinks) {
+    await database.prepare(`DELETE FROM product_tax WHERE productId = ?`).bind(record.id).run();
+    for (const link of input.taxLinks) {
+      await database
+        .prepare(
+          `INSERT INTO product_tax (productId, taxTypeId, ratePercentOverride, isRequired) VALUES (?, ?, ?, 1)`,
+        )
+        .bind(
+          record.id,
+          link.taxTypeId,
+          link.ratePercentOverride ?? null,
+        )
+        .run();
+    }
+  }
 
   if (input.categoryId !== null && (!Number.isInteger(input.categoryId) || input.categoryId <= 0)) appError("PRODUCT_CATEGORY_INVALID");
   const categoryId = await resolveProductCategoryId(db, input.categoryId);
