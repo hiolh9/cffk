@@ -63,12 +63,7 @@ export const adminPages = {
     pageTitle: "卡密管理",
     description: "管理自动发货商品的卡密库存、批次与发售状态。",
   },
-  tax: {
-  title: "税务中心",
-  path: "/accounting/tax",
-  pageTitle: "税务中心",
-  description: "税种、未报义务、申报批次与到期提醒",
-},
+ 
   discounts: {
     title: "优惠券管理",
     path: "/catalog/discounts",
@@ -116,6 +111,12 @@ export const adminPages = {
     path: "/accounting/pnl",
     pageTitle: "日记账与月度损益",
     description: "非订单流水（费用/预存/提款）与按月生成 P&L、一键导出。",
+  },
+  tax: {
+    title: "税务中心",
+    path: "/accounting/tax",
+    pageTitle: "税务中心",
+    description: "税种、未报义务、申报批次与到期提醒",
   },
   users: {
     title: "用户管理",
@@ -237,7 +238,7 @@ export const adminNavigation = {
   accounting: adminPages.accounting,
   settlements: adminPages.settlements,
   pnl: adminPages.pnl,
-  
+  tax: adminPages.tax,
   users: adminPages.users,
   blog: adminPages.blog,
   blogEdit: adminPages.blogEdit,
@@ -251,7 +252,7 @@ export const adminNavigation = {
   payments: adminPages.payments,
   paymentLogs: adminPages.paymentLogs,
   media: adminPages.media,
-    tax: adminPages.tax,
+   
   settings: adminPages.settings,
   risk: adminPages.risk,
   security: adminPages.security,
@@ -338,7 +339,7 @@ export function getAdminBreadcrumb(pathname: string, basePath: string) {
     adminNavigation.accounting,
     adminNavigation.settlements,
     adminNavigation.pnl,
-        adminNavigation.tax,
+    adminNavigation.tax,
     adminNavigation.users,
     adminNavigation.blog,
     adminPages.blogEdit,
