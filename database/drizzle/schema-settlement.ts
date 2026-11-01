@@ -1,280 +1,137 @@
-import { and, eq, gte, lt, sql } from "drizzle-orm";
-import { createDrizzleDb } from "@/database/drizzle";
-import {
-  acctGeneralLedger,
-  acctPnLSnapshot,
-  acctSale,
-  acctSettlement,
-} from "@/database/drizzle/schema-settlement";
-import { round2 } from "./fx";
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-export type GlType =
-  | "Owner_Drawing"
-  | "Capital_Injection"
-  | "Expense"
-  | "Other_Income"
-  | "Prepayment"
-  | "Asset_Transfer";
-
-function monthBoundsKL(yearMonth: string): { from: Date; to: Date } {
-  const [y, m] = yearMonth.split("-").map(Number);
-  if (!y || !m || m < 1 || m > 12) throw new Error("YEAR_MONTH_INVALID");
-  // Use calendar month in UTC aligned to KL civil month labels (YYYY-MM)
-  const from = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0));
-  const to = new Date(Date.UTC(y, m, 1, 0, 0, 0));
-  return { from, to };
-}
-
-export type MonthlyPnL = {
-  yearMonth: string;
-  salesRevenueMyr: number;
-  cogsMyr: number;
-  grossProfitMyr: number;
-  gatewayFeesMyr: number;
-  operatingExpensesMyr: number;
-  /**
-   * Tax-deductible GL Expense impact magnitude for display (always >= 0).
-   * Underlying SUM(amountMyr) is signed (outflows negative).
-   */
-  glExpensesMyr: number;
-  /** Signed SUM of Type=Other_Income amountMyr (inflows positive). */
-  otherIncomeMyr: number;
-  realisedFxGainLossMyr: number;
-  netProfitMyr: number;
-  excluded: {
-    ownerDrawingsMyr: number;
-    prepaymentsMyr: number;
-    capitalInjectionMyr: number;
-    assetTransferMyr: number;
-  };
-};
-
-/**
- * Monthly P&L (LHDN-oriented):
- * Revenue / COGS from Success acctSale in month
- * GL Expense (tax-deductible): SUM(amountMyr) signed — outflows are negative
- * Other_Income: SUM(amountMyr) signed — inflows positive, added to profit
- * Gateway fees from settlements (positive cost)
- * Net = Gross Profit + SUM(Expense deductible) + SUM(Other_Income) - Gateway Fees + FX
- *   (equiv. 毛利 - 费用 + 其他收入 + 汇兑损益 when expenses are stored as negative)
- * Owner drawings, prepayments, capital injection, asset transfer never enter P&L
- */
-export async function computeMonthlyPnL(database: D1Database, yearMonth: string): Promise<MonthlyPnL> {
-  const db = createDrizzleDb(database);
-  const { from, to } = monthBoundsKL(yearMonth);
-
-  const sales = await db
-    .select({
-      revenue: sql<number>`coalesce(sum(${acctSale.revenueMyr}), 0)`,
-      cogs: sql<number>`coalesce(sum(${acctSale.cogsMyr}), 0)`,
-    })
-    .from(acctSale)
-    .where(
-      and(
-        eq(acctSale.status, "Success"),
-        gte(acctSale.transactionDate, from),
-        lt(acctSale.transactionDate, to),
-      ),
-    );
-
-  const salesRevenueMyr = round2(Number(sales[0]?.revenue ?? 0));
-  const cogsMyr = round2(Number(sales[0]?.cogs ?? 0));
-  const grossProfitMyr = round2(salesRevenueMyr - cogsMyr);
-
-  const settlements = await db
-    .select({
-      fees: sql<number>`coalesce(sum(${acctSettlement.gatewayFeeMyr}), 0)`,
-      fx: sql<number>`coalesce(sum(${acctSettlement.realisedFxGainLoss}), 0)`,
-    })
-    .from(acctSettlement)
-    .where(and(gte(acctSettlement.settlementDate, from), lt(acctSettlement.settlementDate, to)));
-
-  const gatewayFeesMyr = round2(Number(settlements[0]?.fees ?? 0));
-  const realisedFxGainLossMyr = round2(Number(settlements[0]?.fx ?? 0));
-
-  const glRows = await db
-    .select()
-    .from(acctGeneralLedger)
-    .where(and(gte(acctGeneralLedger.entryDate, from), lt(acctGeneralLedger.entryDate, to)));
-
-  /** Signed sums so SUM(amountMyr) respects 正=流入 / 负=流出 */
-  let glExpenseSumSigned = 0;
-  let otherIncomeSumSigned = 0;
-  let ownerDrawingsMyr = 0;
-  let prepaymentsMyr = 0;
-  let capitalInjectionMyr = 0;
-  let assetTransferMyr = 0;
-
-  for (const row of glRows) {
-    const amt = Number(row.amountMyr);
-    if (!Number.isFinite(amt)) continue;
-    switch (row.type) {
-      case "Expense":
-        // Only tax-deductible expenses hit P&L; keep sign (usually negative)
-        if (row.isTaxDeductible) glExpenseSumSigned += amt;
-        break;
-      case "Other_Income":
-        // Extra income (interest, recovery, etc.); keep sign (usually positive)
-        otherIncomeSumSigned += amt;
-        break;
-      case "Owner_Drawing":
-        ownerDrawingsMyr += Math.abs(amt);
-        break;
-      case "Prepayment":
-        prepaymentsMyr += Math.abs(amt);
-        break;
-      case "Capital_Injection":
-        capitalInjectionMyr += Math.abs(amt);
-        break;
-      case "Asset_Transfer":
-        assetTransferMyr += Math.abs(amt);
-        break;
-      default:
-        break;
-    }
-  }
-
-  glExpenseSumSigned = round2(glExpenseSumSigned);
-  otherIncomeSumSigned = round2(otherIncomeSumSigned);
-  // Display line "Less: expenses" as a non-negative magnitude
-  const glExpensesMyr = round2(Math.abs(glExpenseSumSigned));
-  const otherIncomeMyr = otherIncomeSumSigned;
-  // Gateway fees are stored as positive cost on settlements
-  const operatingExpensesMyr = round2(glExpensesMyr + gatewayFeesMyr);
-
-  // Net = 毛利 + Σ(费用 signed) + Σ(其他收入 signed) − 网关费 + 汇兑
-  // When expenses are entered as negative outflows, Σ(费用) already reduces profit.
-  const netProfitMyr = round2(
-    grossProfitMyr + glExpenseSumSigned + otherIncomeSumSigned - gatewayFeesMyr + realisedFxGainLossMyr,
-  );
-
-  return {
-    yearMonth,
-    salesRevenueMyr,
-    cogsMyr,
-    grossProfitMyr,
-    gatewayFeesMyr,
-    operatingExpensesMyr,
-    glExpensesMyr,
-    otherIncomeMyr,
-    realisedFxGainLossMyr,
-    netProfitMyr,
-    excluded: {
-      ownerDrawingsMyr: round2(ownerDrawingsMyr),
-      prepaymentsMyr: round2(prepaymentsMyr),
-      capitalInjectionMyr: round2(capitalInjectionMyr),
-      assetTransferMyr: round2(assetTransferMyr),
-    },
-  };
-}
-
-export async function savePnLSnapshot(database: D1Database, pnl: MonthlyPnL) {
-  const db = createDrizzleDb(database);
-  const now = new Date();
-  await db
-    .insert(acctPnLSnapshot)
-    .values({
-      yearMonth: pnl.yearMonth,
-      salesRevenueMyr: pnl.salesRevenueMyr,
-      cogsMyr: pnl.cogsMyr,
-      grossProfitMyr: pnl.grossProfitMyr,
-      gatewayFeesMyr: pnl.gatewayFeesMyr,
-      operatingExpensesMyr: pnl.operatingExpensesMyr,
-      realisedFxGainLossMyr: pnl.realisedFxGainLossMyr,
-      netProfitMyr: pnl.netProfitMyr,
-      detailJson: JSON.stringify(pnl),
-      generatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: acctPnLSnapshot.yearMonth,
-      set: {
-        salesRevenueMyr: pnl.salesRevenueMyr,
-        cogsMyr: pnl.cogsMyr,
-        grossProfitMyr: pnl.grossProfitMyr,
-        gatewayFeesMyr: pnl.gatewayFeesMyr,
-        operatingExpensesMyr: pnl.operatingExpensesMyr,
-        realisedFxGainLossMyr: pnl.realisedFxGainLossMyr,
-        netProfitMyr: pnl.netProfitMyr,
-        detailJson: JSON.stringify(pnl),
-        generatedAt: now,
-      },
-    });
-  return pnl;
-}
-
-export function pnlToCsv(pnl: MonthlyPnL): string {
-  const lines = [
-    "P&L Item,Amount_MYR,Source",
-    `Sales Revenue,${pnl.salesRevenueMyr},acctSale Success Revenue_MYR`,
-    `Less: Cost of Goods Sold,${-pnl.cogsMyr},acctSale Success COGS_MYR`,
-    `Gross Profit,${pnl.grossProfitMyr},Revenue - COGS`,
-    `Less: Gateway Fees,${-pnl.gatewayFeesMyr},acctSettlement Gateway_Fee_MYR`,
-    `Less: Operating Expenses (GL),${-pnl.glExpensesMyr},acctGeneralLedger Expense tax-deductible (SUM signed amountMyr)`,
-    `Add: Other Income (GL),${pnl.otherIncomeMyr},acctGeneralLedger Other_Income (SUM signed amountMyr)`,
-    `Add/Less: Realised FX Gain/Loss,${pnl.realisedFxGainLossMyr},acctSettlement Realised_FX`,
-    `Net Profit,${pnl.netProfitMyr},Gross - Expenses + Other Income + FX`,
-    "",
-    "Excluded from P&L,Amount_MYR,Note",
-    `Owner Drawings,${-pnl.excluded.ownerDrawingsMyr},Not deductible`,
-    `Prepayments,${-pnl.excluded.prepaymentsMyr},Asset not expense`,
-    `Capital Injection,${pnl.excluded.capitalInjectionMyr},Equity`,
-    `Asset Transfer,${pnl.excluded.assetTransferMyr},Balance sheet only`,
-  ];
-  return lines.join("\n");
-}
-
-export async function createGlEntry(
-  database: D1Database,
-  input: {
-    entryId?: string;
-    entryDateMs: number;
-    type: GlType;
-    description: string;
-    amountMyr: number;
-    isTaxDeductible?: boolean;
-    actorUserId?: string | null;
+/** BNM (or manual) monthly average: 1 unit of currency → MYR */
+export const fxMonthlyRate = sqliteTable(
+  "fxMonthlyRate",
+  {
+    yearMonth: text("yearMonth").notNull(),
+    currency: text("currency").notNull(),
+    rateToMyr: real("rateToMyr").notNull(),
+    source: text("source").notNull().default("BNM"),
+    fetchedAt: integer("fetchedAt", { mode: "timestamp_ms" }).notNull(),
   },
-) {
-  const db = createDrizzleDb(database);
-  const type = input.type;
-  const allowed: GlType[] = [
-    "Owner_Drawing",
-    "Capital_Injection",
-    "Expense",
-    "Other_Income",
-    "Prepayment",
-    "Asset_Transfer",
-  ];
-  if (!allowed.includes(type)) throw new Error("GL_TYPE_INVALID");
-  const desc = input.description.trim();
-  if (!desc) throw new Error("GL_DESCRIPTION_REQUIRED");
-  if (!Number.isFinite(input.amountMyr) || input.amountMyr === 0) throw new Error("GL_AMOUNT_INVALID");
+  (table) => [primaryKey({ columns: [table.yearMonth, table.currency] })],
+);
 
-  // Defaults: Expense deductible; Other_Income / drawings / prepayment not
-  let deductible = Boolean(input.isTaxDeductible);
-  if (input.isTaxDeductible === undefined) {
-    deductible = type === "Expense";
-  }
-  if (type === "Owner_Drawing" || type === "Prepayment" || type === "Other_Income" || type === "Capital_Injection" || type === "Asset_Transfer") {
-    deductible = false;
-  }
+/** Accounting sale line — revenue locked on transaction date */
+export const acctSale = sqliteTable(
+  "acctSale",
+  {
+    orderId: text("orderId").primaryKey(),
+    sourceOrderPk: integer("sourceOrderPk"),
+    transactionDate: integer("transactionDate", { mode: "timestamp_ms" }).notNull(),
+    customerId: text("customerId"),
+    productDesc: text("productDesc").notNull(),
+    originalCurrency: text("originalCurrency").notNull(),
+    originalAmount: real("originalAmount").notNull(),
+    transactionFxRate: real("transactionFxRate").notNull(),
+    revenueMyr: real("revenueMyr").notNull(),
+    cogsMyr: real("cogsMyr").notNull().default(0),
+    status: text("status", { enum: ["Success", "Refunded", "Voided"] })
+      .notNull()
+      .default("Success"),
+    gatewayProvider: text("gatewayProvider"),
+    gatewayRef: text("gatewayRef"),
+    refundedAt: integer("refundedAt", { mode: "timestamp_ms" }),
+    refundMyr: real("refundMyr").default(0),
+    refundNote: text("refundNote"),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("acctSale_transactionDate_idx").on(table.transactionDate),
+    index("acctSale_status_transactionDate_idx").on(table.status, table.transactionDate),
+    index("acctSale_sourceOrderPk_idx").on(table.sourceOrderPk),
+  ],
+);
 
-  const d = new Date(input.entryDateMs);
-  const entryId =
-    input.entryId?.trim()
-    || `GL-${d.toISOString().slice(0, 7).replace("-", "")}-${String(Date.now()).slice(-4)}`;
+export const acctSettlement = sqliteTable(
+  "acctSettlement",
+  {
+    settlementId: text("settlementId").primaryKey(),
+    settlementDate: integer("settlementDate", { mode: "timestamp_ms" }).notNull(),
+    grossOrdersMyrTotal: real("grossOrdersMyrTotal").notNull().default(0),
+    gatewayFeeMyr: real("gatewayFeeMyr").notNull().default(0),
+    bankReceivedMyr: real("bankReceivedMyr").notNull(),
+    realisedFxGainLoss: real("realisedFxGainLoss").notNull().default(0),
+    notes: text("notes"),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("acctSettlement_settlementDate_idx").on(table.settlementDate)],
+);
 
-  const now = new Date();
-  await db.insert(acctGeneralLedger).values({
-    entryId,
-    entryDate: d,
-    type,
-    description: desc,
-    amountMyr: round2(input.amountMyr),
-    isTaxDeductible: deductible,
-    createdAt: now,
-    createdBy: input.actorUserId ?? null,
-    updatedAt: now,
-  });
-  return { entryId, type, amountMyr: round2(input.amountMyr), isTaxDeductible: deductible };
-}
+export const acctSettlementOrder = sqliteTable(
+  "acctSettlementOrder",
+  {
+    settlementId: text("settlementId")
+      .notNull()
+      .references(() => acctSettlement.settlementId, { onDelete: "cascade" }),
+    orderId: text("orderId")
+      .notNull()
+      .references(() => acctSale.orderId, { onDelete: "restrict" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.settlementId, table.orderId] }),
+    uniqueIndex("acctSettlementOrder_order_once").on(table.orderId),
+    index("acctSettlementOrder_settlementId_idx").on(table.settlementId),
+  ],
+);
+
+/** Post-settlement refund / void / FX correction lines */
+export const acctAdjustment = sqliteTable(
+  "acctAdjustment",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    orderId: text("orderId").notNull(),
+    settlementId: text("settlementId"),
+    type: text("type", { enum: ["REFUND", "VOID", "FX_CORRECTION"] }).notNull(),
+    revenueReversalMyr: real("revenueReversalMyr").notNull().default(0),
+    bankImpactMyr: real("bankImpactMyr").notNull().default(0),
+    note: text("note"),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    createdBy: text("createdBy"),
+  },
+  (table) => [
+    index("acctAdjustment_orderId_idx").on(table.orderId),
+    index("acctAdjustment_settlementId_idx").on(table.settlementId),
+    index("acctAdjustment_createdAt_idx").on(table.createdAt),
+  ],
+);
+
+/** Non-order cash movements (drawings, expenses, prepayments, etc.) */
+export const acctGeneralLedger = sqliteTable(
+  "acctGeneralLedger",
+  {
+    entryId: text("entryId").primaryKey(),
+    entryDate: integer("entryDate", { mode: "timestamp_ms" }).notNull(),
+    type: text("type", {
+      enum: ["Owner_Drawing", "Capital_Injection", "Expense", "Other_Income", "Prepayment", "Asset_Transfer"],
+    }).notNull(),
+    description: text("description").notNull(),
+    /** Positive = inflow, negative = outflow */
+    amountMyr: real("amountMyr").notNull(),
+    isTaxDeductible: integer("isTaxDeductible", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    createdBy: text("createdBy"),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("acctGeneralLedger_entryDate_idx").on(table.entryDate),
+    index("acctGeneralLedger_type_entryDate_idx").on(table.type, table.entryDate),
+  ],
+);
+
+/** Saved monthly P&L runs */
+export const acctPnLSnapshot = sqliteTable("acctPnLSnapshot", {
+  yearMonth: text("yearMonth").primaryKey(),
+  salesRevenueMyr: real("salesRevenueMyr").notNull().default(0),
+  cogsMyr: real("cogsMyr").notNull().default(0),
+  grossProfitMyr: real("grossProfitMyr").notNull().default(0),
+  gatewayFeesMyr: real("gatewayFeesMyr").notNull().default(0),
+  operatingExpensesMyr: real("operatingExpensesMyr").notNull().default(0),
+  realisedFxGainLossMyr: real("realisedFxGainLossMyr").notNull().default(0),
+  netProfitMyr: real("netProfitMyr").notNull().default(0),
+  detailJson: text("detailJson"),
+  generatedAt: integer("generatedAt", { mode: "timestamp_ms" }).notNull(),
+});
