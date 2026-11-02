@@ -15,6 +15,7 @@ export type PublicSiteSettings = {
   /** Admin-configured HTML/scripts injected on public pages */
   headCode: string | null;
   footerCode: string | null;
+  homeBannersJson: string | null;
 };
 
 type SiteSettingRecord = typeof siteSetting.$inferSelect;
@@ -76,6 +77,7 @@ const defaultSettings: SiteSettingRecord = {
   enabledCurrenciesJson: null,
   createdAt: new Date(0),
   updatedAt: new Date(0),
+  homeBannersJson: null,
 };
 
 async function querySettings(database: D1Database) {
@@ -109,5 +111,6 @@ export function toPublicSiteSettings(record: SiteSettingRecord): PublicSiteSetti
     orderNotice: record.orderNotice,
     headCode: record.headCode?.trim() || null,
     footerCode: record.footerCode?.trim() || null,
+    homeBannersJson: record.homeBannersJson?.trim() || null,
   };
 }
