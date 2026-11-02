@@ -9,26 +9,46 @@
     <div class="mt-12 flex min-h-0 flex-1 flex-col overflow-y-auto sm:mt-14">
       <section class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-x-6 gap-y-4 px-3 pb-8 pt-3 sm:px-5 sm:pt-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr]">
         <div class="min-w-0 lg:col-start-1 lg:row-start-1">
-          <div class="overflow-hidden rounded-lg border border-black/5 bg-white dark:border-border dark:bg-card">
-            <div class="relative aspect-square max-h-[22rem] w-full overflow-hidden bg-muted sm:aspect-[4/3] sm:max-h-[28rem]">
+          <!-- SEAGM / store style: small icon left, text right -->
+          <div class="flex items-start gap-3 rounded-xl border border-black/[0.05] bg-white p-3 sm:gap-4 sm:p-4 dark:border-border dark:bg-card">
+            <button
+              type="button"
+              class="relative size-16 shrink-0 overflow-hidden rounded-xl bg-muted sm:size-20"
+              @click="previewImage = { src: data.coverImage || defaultProductImage, alt: displayName }"
+            >
               <div v-if="!coverLoaded" class="absolute inset-0 animate-pulse bg-muted" aria-hidden="true" />
-              <img :src="data.coverImage || defaultProductImage" :alt="displayName" width="800" height="800" loading="eager" decoding="async" fetchpriority="high" class="h-full w-full object-cover transition-opacity duration-500 ease-out" :class="coverLoaded ? 'opacity-100' : 'opacity-0'" @load="coverLoaded = true" @error="coverLoaded = true" />
+              <img
+                :src="data.coverImage || defaultProductImage"
+                :alt="displayName"
+                width="80"
+                height="80"
+                loading="eager"
+                decoding="async"
+                fetchpriority="high"
+                class="h-full w-full object-cover transition-opacity duration-300"
+                :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
+                @load="coverLoaded = true"
+                @error="coverLoaded = true"
+              />
+            </button>
+            <div class="min-w-0 flex-1 pt-0.5">
+              <Badge variant="secondary" class="rounded px-1.5 py-0 text-[10px] font-medium shadow-none">{{ data.categoryName || messages.productCheckout.defaultCategory }}</Badge>
+              <h1 class="mt-1 text-base font-bold leading-snug tracking-tight sm:text-lg">{{ displayName }}</h1>
+              <p v-if="displaySubtitle" class="mt-1 line-clamp-2 text-[12px] leading-5 text-muted-foreground">{{ displaySubtitle }}</p>
+              <p class="mt-2 text-xl font-bold tabular-nums text-brand sm:text-2xl">
+                <span class="text-xs font-semibold">RM</span>{{ selectedSku.price }}
+              </p>
             </div>
-          </div>
-          <div class="mt-3 sm:mt-4">
-            <Badge variant="secondary" class="rounded px-1.5 py-0 text-[11px] font-medium shadow-none">{{ data.categoryName || messages.productCheckout.defaultCategory }}</Badge>
-            <h1 class="mt-2 text-lg font-bold tracking-tight sm:text-xl">{{ displayName }}</h1>
-            <p v-if="displaySubtitle" class="mt-1 text-[13px] leading-5 text-muted-foreground">{{ displaySubtitle }}</p>
           </div>
         </div>
         <aside class="min-w-0 self-start lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-          <Card class="gap-5 rounded-xl border border-black/5 bg-white py-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:border-border dark:bg-card">
+          <Card class="gap-4 rounded-xl border border-black/[0.05] bg-white py-4 shadow-none dark:border-border dark:bg-card">
             <CardHeader class="gap-1 px-5">
               <CardDescription>{{ messages.productCheckout.currentPrice }}</CardDescription>
-              <CardTitle class="text-2xl font-bold tabular-nums text-brand sm:text-[1.65rem]">RM{{ selectedSku.price }}</CardTitle>
+              <CardTitle class="text-xl font-bold tabular-nums text-brand">RM{{ selectedSku.price }}</CardTitle>
             </CardHeader>
-            <form class="grid min-w-0 gap-5" novalidate @submit.prevent="submit">
-              <CardContent class="grid min-w-0 gap-5 px-5">
+            <form class="grid min-w-0 gap-3.5" novalidate @submit.prevent="submit">
+              <CardContent class="grid min-w-0 gap-3.5 px-5">
                 <div v-if="!user" class="rounded-lg border border-brand/20 bg-brand-soft p-3 text-sm leading-6">
                   <a :href="loginHref" class="font-semibold text-brand underline underline-offset-2">{{ messages.productCheckout.signInLink || 'Sign in' }}</a>
                   — {{ messages.productCheckout.loginToCheckoutHint || 'Sign in to place an order.' }}
@@ -40,8 +60,8 @@
                   </div>
                 </div>
                 <p v-if="requiresPayment && !methods.length" class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{{ messages.productCheckout.noPaymentMethod }}</p>
-                <label class="grid min-w-0 gap-2 text-sm font-medium"><span class="flex items-center gap-1"><span class="text-destructive">*</span> {{ messages.productCheckout.contactEmail }}</span><Input v-model="contactValue" type="email" inputmode="email" autocomplete="email" required class="h-11 shadow-none" /></label>
-                <label class="grid min-w-0 gap-2 text-sm font-medium"><span class="flex items-center gap-1"><span class="text-destructive">*</span> {{ messages.productCheckout.quantity }}</span><Input v-model.number="quantity" type="number" inputmode="numeric" :min="selectedSku.minBuy" :max="purchaseLimit" required class="h-11 shadow-none" /><span v-if="isStockLimited" class="text-xs font-normal text-muted-foreground">{{ t(messages.productCheckout.availableStock, { count: availableStock }) }}</span></label>
+                <label class="grid min-w-0 gap-2 text-sm font-medium"><span class="flex items-center gap-1"><span class="text-destructive">*</span> {{ messages.productCheckout.contactEmail }}</span><Input v-model="contactValue" type="email" inputmode="email" autocomplete="email" required class="h-10 shadow-none" /></label>
+                <label class="grid min-w-0 gap-2 text-sm font-medium"><span class="flex items-center gap-1"><span class="text-destructive">*</span> {{ messages.productCheckout.quantity }}</span><Input v-model.number="quantity" type="number" inputmode="numeric" :min="selectedSku.minBuy" :max="purchaseLimit" required class="h-10 shadow-none" /><span v-if="isStockLimited" class="text-xs font-normal text-muted-foreground">{{ t(messages.productCheckout.availableStock, { count: availableStock }) }}</span></label>
                 <FieldSet v-if="selectedSku.deliveryType === 'EXPRESS'" class="min-w-0 gap-4 rounded-lg border bg-muted/40 p-4">
                   <FieldLegend>{{ messages.productCheckout.shippingAddress }}</FieldLegend>
                   <Field v-if="addresses.length" class="min-w-0">
@@ -99,7 +119,7 @@
                 <p v-if="eligibilityMessage" class="text-sm text-destructive">{{ eligibilityMessage }}</p>
               </CardContent>
               <CardFooter class="flex-col items-stretch gap-3 px-5">
-                <Button type="submit" class="h-12 w-full rounded-lg bg-primary text-base font-semibold text-primary-foreground shadow-sm hover:bg-primary/90" :disabled="!user || loading || isOutOfStock || (requiresPayment && !methods.length)">{{ !user ? (messages.productCheckout.loginRequired || 'Sign in first') : loading ? messages.productCheckout.processingOrder : isOutOfStock ? messages.storefront.outOfStock : requiresPayment ? messages.productCheckout.submitAndPay : messages.productCheckout.createFreeOrder }}</Button>
+                <Button type="submit" class="h-11 w-full rounded-lg bg-primary text-[15px] font-semibold text-primary-foreground shadow-sm hover:bg-primary/90" :disabled="!user || loading || isOutOfStock || (requiresPayment && !methods.length)">{{ !user ? (messages.productCheckout.loginRequired || 'Sign in first') : loading ? messages.productCheckout.processingOrder : isOutOfStock ? messages.storefront.outOfStock : requiresPayment ? messages.productCheckout.submitAndPay : messages.productCheckout.createFreeOrder }}</Button>
                 <p class="text-xs leading-5 text-muted-foreground">{{ messages.productCheckout.paymentAmountNotice }}</p>
               </CardFooter>
             </form>
