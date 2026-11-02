@@ -174,6 +174,7 @@ import { saveGuestOrder } from "@/lib/local-orders";
 import { cacheQrPayment } from "@/lib/payment-utils";
 import { getOrCreateDeviceId } from "@/lib/device-id";
 import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
+import { onValidateSupplierAccount } from "@/server/supplier/validate.telefunc";
 import BuyerFormFields from "@/components/storefront/BuyerFormFields.vue";
 import { parseBuyerFormJson } from "@/lib/buyer-form";
 import { onGetCheckoutEligibility } from "@/server/payment/checkout-eligibility.telefunc";
@@ -318,32 +319,30 @@ async function submit() {
       loading.value = false;
       return;
     }
-                  // formValues = 用户填写的对象，key = 表单 name（建议 = 上游字段名）
-const fields: Record<string, string> = {};
-for (const [key, value] of Object.entries(formValues ?? {})) {
-  const k = String(key).trim();
-  const v = String(value ?? "").trim();
-  if (k && v) fields[k] = v;
-}
-
-// 没有可校验字段 → 跳过 validate（或不调接口）
-if (!Object.keys(fields).length) {
-  // 非代充 / 无账号栏：直接去支付
-} else {
-  const res = await runTelefunc(() =>
-    onValidateSupplierAccount({
-      productSkuId: selectedSkuId,
-      fields, // 整份动态字段，不要写死 User ID / Server
-    }),
-  );
-  if (!res.ok) {
-    toast.error(res.message || "账号验证失败");
-    return;
-  }
-  if (!res.skip && res.username) {
-    toast.success(`已验证：${res.username}`);
-  }
-}
+    // MooGold product/validate：动态字段（buyerForm name = 上游字段名）
+    {
+      const fields: Record<string, string> = {};
+      for (const [key, value] of Object.entries(formValues.value ?? {})) {
+        const k = String(key).trim();
+        const v = String(value ?? "").trim();
+        if (k && v) fields[k] = v;
+      }
+      if (Object.keys(fields).length) {
+        const res = await runTelefunc(() =>
+          onValidateSupplierAccount({
+            productSkuId: payload.skuId,
+            fields,
+          }),
+        );
+        if (!res.ok) {
+          toast.error(res.message || "账号验证失败");
+          return;
+        }
+        if (!res.skip && res.username) {
+          toast.success(`已验证：${res.username}`);
+        }
+      }
+    }
     const result = await runTelefunc(() => onCreatePayment(payload as never));
     if (result && typeof result === "object" && "orderNo" in result) {
       if (user) { /* account order */ }
