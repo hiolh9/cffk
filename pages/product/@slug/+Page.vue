@@ -1,31 +1,31 @@
 <template>
   <main class="flex h-dvh flex-col overflow-hidden bg-[#f5f7fb] text-foreground dark:bg-background">
     <header class="fixed inset-x-0 top-0 z-50 border-b border-black/5 bg-white dark:border-border dark:bg-background">
-      <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
+      <div class="mx-auto flex h-12 max-w-6xl items-center justify-between gap-2 px-3 sm:h-14 sm:px-5">
         <StorefrontBrand />
         <PublicNav />
       </div>
     </header>
-    <div class="mt-14 flex min-h-0 flex-1 flex-col overflow-y-auto sm:mt-16">
-      <section class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-x-8 gap-y-6 px-4 pb-10 pt-5 sm:px-6 sm:pt-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:grid-rows-[auto_1fr]">
+    <div class="mt-12 flex min-h-0 flex-1 flex-col overflow-y-auto sm:mt-14">
+      <section class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-x-6 gap-y-4 px-3 pb-8 pt-3 sm:px-5 sm:pt-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr]">
         <div class="min-w-0 lg:col-start-1 lg:row-start-1">
-          <div class="overflow-hidden rounded-xl border border-black/5 bg-white dark:border-border dark:bg-card">
-            <div class="relative aspect-4/3 max-h-[26rem] w-full overflow-hidden bg-muted sm:aspect-video">
+          <div class="overflow-hidden rounded-lg border border-black/5 bg-white dark:border-border dark:bg-card">
+            <div class="relative aspect-square max-h-[22rem] w-full overflow-hidden bg-muted sm:aspect-[4/3] sm:max-h-[28rem]">
               <div v-if="!coverLoaded" class="absolute inset-0 animate-pulse bg-muted" aria-hidden="true" />
-              <img :src="data.coverImage || defaultProductImage" :alt="displayName" width="1200" height="675" loading="eager" decoding="async" fetchpriority="high" class="h-full w-full object-cover transition-opacity duration-500 ease-out" :class="coverLoaded ? 'opacity-100' : 'opacity-0'" @load="coverLoaded = true" @error="coverLoaded = true" />
+              <img :src="data.coverImage || defaultProductImage" :alt="displayName" width="800" height="800" loading="eager" decoding="async" fetchpriority="high" class="h-full w-full object-cover transition-opacity duration-500 ease-out" :class="coverLoaded ? 'opacity-100' : 'opacity-0'" @load="coverLoaded = true" @error="coverLoaded = true" />
             </div>
           </div>
-          <div class="mt-5">
-            <Badge variant="secondary" class="rounded px-2 py-0.5 text-xs font-medium shadow-none">{{ data.categoryName || messages.productCheckout.defaultCategory }}</Badge>
-            <h1 class="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{{ displayName }}</h1>
-            <p v-if="displaySubtitle" class="mt-2 text-sm leading-6 text-muted-foreground">{{ displaySubtitle }}</p>
+          <div class="mt-3 sm:mt-4">
+            <Badge variant="secondary" class="rounded px-1.5 py-0 text-[11px] font-medium shadow-none">{{ data.categoryName || messages.productCheckout.defaultCategory }}</Badge>
+            <h1 class="mt-2 text-lg font-bold tracking-tight sm:text-xl">{{ displayName }}</h1>
+            <p v-if="displaySubtitle" class="mt-1 text-[13px] leading-5 text-muted-foreground">{{ displaySubtitle }}</p>
           </div>
         </div>
         <aside class="min-w-0 self-start lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <Card class="gap-5 rounded-xl border border-black/5 bg-white py-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:border-border dark:bg-card">
             <CardHeader class="gap-1 px-5">
               <CardDescription>{{ messages.productCheckout.currentPrice }}</CardDescription>
-              <CardTitle class="text-3xl font-bold tabular-nums text-brand">RM{{ selectedSku.price }}</CardTitle>
+              <CardTitle class="text-2xl font-bold tabular-nums text-brand sm:text-[1.65rem]">RM{{ selectedSku.price }}</CardTitle>
             </CardHeader>
             <form class="grid min-w-0 gap-5" novalidate @submit.prevent="submit">
               <CardContent class="grid min-w-0 gap-5 px-5">
@@ -128,7 +128,7 @@
         <DialogTitle class="sr-only">{{ messages.productCheckout.imagePreview }}</DialogTitle>
         <div class="relative inline-flex">
           <img v-if="previewImage" :src="previewImage.src" :alt="previewImage.alt" class="max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] rounded-md object-contain sm:max-w-[calc(100vw-4rem)]" />
-          <DialogClose as-child><Button type="button" variant="ghost" size="icon" class="absolute right-2 top-2 size-10 rounded-full bg-black/55 text-white hover:bg-black/75 hover:text-white" :aria-label="messages.productCheckout.closeImagePreview"><XIcon /></Button></DialogClose>
+          <DialogClose as-child><Button type="button" variant="ghost" size="icon" class="absolute right-2 top-2 size-8 rounded-full bg-black/55 text-white hover:bg-black/75 hover:text-white" :aria-label="messages.productCheckout.closeImagePreview"><XIcon class="size-4" /></Button></DialogClose>
         </div>
       </DialogContent>
     </Dialog>
