@@ -42,7 +42,66 @@ export class MoogoldAdapter implements SupplierAdapter {
     if (!sku) throw new SupplierDomainError("supplier_sku_not_found", 404, "Supplier SKU was not found");
     return sku;
   }
+  /**
+   * Pre-check player/account fields via MooGold product/validate.
+   * Fields keys must match upstream (e.g. "User ID", "Server").
+   */
+  async validateAccount(input: {
+    productId: string;
+    fields: Record<string, string>;
+  }): Promise<
+    | { ok: true; username: string | null; message: string }
+    | { ok: false; message: string; code?: string }
+  > {
+    const data: Record<string, string | number> = {
+      "product-id": /^\d+$/.test(input.productId) ? Number(input.productId) : input.productId,
+    };
+    for (const [k, v] of Object.entries(input.fields ?? {})) {
+      if (!k || v == null) continue;
+      const key = String(k).trim();
+      const val = String(v).trim();
+      if (!key || !val) continue;
+      if (["product-id", "product_id", "category", "Category", "quantity"].includes(key)) continue;
+      data[key] = val;
+    }
 
+    try {
+      const body = await this.req("product/validate", data);
+      const rec =
+        body && typeof body === "object" ? (body as Record<string, unknown>) : ({} as Record<string, unknown>);
+      const statusRaw = rec.status;
+      const statusTrue =
+        statusRaw === true ||
+        statusRaw === 1 ||
+        String(statusRaw ?? "").toLowerCase() === "true" ||
+        String(statusRaw ?? "").toLowerCase() === "success";
+      const message = String(
+        rec.message ?? rec.msg ?? (statusTrue ? "Account has been validated." : "Validation failed"),
+      );
+      const username =
+        typeof rec.username === "string" && rec.username.trim()
+          ? rec.username.trim()
+          : typeof rec.Username === "string" && String(rec.Username).trim()
+            ? String(rec.Username).trim()
+            : null;
+
+      if (statusTrue) return { ok: true, username, message };
+      return {
+        ok: false,
+        message: message || "Account validation failed",
+        code: String(rec.code ?? rec.error_code ?? "moogold_validate_failed"),
+      };
+    } catch (cause) {
+      if (cause instanceof SupplierDomainError) {
+        return { ok: false, message: cause.message, code: cause.code };
+      }
+      return {
+        ok: false,
+        message: cause instanceof Error ? cause.message : "MooGold validate request failed",
+        code: "moogold_validate_error",
+      };
+    }
+  }
   async submitOrder(input: { skuId: string; quantity: number; requestNo: string; callbackUrl: string; traceId: string; purchaseContext?: SupplierPurchaseContext }): Promise<SupplierPurchaseResult> {
     const category = asStr(input.purchaseContext?.code) ?? asStr(input.purchaseContext?.widget?.category) ?? asStr(input.purchaseContext?.widget?.Category) ?? "1";
     const data: Record<string, string | number> = { category: Number(category) || category, "product-id": /^\d+$/.test(input.skuId) ? Number(input.skuId) : input.skuId, quantity: input.quantity };
