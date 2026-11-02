@@ -258,3 +258,65 @@ Net Profit = Gross Profit + GL Expense SUM + Other Income SUM − Gateway Fees +
 | 老板拿钱 | 日记账与P&L | Owner_Drawing 负数 |
 | 注资 | 日记账与P&L | Capital_Injection 正数 |
 | 月末归档 | 日记账与P&L | 一键导出 |
+
+## 销货成本（COGS）怎么记
+
+主账本只认 **马币实耗**：订单字段 `cogsAmountMyrCents`（分）→ 会计 `COGS_MYR`（令吉）。
+
+系统里成本来源用 `cogsSource` 区分：
+
+| cogsSource | 含义 | 钱从哪扣 | 怎么录入 |
+|------------|------|----------|----------|
+| `LOCAL_PREPAID` | 供应商预存款 / API 扣预存 | 预存余额减少，**不是**当次银行卡新扣（充预存时已记资产） | MooGold/本地 API 发货成功后按**当次实时报价**自动写入；或后台补录 MYR |
+| `CROSS_BORDER` | 跨境/淘宝等你自己银行付 | **银行卡/账户实付 MYR** | 发货后在后台填**银行实付 MYR**；可选填淘宝 CNY，系统用 BNM 算汇差 |
+| `LOCAL_STOCK` | 本地自有库存/卡密 | 采购入库时已花的钱（可按批次） | 出库时按该件成本 MYR 记，或批量均摊后补录 |
+
+### 两种钱能不能都正常录？
+
+**能。** 关键是：
+
+1. **预付款供应商（如 MooGold）**  
+   - 充预存时：GL 记 **Prepayment（资产）**，**不进**当期 COGS。  
+   - 客户单发货、API 扣预存时：才把**本次扣减对应的 MYR** 记入该订单 **COGS**（`LOCAL_PREPAID`）。  
+   - 价格不固定：以发货时接口**实时报价**为准，不要死用 SKU 固定成本。
+
+2. **你自己银行付（淘宝人工等）**  
+   - 不经过供应商预存。  
+   - 发货后后台 **补录 COGS = 银行流水实付 MYR**（`CROSS_BORDER`）。  
+   - 可选填人民币金额；BNM 换算与实付的差额进 `fxDifference`（分析用），**P&L 销货成本仍用实付 MYR**。
+
+同一订单只应有一种主路径：要么预存扣减，要么银行自付；不要把预存扣款和银行再付记成双倍成本。
+
+### 操作步骤（人工淘宝）
+
+1. 客户付款 → 收入按销售规则入账（COGS 可先为 0）。  
+2. 淘宝下单并发货。  
+3. 后台订单 →「补录成本」：  
+   - **实付 MYR**（必填）= 银行/卡实际扣款；  
+   - **淘宝 CNY**（可选）。  
+4. 保存后订单 `cogsAmountMyrCents` 与会计 `COGS_MYR` 同步（若已有 acctSale 行）。
+
+### 操作步骤（MooGold / 预存 API）
+
+1. 确保供应商账户、binding、`maxCostMinor` 合理。  
+2. 支付成功 → 自动/重试发货。  
+3. 适配器 **实时 quote** → 扣预存成功后 **自动写 COGS（MYR）**。  
+4. 若汇率表缺币种或金额不对：同一后台入口用「实付 MYR」纠正（会留审计痕迹）。
+
+### 代码位置（仓库路径）
+
+| 用途 | 路径 |
+|------|------|
+| MooGold 适配器 | `server/supplier/providers/moogold.ts` |
+| 供应商发货主流程 | `server/supplier/process-core.ts` |
+| 资格/下单前检查（含 quote） | `server/supplier/eligibility.ts` |
+| 成本写入服务 | `server/order/cogs.ts`（需新增） |
+| 后台补录接口 | `server/order/admin.telefunc.ts` → `onSetOrderCogs` |
+| 订单表 COGS 字段 | `database/drizzle/schema-tables-a-order.ts`（`cogsSource`、`cogsAmountMyrCents` 等） |
+
+### 禁止
+
+- 用固定 SKU 进货价长期代替 MooGold 实时价（仅作参考/上限）。  
+- 充预存时把整笔充值当 COGS。  
+- 淘宝只按「CNY×BNM」入账却与银行 MYR 对不上且不留汇差。  
+- 物理删除订单来「改成本」；只更新 COGS 字段并写 audit。
