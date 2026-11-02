@@ -14,6 +14,7 @@ export const siteSetting = sqliteTable("siteSetting", {
   orderNotice: text("orderNotice"),
   headCode: text("headCode"),
   footerCode: text("footerCode"),
+  homeBannersJson: text("homeBannersJson"),
   registrationEnabled: integer("registrationEnabled", { mode: "boolean" }).notNull().default(false),
   checkoutEnabled: integer("checkoutEnabled", { mode: "boolean" }).notNull().default(true),
   autoFulfillEnabled: integer("autoFulfillEnabled", { mode: "boolean" }).notNull().default(true),
