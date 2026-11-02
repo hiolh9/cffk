@@ -5,14 +5,14 @@
         <StorefrontBrand />
         <div class="relative mx-1 hidden min-w-0 flex-1 md:block md:max-w-xs lg:max-w-sm">
           <SearchIcon class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="query" type="search" class="h-8 rounded-full border-transparent bg-[#f0f1f3] pl-8 text-[13px] shadow-none dark:bg-muted" :placeholder="messages.storefront.searchProducts" />
+          <Input v-model="query" type="search" class="h-9 rounded-full border-transparent bg-[#f0f1f3] pl-8 text-sm shadow-none dark:bg-muted" :placeholder="messages.storefront.searchProducts" />
         </div>
         <PublicNav />
       </div>
     </header>
 
     <div v-if="site.notice" class="border-b border-black/[0.04] bg-white">
-      <div class="mx-auto flex max-w-[1000px] items-center gap-2 px-3 py-1.5 text-[12px] text-muted-foreground sm:px-4">
+      <div class="mx-auto flex max-w-[1000px] items-center gap-2 px-3 py-1.5 text-[13px] text-muted-foreground sm:px-4">
         <InfoIcon class="size-3.5 shrink-0 text-brand" />
         <p class="m-0 truncate">{{ site.notice }}</p>
       </div>
@@ -27,8 +27,8 @@
               <img :src="slide.image" :alt="slide.title" class="h-full w-full object-cover" loading="lazy" />
               <div class="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
               <div v-if="slide.title" class="absolute bottom-0 p-3 sm:p-4">
-                <h2 class="line-clamp-2 text-[13px] font-semibold text-white sm:text-base">{{ slide.title }}</h2>
-                <p v-if="slide.subtitle" class="mt-0.5 line-clamp-1 text-[11px] text-white/85">{{ slide.subtitle }}</p>
+                <h2 class="line-clamp-2 text-sm font-semibold text-white sm:text-lg">{{ slide.title }}</h2>
+                <p v-if="slide.subtitle" class="mt-0.5 line-clamp-1 text-xs text-white/85">{{ slide.subtitle }}</p>
               </div>
             </div>
           </a>
@@ -45,7 +45,7 @@
       <div class="px-3 pt-2 md:hidden sm:px-0">
         <div class="relative">
           <SearchIcon class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input v-model="query" type="search" class="h-9 rounded-full border-transparent bg-white pl-8 text-[13px] shadow-sm dark:bg-muted" :placeholder="messages.storefront.searchProducts" />
+          <Input v-model="query" type="search" class="h-10 rounded-full border-transparent bg-white pl-8 text-sm shadow-sm dark:bg-muted" :placeholder="messages.storefront.searchProducts" />
         </div>
       </div>
 
@@ -61,19 +61,19 @@
       <div class="mt-2 grid gap-4 md:grid-cols-2 md:gap-6">
         <section>
           <div class="mb-1.5 flex items-center justify-between px-3 sm:px-0">
-            <h2 class="text-[13px] font-semibold">Flash Deals</h2>
-            <div class="font-mono text-[11px] tabular-nums text-brand">{{ flashCountdown.h }}:{{ flashCountdown.m }}:{{ flashCountdown.s }}</div>
+            <h2 class="text-sm font-semibold sm:text-base">Flash Deals</h2>
+            <div class="font-mono text-xs tabular-nums text-brand sm:text-[13px]">{{ flashCountdown.h }}:{{ flashCountdown.m }}:{{ flashCountdown.s }}</div>
           </div>
           <ul class="divide-y divide-black/[0.05] bg-white sm:overflow-hidden sm:rounded-xl sm:border sm:border-black/[0.05] dark:divide-border dark:bg-card dark:sm:border-border">
             <li v-for="p in flashProducts" :key="'f'+p.id">
               <a :href="'/product/' + p.slug" class="flex items-center gap-3 px-3 py-2.5 transition hover:bg-black/[0.02] dark:hover:bg-muted/40">
-                <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-12 shrink-0 rounded-lg object-cover bg-[#eef1f5] sm:size-14" loading="lazy" width="56" height="56" />
+                <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-14 shrink-0 rounded-lg object-cover bg-[#eef1f5] sm:size-16" loading="lazy" width="64" height="64" />
                 <div class="min-w-0 flex-1">
-                  <h3 class="line-clamp-2 text-[13px] font-medium leading-snug">{{ p.name }}</h3>
-                  <p v-if="p.subtitle" class="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">{{ p.subtitle }}</p>
-                  <p class="mt-1 text-[13px] font-semibold tabular-nums text-brand"><span class="text-[10px]">RM</span>{{ p.price }}</p>
+                  <h3 class="line-clamp-2 text-[15px] font-medium leading-snug sm:text-base">{{ p.name }}</h3>
+                  <p v-if="p.subtitle" class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{{ p.subtitle }}</p>
+                  <p class="mt-1 text-[15px] font-semibold tabular-nums text-brand sm:text-base"><span class="text-xs font-semibold">RM</span>{{ p.price }}</p>
                 </div>
-                <span v-if="dealBadge(p)" class="shrink-0 rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">{{ dealBadge(p) }}</span>
+                <span v-if="dealBadge(p)" class="shrink-0 rounded bg-brand/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand">{{ dealBadge(p) }}</span>
               </a>
             </li>
           </ul>
@@ -81,16 +81,16 @@
 
         <section>
           <div class="mb-1.5 px-3 sm:px-0">
-            <h2 class="text-[13px] font-semibold">Hot Products</h2>
+            <h2 class="text-sm font-semibold sm:text-base">Hot Products</h2>
           </div>
           <ul class="divide-y divide-black/[0.05] bg-white sm:overflow-hidden sm:rounded-xl sm:border sm:border-black/[0.05] dark:divide-border dark:bg-card dark:sm:border-border">
             <li v-for="p in hotProducts" :key="'h'+p.id">
               <a :href="'/product/' + p.slug" class="flex items-center gap-3 px-3 py-2.5 transition hover:bg-black/[0.02] dark:hover:bg-muted/40">
-                <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-12 shrink-0 rounded-lg object-cover bg-[#eef1f5] sm:size-14" loading="lazy" width="56" height="56" />
+                <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-14 shrink-0 rounded-lg object-cover bg-[#eef1f5] sm:size-16" loading="lazy" width="64" height="64" />
                 <div class="min-w-0 flex-1">
-                  <h3 class="line-clamp-2 text-[13px] font-medium leading-snug">{{ p.name }}</h3>
-                  <p v-if="p.subtitle" class="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">{{ p.subtitle }}</p>
-                  <p class="mt-1 text-[13px] font-semibold tabular-nums text-brand"><span class="text-[10px]">RM</span>{{ p.price }}</p>
+                  <h3 class="line-clamp-2 text-[15px] font-medium leading-snug sm:text-base">{{ p.name }}</h3>
+                  <p v-if="p.subtitle" class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{{ p.subtitle }}</p>
+                  <p class="mt-1 text-[15px] font-semibold tabular-nums text-brand sm:text-base"><span class="text-xs font-semibold">RM</span>{{ p.price }}</p>
                 </div>
               </a>
             </li>
@@ -101,19 +101,19 @@
       <!-- All: Play Store horizontal rows -->
       <section class="mt-5 mb-8">
         <div class="mb-1.5 flex items-baseline justify-between px-3 sm:px-0">
-          <h2 class="text-[13px] font-semibold">{{ messages.storefront.products }}</h2>
-          <p class="text-[11px] text-muted-foreground">{{ t(messages.storefront.relatedProducts, { count: visibleProducts.length }) }}</p>
+          <h2 class="text-sm font-semibold sm:text-base">{{ messages.storefront.products }}</h2>
+          <p class="text-xs text-muted-foreground">{{ t(messages.storefront.relatedProducts, { count: visibleProducts.length }) }}</p>
         </div>
         <ul v-if="visibleProducts.length" class="divide-y divide-black/[0.05] bg-white sm:overflow-hidden sm:rounded-xl sm:border sm:border-black/[0.05] dark:divide-border dark:bg-card dark:sm:border-border">
           <li v-for="p in visibleProducts" :key="p.id">
             <a :href="'/product/' + p.slug" class="flex items-center gap-3 px-3 py-2.5 transition hover:bg-black/[0.02] dark:hover:bg-muted/40">
-              <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-12 shrink-0 rounded-lg object-cover bg-[#eef1f5] sm:size-14" loading="lazy" width="56" height="56" />
+              <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-14 shrink-0 rounded-lg object-cover bg-[#eef1f5] sm:size-16" loading="lazy" width="64" height="64" />
               <div class="min-w-0 flex-1">
-                <h3 class="line-clamp-2 text-[13px] font-medium leading-snug">{{ p.name }}</h3>
-                <p v-if="p.subtitle" class="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">{{ p.subtitle }}</p>
+                <h3 class="line-clamp-2 text-[15px] font-medium leading-snug sm:text-base">{{ p.name }}</h3>
+                <p v-if="p.subtitle" class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{{ p.subtitle }}</p>
                 <div class="mt-1 flex items-center gap-2">
-                  <p class="text-[13px] font-semibold tabular-nums text-brand"><span class="text-[10px]">RM</span>{{ p.price }}</p>
-                  <span class="text-[10px] text-muted-foreground" :class="stockClass(p)">{{ stockLabel(p) }}</span>
+                  <p class="text-[15px] font-semibold tabular-nums text-brand sm:text-base"><span class="text-xs font-semibold">RM</span>{{ p.price }}</p>
+                  <span class="text-xs text-muted-foreground" :class="stockClass(p)">{{ stockLabel(p) }}</span>
                 </div>
               </div>
             </a>
@@ -242,7 +242,7 @@ function nextBanner(dir: number) {
 }
 function chipClass(active: boolean) {
   return [
-    "shrink-0 rounded-full px-3 py-1 text-[12px] font-medium",
+    "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium",
     active ? "bg-brand text-white" : "text-foreground/70 hover:bg-white",
   ];
 }
