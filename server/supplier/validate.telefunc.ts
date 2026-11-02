@@ -1,16 +1,19 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, lte, or } from "drizzle-orm";
 import { telefuncAction } from "@/server/telefunc-action";
 import { appError } from "@/lib/app-error";
 import { createDrizzleDb } from "@/database/drizzle";
-import { productSku, supplierBinding, supplierAccount } from "@/database/drizzle/schema";
+import { productSku, supplierAccount, supplierBinding } from "@/database/drizzle/schema";
 import { createSupplierAdapterFromAccount } from "@/server/supplier/providers/factory";
 import { MoogoldAdapter } from "@/server/supplier/providers/moogold";
-// 改成你项目里「要求已登录」的函数：
 import { requireUser } from "@/server/telefunc-context";
 
+/**
+ * Pre-checkout: MooGold product/validate with dynamic account fields.
+ * Non-supplier / non-moogold → { ok: true, skip: true }.
+ */
 export const onValidateSupplierAccount = telefuncAction(
   async (input: { productSkuId: number; fields: Record<string, string> }) => {
-    const { database } = requireUser(); // 若返回值不同，改成你的
+    const { database } = requireUser();
     const db = createDrizzleDb(database);
 
     const skuId = Number(input.productSkuId);
@@ -22,53 +25,80 @@ export const onValidateSupplierAccount = telefuncAction(
       const val = String(v ?? "").trim().slice(0, 200);
       if (key && val) fields[key] = val;
     }
-    if (!Object.keys(fields).length) appError("VALIDATION_FAILED");
+    if (!Object.keys(fields).length) {
+      return { ok: true as const, skip: true as const, message: "no_fields" };
+    }
 
-    const [sku] = await db
-      .select()
-      .from(productSku)
-      .where(eq(productSku.id, skuId))
-      .limit(1);
-
+    const [sku] = await db.select().from(productSku).where(eq(productSku.id, skuId)).limit(1);
     if (!sku || sku.fulfillmentSource !== "SUPPLIER") {
       return { ok: true as const, skip: true as const, message: "not_supplier" };
     }
 
-    // 按你表结构取 binding（示例）
     const [binding] = await db
       .select()
       .from(supplierBinding)
-      .where(eq(supplierBinding.id, sku.supplierBindingId)) // 列名以你库为准
+      .where(and(eq(supplierBinding.productSkuId, skuId), eq(supplierBinding.enabled, true)))
       .limit(1);
 
-    if (!binding || binding.provider !== "moogold") {
+    if (!binding) {
+      return { ok: true as const, skip: true as const, message: "no_binding" };
+    }
+    if (binding.provider !== "moogold") {
       return { ok: true as const, skip: true as const, message: "not_moogold" };
     }
 
-    const [account] = await db
+    const now = new Date();
+    const accounts = await db
       .select()
       .from(supplierAccount)
-      .where(eq(supplierAccount.id, binding.supplierAccountId))
-      .limit(1);
+      .where(
+        and(
+          eq(supplierAccount.provider, binding.provider),
+          eq(supplierAccount.normalizedApiOrigin, binding.normalizedApiOrigin),
+          eq(supplierAccount.protocolVersion, binding.protocolVersion),
+          eq(supplierAccount.enabled, true),
+          or(isNull(supplierAccount.cooldownUntil), lte(supplierAccount.cooldownUntil, now)),
+        ),
+      )
+      .limit(5);
 
-    if (!account) return { ok: false as const, message: "Supplier account missing" };
-
-    const adapter = await createSupplierAdapterFromAccount(account);
-    if (!(adapter instanceof MoogoldAdapter)) {
-      return { ok: true as const, skip: true as const, message: "not_moogold_adapter" };
+    if (!accounts.length) {
+      return { ok: false as const, message: "Supplier account unavailable", code: "supplier_account_missing" };
     }
 
-    const productId = String(binding.upstreamSkuId || binding.upstreamProductId);
-    const result = await adapter.validateAccount({ productId, fields });
-
-    if (result.ok) {
-      return {
-        ok: true as const,
-        skip: false as const,
-        username: result.username,
-        message: result.message,
-      };
+    const productId = String(binding.upstreamSkuId || binding.upstreamProductId).trim();
+    if (!productId) {
+      return { ok: false as const, message: "Missing upstream product id", code: "upstream_product_missing" };
     }
-    return { ok: false as const, message: result.message, code: result.code };
+
+    let lastMessage = "Account validation failed";
+    let lastCode = "moogold_validate_failed";
+
+    for (const account of accounts) {
+      try {
+        const adapter = await createSupplierAdapterFromAccount(account);
+        if (!(adapter instanceof MoogoldAdapter)) {
+          return { ok: true as const, skip: true as const, message: "not_moogold_adapter" };
+        }
+        const result = await adapter.validateAccount({ productId, fields });
+        if (result.ok) {
+          return {
+            ok: true as const,
+            skip: false as const,
+            username: result.username,
+            message: result.message,
+          };
+        }
+        lastMessage = result.message;
+        lastCode = result.code ?? lastCode;
+        // Validation rejection is definitive — don't retry other accounts
+        return { ok: false as const, message: lastMessage, code: lastCode };
+      } catch (cause) {
+        lastMessage = cause instanceof Error ? cause.message : lastMessage;
+        lastCode = "moogold_validate_error";
+      }
+    }
+
+    return { ok: false as const, message: lastMessage, code: lastCode };
   },
 );
