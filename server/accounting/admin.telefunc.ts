@@ -171,3 +171,38 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
 
   return { orderId: created.id, orderNo: created.orderNo, invoiceNo: created.invoiceNo };
 });
+
+// Append to server/order/admin.telefunc.ts
+
+import { setOrderCogs } from "@/server/order/cogs";
+
+/** Manual COGS for Taobao / variable cost â€” actual MYR required; CNY optional. */
+async function internalOnSetOrderCogs(input: {
+  orderId: number;
+  cogsAmountMyr: number;
+  cogsSource?: "LOCAL_PREPAID" | "CROSS_BORDER" | "LOCAL_STOCK";
+  cogsOriginalCny?: number | null;
+  exchangeRateUsed?: number | null;
+  note?: string | null;
+}) {
+  const { database, adminUserId } = await requireAdminSecure();
+  await assertStepUp(database, adminUserId);
+  if (!input || !Number.isInteger(input.orderId) || input.orderId <= 0) appError("ORDER_ID_INVALID");
+  try {
+    return await setOrderCogs(database, {
+      orderId: input.orderId,
+      cogsAmountMyr: input.cogsAmountMyr,
+      cogsSource: input.cogsSource,
+      cogsOriginalCny: input.cogsOriginalCny,
+      exchangeRateUsed: input.exchangeRateUsed,
+      note: input.note,
+      actorUserId: adminUserId,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.message === "ORDER_NOT_FOUND") appError("ORDER_NOT_FOUND");
+    if (e instanceof Error && e.message === "COGS_MYR_INVALID") appError("VALIDATION_FAILED");
+    throw e;
+  }
+}
+
+export const onSetOrderCogs = telefuncAction(internalOnSetOrderCogs);
