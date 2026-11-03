@@ -1,5 +1,5 @@
 <template>
-  <main class="page-bg flex min-h-screen flex-col bg-[#eef1f7] text-foreground dark:bg-background">
+  <main class="page-bg flex min-h-screen flex-col text-foreground">
     <!-- Slim top bar: site notice -->
     <div v-if="site.notice" class="border-b border-border bg-background">
       <div class="mx-auto flex max-w-[1280px] items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground">
@@ -86,50 +86,52 @@
         </div>
 
         <!-- Flash deals -->
-        <div v-if="dealProducts.length" class="mt-4 overflow-hidden rounded-xl bg-card shadow-[0_16px_36px_-16px_rgba(220,38,38,0.5)] ring-1 ring-red-500/25">
-          <div class="relative flex items-center justify-between gap-3 overflow-hidden bg-gradient-to-r from-red-600 via-red-500 to-orange-500 px-3 py-2.5 text-white sm:px-4">
-            <span class="deal-shine pointer-events-none absolute inset-y-0 left-0 w-1/6 bg-white/25" />
-            <div class="relative flex min-w-0 items-center gap-2">
-              <ZapIcon class="deal-bolt size-6 shrink-0 fill-yellow-300 text-yellow-300 drop-shadow" />
-              <div class="min-w-0">
-                <h2 class="m-0 text-lg font-black uppercase italic leading-none tracking-wide sm:text-xl">{{ L("flashDeals", "Flash Deals") }}</h2>
-                <p class="m-0 mt-1 hidden truncate text-[11px] text-white/85 sm:block">{{ L("flashDealsSub", "Limited time only!") }}</p>
-              </div>
+        <div v-if="dealProducts.length" class="surface mt-4 rounded-xl bg-card p-3 ring-1 ring-black/[0.05] sm:p-4 dark:ring-white/10">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-2.5">
+              <span class="flex shrink-0 items-center gap-1 rounded-lg bg-gradient-to-r from-red-600 to-orange-500 py-1 pl-2 pr-2.5 text-white shadow-sm">
+                <ZapIcon class="deal-bolt size-4 fill-yellow-300 text-yellow-300" />
+                <h2 class="m-0 text-[15px] font-black uppercase italic leading-none tracking-wide">{{ L("flashDeals", "Flash Deals") }}</h2>
+              </span>
+              <p class="m-0 hidden truncate text-xs text-muted-foreground sm:block">{{ L("flashDealsSub", "Limited time only!") }}</p>
             </div>
-            <div class="relative flex shrink-0 items-center gap-1.5 text-xs">
-              <span class="hidden text-white/90 sm:inline">{{ L("endsIn", "Ends in") }}</span>
-              <div class="flex items-center gap-0.5 font-mono text-[13px] font-extrabold tabular-nums">
-                <span class="rounded bg-white px-1.5 py-0.5 text-red-600 shadow-sm">{{ flashCountdown.h }}</span>
-                <span>:</span>
-                <span class="rounded bg-white px-1.5 py-0.5 text-red-600 shadow-sm">{{ flashCountdown.m }}</span>
-                <span>:</span>
-                <span class="rounded bg-white px-1.5 py-0.5 text-red-600 shadow-sm">{{ flashCountdown.s }}</span>
+            <div class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <span class="hidden sm:inline">{{ L("endsIn", "Ends in") }}</span>
+              <div class="flex items-center gap-0.5 font-mono text-[13px] font-bold tabular-nums">
+                <span class="rounded bg-red-600 px-1.5 py-0.5 text-white">{{ flashCountdown.h }}</span>
+                <span class="text-red-600">:</span>
+                <span class="rounded bg-red-600 px-1.5 py-0.5 text-white">{{ flashCountdown.m }}</span>
+                <span class="text-red-600">:</span>
+                <span class="rounded bg-red-600 px-1.5 py-0.5 text-white">{{ flashCountdown.s }}</span>
               </div>
             </div>
           </div>
 
-          <ul class="m-0 flex list-none gap-3 overflow-x-auto bg-gradient-to-b from-red-50/70 to-card p-3 [scrollbar-width:none] dark:from-red-500/10 [&::-webkit-scrollbar]:hidden">
-            <li v-for="p in dealProducts" :key="'d' + p.id" class="w-[136px] shrink-0 sm:w-[160px]">
+          <ul class="m-0 grid list-none auto-cols-[276px] grid-flow-col grid-rows-2 gap-2.5 overflow-x-auto p-0 pb-1 [scrollbar-width:none] lg:grid-rows-1 [&::-webkit-scrollbar]:hidden">
+            <li v-for="p in dealProducts" :key="'d' + p.id">
               <a
                 :href="'/product/' + p.slug"
-                class="hue-card group flex h-full flex-col rounded-xl p-2 ring-1 ring-black/5 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-red-500/30 dark:ring-white/10"
+                class="hue-row group flex h-full items-center gap-3 rounded-xl p-2.5 transition hover:-translate-y-0.5"
                 :style="hueStyle(p.coverImage)"
               >
-                <div class="relative aspect-square overflow-hidden rounded-lg bg-white/60 dark:bg-black/20">
-                  <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-full object-cover transition duration-300 group-hover:scale-105" loading="lazy" />
-                  <span v-if="dealBadge(p)" class="absolute left-0 top-2 rounded-r bg-gradient-to-r from-red-600 to-orange-500 py-0.5 pl-1.5 pr-2 text-[12px] font-black text-white shadow">{{ dealBadge(p) }}</span>
+                <div class="relative size-[68px] shrink-0 overflow-hidden rounded-xl bg-white/60 shadow-sm dark:bg-black/20">
+                  <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-full object-cover transition duration-300 group-hover:scale-105" loading="lazy" width="68" height="68" />
                 </div>
-                <h3 class="mt-2 line-clamp-1 text-[13px] font-medium">{{ p.name }}</h3>
-                <p class="m-0 mt-0.5 text-lg font-black tabular-nums leading-tight text-red-600"><span class="mr-px text-[11px] font-bold">RM</span>{{ p.price }}</p>
-                <div class="mt-1.5 h-7">
-                  <template v-if="lowStock(p)">
-                    <div class="h-1.5 overflow-hidden rounded-full bg-red-500/15">
-                      <div class="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-500" :style="{ width: Math.max(10, ((p.availableStock ?? 0) / 20) * 100) + '%' }" />
+                <div class="flex min-w-0 flex-1 flex-col justify-center gap-1">
+                  <h3 class="line-clamp-1 text-[13px] font-medium">{{ p.name }}</h3>
+                  <p v-if="p.subtitle" class="m-0 line-clamp-1 text-[11px] text-muted-foreground">{{ p.subtitle }}</p>
+                  <div class="flex items-center gap-1.5">
+                    <p class="m-0 text-base font-black tabular-nums leading-none text-red-600"><span class="mr-px text-[11px] font-bold">RM</span>{{ p.price }}</p>
+                    <span v-if="dealBadge(p)" class="rounded bg-gradient-to-r from-red-600 to-orange-500 px-1.5 py-0.5 text-[11px] font-black leading-none text-white">{{ dealBadge(p) }}</span>
+                  </div>
+                  <div v-if="lowStock(p)" class="flex items-center gap-1.5">
+                    <div class="h-1.5 w-16 overflow-hidden rounded-full bg-red-500/20">
+                      <div class="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-500" :style="{ width: Math.max(12, ((p.availableStock ?? 0) / 20) * 100) + '%' }" />
                     </div>
-                    <p class="m-0 mt-0.5 flex items-center gap-0.5 text-[10px] font-bold text-red-500">
+                    <span class="flex items-center gap-0.5 text-[10px] font-bold text-red-500">
                       <FlameIcon class="size-3" />{{ t(L("itemsLeft", "{count} left"), { count: p.availableStock }) }}
-                    </p>
-                  </template>
+                    </span>
+                  </div>
                 </div>
               </a>
             </li>
@@ -199,7 +201,7 @@
             <li v-for="p in sortedProducts" :key="p.id">
               <a
                 :href="'/product/' + p.slug"
-                class="hue-row surface group flex h-full items-center gap-3 rounded-xl p-2.5 ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:ring-brand/30 dark:ring-white/10"
+                class="hue-row group flex h-full items-center gap-3 rounded-xl p-2.5 transition hover:-translate-y-0.5"
                 :style="hueStyle(p.coverImage)"
               >
                 <div class="relative size-[76px] shrink-0 overflow-hidden rounded-xl bg-white/60 shadow-sm sm:size-[88px] dark:bg-black/20">
@@ -527,45 +529,50 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
-/* Tint from the image's dominant colour (--hue, set from JS) fading into the surface colour.
-   Only applies once --hue exists, so un-sampled items keep the plain card background. */
-.hue-row,
-.hue-card {
+/* Product-row tint from the icon's dominant colour (--hue, set from JS):
+   strong at the icon side, long fade into the surface colour, with a hue-coloured edge and shadow.
+   Only applies once --hue exists, so un-sampled rows keep the plain card background. */
+.hue-row {
   --hue-base: #ffffff;
-}
-.dark .hue-row,
-.dark .hue-card {
-  --hue-base: #171b26;
-}
-.hue-row[style*="--hue"] {
-  background-image: linear-gradient(100deg, color-mix(in srgb, var(--hue) 26%, var(--hue-base)), var(--hue-base) 72%);
-}
-.hue-card[style*="--hue"] {
-  background-image: linear-gradient(180deg, color-mix(in srgb, var(--hue) 24%, var(--hue-base)), var(--hue-base) 64%);
-}
-.hue-card:not([style*="--hue"]) {
+  --mix-a: 44%;
+  --mix-b: 18%;
   background-color: var(--hue-base);
 }
+.dark .hue-row {
+  --hue-base: #171b26;
+  --mix-a: 36%;
+  --mix-b: 14%;
+}
+.hue-row[style*="--hue"] {
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--hue) var(--mix-a), var(--hue-base)) 0%,
+    color-mix(in srgb, var(--hue) var(--mix-b), var(--hue-base)) 55%,
+    var(--hue-base) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--hue) 26%, transparent),
+    0 12px 24px -14px color-mix(in srgb, var(--hue) 70%, transparent);
+}
+.hue-row {
+  transition: transform 0.2s, filter 0.2s;
+}
+.hue-row:hover {
+  filter: saturate(1.2);
+}
 
-/* Layered page background: soft colour glows + faint dot texture */
+/* Page texture: paper grain (SVG noise) + fine diagonal weave */
 .page-bg {
-  --glow-a: rgba(0, 136, 238, 0.16);
-  --glow-b: rgba(255, 110, 64, 0.11);
-  --glow-c: rgba(0, 62, 170, 0.08);
-  --dot: rgba(15, 23, 42, 0.06);
-  background-image:
-    radial-gradient(900px 460px at 8% -4%, var(--glow-a), transparent 70%),
-    radial-gradient(760px 420px at 96% 12%, var(--glow-b), transparent 70%),
-    radial-gradient(1100px 620px at 50% 102%, var(--glow-c), transparent 70%),
-    radial-gradient(var(--dot) 1px, transparent 1px);
-  background-size: auto, auto, auto, 22px 22px;
-  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  --paper: #f1f3f8;
+  --weave: rgba(30, 41, 59, 0.045);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+  background-color: var(--paper);
+  background-image: var(--grain), repeating-linear-gradient(135deg, var(--weave) 0 1px, transparent 1px 6px);
 }
 .dark .page-bg {
-  --glow-a: rgba(0, 136, 238, 0.18);
-  --glow-b: rgba(255, 110, 64, 0.08);
-  --glow-c: rgba(0, 62, 170, 0.14);
-  --dot: rgba(255, 255, 255, 0.045);
+  --paper: #10131b;
+  --weave: rgba(255, 255, 255, 0.035);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");
 }
 /* Raised surface: tight contact shadow + wide soft shadow */
 .surface {
@@ -576,20 +583,14 @@ onBeforeUnmount(() => {
 }
 
 /* Flash-deal motion */
-@keyframes deal-shine {
-  0% { transform: translateX(-160%) skewX(-20deg); }
-  55%, 100% { transform: translateX(700%) skewX(-20deg); }
-}
 @keyframes deal-bolt {
   0%, 100% { opacity: 1; }
   45% { opacity: 0.5; }
   50% { opacity: 1; }
   58% { opacity: 0.6; }
 }
-.deal-shine { animation: deal-shine 3.4s ease-in-out infinite; }
 .deal-bolt { animation: deal-bolt 1.8s steps(1) infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .deal-shine,
   .deal-bolt { animation: none; }
 }
 </style>
