@@ -34,15 +34,8 @@
     </header>
 
     <!-- Hero cover -->
-    <section v-if="!isFiltering && (bannerSlides.length || dealProducts.length)" class="relative overflow-hidden">
-      <div
-        v-if="currentBanner"
-        class="pointer-events-none absolute inset-0 [-webkit-mask-image:linear-gradient(to_bottom,black_45%,transparent)] [mask-image:linear-gradient(to_bottom,black_45%,transparent)]"
-      >
-        <img :key="currentBanner.id" :src="currentBanner.image" alt="" class="absolute inset-0 size-full scale-125 object-cover opacity-60 blur-3xl saturate-150 transition-opacity duration-500" />
-      </div>
-
-      <div class="relative mx-auto max-w-[1280px] px-3 pb-4 pt-3 sm:pt-5">
+    <section v-if="!isFiltering && (bannerSlides.length || dealProducts.length)" class="hero-band relative overflow-hidden border-b border-black/[0.08] dark:border-border">
+<div class="relative mx-auto max-w-[1280px] px-3 pb-4 pt-3 sm:pt-5">
         <!-- Slider -->
         <div v-if="bannerSlides.length" class="group relative -mx-3" @mouseenter="paused = true" @mouseleave="paused = false">
           <div
@@ -54,7 +47,7 @@
               v-for="(slide, i) in bannerSlides"
               :key="slide.id"
               :href="slide.href"
-              class="relative h-40 w-[86%] shrink-0 snap-center overflow-hidden rounded-xl bg-muted shadow-sm transition-opacity duration-300 sm:h-56 sm:w-[78%] lg:h-[360px] lg:w-[1000px]"
+              class="relative h-40 w-[86%] shrink-0 snap-center overflow-hidden rounded-xl bg-muted shadow-sm transition-opacity duration-300 sm:h-44 sm:w-[78%] lg:h-[200px] lg:w-[1000px]"
               :class="i === bannerIndex ? 'opacity-100' : 'opacity-50'"
             >
               <img :src="slide.image" :alt="slide.title" class="size-full object-cover" :loading="i === 0 ? 'eager' : 'lazy'" />
@@ -183,7 +176,7 @@
       </section>
 
       <!-- All products / search results -->
-      <section id="all-products" class="scroll-mt-28">
+      <section id="all-products" class="products-band scroll-mt-28 -mx-3 px-3 py-5 sm:mx-0 sm:rounded-2xl sm:px-4 sm:py-6">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div class="flex min-w-0 items-baseline gap-2">
             <h2 class="shrink-0 text-base font-bold">{{ messages.storefront.products }}</h2>
@@ -532,47 +525,99 @@ onBeforeUnmount(() => {
 /* Product-row tint from the icon's dominant colour (--hue, set from JS):
    strong at the icon side, long fade into the surface colour, with a hue-coloured edge and shadow.
    Only applies once --hue exists, so un-sampled rows keep the plain card background. */
+/* Layered card: cool gray underlay + logo-hue wash on top for depth */
 .hue-row {
   --hue-base: #ffffff;
-  --mix-a: 44%;
-  --mix-b: 18%;
-  background-color: var(--hue-base);
+  --mix-a: 38%;
+  --mix-b: 14%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #eef1f6;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  box-shadow:
+    inset 0 0 0 1px rgba(15, 23, 42, 0.05),
+    0 1px 2px rgba(15, 23, 42, 0.04);
 }
 .dark .hue-row {
-  --hue-base: #171b26;
-  --mix-a: 36%;
-  --mix-b: 14%;
-}
-.hue-row[style*="--hue"] {
-  background-image: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--hue) var(--mix-a), var(--hue-base)) 0%,
-    color-mix(in srgb, var(--hue) var(--mix-b), var(--hue-base)) 55%,
-    var(--hue-base) 100%
-  );
+  --hue-base: #1a1f2c;
+  --mix-a: 32%;
+  --mix-b: 12%;
+  background-color: #12151e;
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--hue) 26%, transparent),
-    0 12px 24px -14px color-mix(in srgb, var(--hue) 70%, transparent);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.35);
 }
-.hue-row {
-  transition: transform 0.2s, filter 0.2s;
+/* Soft white/gray plate sitting above the underlay */
+.hue-row::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6fa 100%);
+  pointer-events: none;
+}
+.dark .hue-row::before {
+  background: linear-gradient(180deg, #1c2230 0%, #151922 100%);
+}
+/* Logo color wash — only when --hue is set from cover */
+.hue-row[style*="--hue"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--hue) var(--mix-a), transparent) 0%,
+    color-mix(in srgb, var(--hue) var(--mix-b), transparent) 42%,
+    transparent 78%
+  );
+  opacity: 0.92;
+}
+.hue-row > * {
+  position: relative;
+  z-index: 2;
 }
 .hue-row:hover {
-  filter: saturate(1.2);
+  filter: saturate(1.12);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--hue, #64748b) 18%, transparent),
+    0 10px 22px -12px color-mix(in srgb, var(--hue, #64748b) 45%, transparent);
+}
+.dark .hue-row:hover {
+  filter: saturate(1.08);
 }
 
-/* Page texture: paper grain (SVG noise) + fine diagonal weave */
+/* Page texture: soft dots only (no product imagery, no heavy noise) */
 .page-bg {
   --paper: #f1f3f8;
-  --weave: rgba(30, 41, 59, 0.045);
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
   background-color: var(--paper);
-  background-image: var(--grain), repeating-linear-gradient(135deg, var(--weave) 0 1px, transparent 1px 6px);
+  background-image: radial-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+  background-size: 14px 14px;
 }
 .dark .page-bg {
   --paper: #10131b;
-  --weave: rgba(255, 255, 255, 0.035);
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+/* Clear split under hero */
+.hero-band {
+  background: linear-gradient(180deg, #e8ecf3 0%, #eef1f6 100%);
+}
+.dark .hero-band {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
+}
+.products-band {
+  background-color: #f7f8fb;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+.dark .products-band {
+  background-color: transparent;
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
 /* Raised surface: tight contact shadow + wide soft shadow */
 .surface {
