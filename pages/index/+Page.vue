@@ -1,5 +1,5 @@
 <template>
-  <main class="flex min-h-screen flex-col bg-[#f2f4f8] text-foreground dark:bg-background">
+  <main class="page-bg flex min-h-screen flex-col bg-[#eef1f7] text-foreground dark:bg-background">
     <!-- Slim top bar: site notice -->
     <div v-if="site.notice" class="border-b border-border bg-background">
       <div class="mx-auto flex max-w-[1280px] items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground">
@@ -35,9 +35,11 @@
 
     <!-- Hero cover -->
     <section v-if="!isFiltering && (bannerSlides.length || dealProducts.length)" class="relative overflow-hidden">
-      <div v-if="currentBanner" class="pointer-events-none absolute inset-0">
-        <img :key="currentBanner.id" :src="currentBanner.image" alt="" class="absolute inset-0 size-full scale-125 object-cover opacity-40 blur-3xl" />
-        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-[#f2f4f8]/50 to-[#f2f4f8] dark:via-background/50 dark:to-background" />
+      <div
+        v-if="currentBanner"
+        class="pointer-events-none absolute inset-0 [-webkit-mask-image:linear-gradient(to_bottom,black_45%,transparent)] [mask-image:linear-gradient(to_bottom,black_45%,transparent)]"
+      >
+        <img :key="currentBanner.id" :src="currentBanner.image" alt="" class="absolute inset-0 size-full scale-125 object-cover opacity-60 blur-3xl saturate-150 transition-opacity duration-500" />
       </div>
 
       <div class="relative mx-auto max-w-[1280px] px-3 pb-4 pt-3 sm:pt-5">
@@ -84,7 +86,7 @@
         </div>
 
         <!-- Flash deals -->
-        <div v-if="dealProducts.length" class="mt-4 overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-red-500/20">
+        <div v-if="dealProducts.length" class="mt-4 overflow-hidden rounded-xl bg-card shadow-[0_16px_36px_-16px_rgba(220,38,38,0.5)] ring-1 ring-red-500/25">
           <div class="relative flex items-center justify-between gap-3 overflow-hidden bg-gradient-to-r from-red-600 via-red-500 to-orange-500 px-3 py-2.5 text-white sm:px-4">
             <span class="deal-shine pointer-events-none absolute inset-y-0 left-0 w-1/6 bg-white/25" />
             <div class="relative flex min-w-0 items-center gap-2">
@@ -150,7 +152,7 @@
 
       <!-- Featured columns: one per category, each row tinted with the icon's dominant colour -->
       <section v-if="!isFiltering && featuredColumns.length" class="-mx-3 flex snap-x gap-3 overflow-x-auto px-3 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
-        <div v-for="col in featuredColumns" :key="'col' + col.id" class="w-[86%] shrink-0 snap-start rounded-xl bg-card p-3 shadow-sm md:w-auto">
+        <div v-for="col in featuredColumns" :key="'col' + col.id" class="surface w-[86%] shrink-0 snap-start rounded-xl bg-card p-3 ring-1 ring-black/[0.04] md:w-auto dark:ring-white/10">
           <div class="mb-1 flex items-center justify-between gap-2">
             <h3 class="flex items-center gap-2 text-[15px] font-bold">
               <span class="h-4 w-1 rounded-full bg-brand" />
@@ -192,34 +194,40 @@
           </div>
         </div>
 
-        <ul v-if="sortedProducts.length" class="m-0 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          <li v-for="p in sortedProducts" :key="p.id">
-            <a
-              :href="'/product/' + p.slug"
-              class="hue-card group flex h-full flex-col rounded-xl p-2 shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md dark:ring-white/10"
-              :style="hueStyle(p.coverImage)"
-            >
-              <div class="relative aspect-square overflow-hidden rounded-lg bg-white/60 dark:bg-black/20">
-                <img
-                  :src="p.coverImage || defaultProductImage"
-                  :alt="p.name"
-                  class="size-full object-cover transition duration-300 group-hover:scale-105"
-                  :class="p.availableStock === 0 ? 'opacity-50 grayscale' : ''"
-                  loading="lazy"
-                />
-                <span v-if="dealBadge(p)" class="absolute left-0 top-2 rounded-r bg-gradient-to-r from-red-600 to-orange-500 py-0.5 pl-1.5 pr-2 text-[11px] font-black text-white shadow">{{ dealBadge(p) }}</span>
-              </div>
-              <div class="flex flex-1 flex-col px-0.5 pb-0.5 pt-2">
-                <h3 class="line-clamp-2 text-[13px] font-medium leading-snug group-hover:text-brand">{{ p.name }}</h3>
-                <p v-if="p.subtitle" class="mt-1 line-clamp-1 text-[11px] text-muted-foreground">{{ p.subtitle }}</p>
-                <div class="mt-auto flex flex-wrap items-baseline justify-between gap-x-2 pt-2">
-                  <p class="m-0 text-[15px] font-bold tabular-nums"><span class="mr-px text-[11px] font-semibold text-muted-foreground">RM</span>{{ p.price }}</p>
-                  <span class="text-[11px]" :class="stockClass(p)">{{ stockLabel(p) }}</span>
+        <div v-if="sortedProducts.length" class="rounded-2xl bg-white/55 p-2.5 ring-1 ring-white/70 sm:p-3 dark:bg-white/[0.04] dark:ring-white/10">
+          <ul class="m-0 grid list-none grid-cols-1 gap-2.5 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <li v-for="p in sortedProducts" :key="p.id">
+              <a
+                :href="'/product/' + p.slug"
+                class="hue-row surface group flex h-full items-center gap-3 rounded-xl p-2.5 ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:ring-brand/30 dark:ring-white/10"
+                :style="hueStyle(p.coverImage)"
+              >
+                <div class="relative size-[76px] shrink-0 overflow-hidden rounded-xl bg-white/60 shadow-sm sm:size-[88px] dark:bg-black/20">
+                  <img
+                    :src="p.coverImage || defaultProductImage"
+                    :alt="p.name"
+                    class="size-full object-cover transition duration-300 group-hover:scale-105"
+                    :class="p.availableStock === 0 ? 'opacity-50 grayscale' : ''"
+                    loading="lazy"
+                  />
                 </div>
-              </div>
-            </a>
-          </li>
-        </ul>
+                <div class="flex min-w-0 flex-1 flex-col justify-between self-stretch py-0.5">
+                  <div>
+                    <h3 class="line-clamp-2 text-[13px] font-medium leading-snug group-hover:text-brand sm:text-sm">{{ p.name }}</h3>
+                    <p v-if="p.subtitle" class="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">{{ p.subtitle }}</p>
+                  </div>
+                  <div class="mt-1.5 flex items-end justify-between gap-2">
+                    <div class="flex items-center gap-1.5">
+                      <p class="m-0 text-base font-bold tabular-nums leading-none"><span class="mr-px text-[11px] font-semibold text-muted-foreground">RM</span>{{ p.price }}</p>
+                      <span v-if="dealBadge(p)" class="rounded bg-gradient-to-r from-red-600 to-orange-500 px-1.5 py-0.5 text-[11px] font-black leading-none text-white">{{ dealBadge(p) }}</span>
+                    </div>
+                    <span class="shrink-0 text-[11px] leading-none" :class="stockClass(p)">{{ stockLabel(p) }}</span>
+                  </div>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </div>
         <p v-else class="rounded-xl bg-card py-16 text-center text-sm text-muted-foreground">{{ messages.storefront.noProducts }}</p>
       </section>
     </div>
@@ -537,6 +545,34 @@ onBeforeUnmount(() => {
 }
 .hue-card:not([style*="--hue"]) {
   background-color: var(--hue-base);
+}
+
+/* Layered page background: soft colour glows + faint dot texture */
+.page-bg {
+  --glow-a: rgba(0, 136, 238, 0.16);
+  --glow-b: rgba(255, 110, 64, 0.11);
+  --glow-c: rgba(0, 62, 170, 0.08);
+  --dot: rgba(15, 23, 42, 0.06);
+  background-image:
+    radial-gradient(900px 460px at 8% -4%, var(--glow-a), transparent 70%),
+    radial-gradient(760px 420px at 96% 12%, var(--glow-b), transparent 70%),
+    radial-gradient(1100px 620px at 50% 102%, var(--glow-c), transparent 70%),
+    radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: auto, auto, auto, 22px 22px;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+}
+.dark .page-bg {
+  --glow-a: rgba(0, 136, 238, 0.18);
+  --glow-b: rgba(255, 110, 64, 0.08);
+  --glow-c: rgba(0, 62, 170, 0.14);
+  --dot: rgba(255, 255, 255, 0.045);
+}
+/* Raised surface: tight contact shadow + wide soft shadow */
+.surface {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 14px 30px -18px rgba(16, 24, 40, 0.28);
+}
+.dark .surface {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 30px -18px rgba(0, 0, 0, 0.7);
 }
 
 /* Flash-deal motion */
