@@ -121,7 +121,7 @@
                   <h3 class="line-clamp-1 text-[13px] font-medium">{{ p.name }}</h3>
                   <p v-if="p.subtitle" class="m-0 line-clamp-1 text-[11px] text-muted-foreground">{{ p.subtitle }}</p>
                   <div class="flex items-center gap-1.5">
-                    <p class="m-0 text-base font-black tabular-nums leading-none text-red-600"><span class="mr-px text-[11px] font-bold">RM</span>{{ p.price }}</p>
+                    <p class="m-0 text-[17px] font-extrabold tabular-nums leading-none text-foreground"><span class="mr-px text-[11px] font-bold text-foreground/60">RM</span>{{ p.price }}</p>
                     <span v-if="dealBadge(p)" class="rounded bg-gradient-to-r from-red-600 to-orange-500 px-1.5 py-0.5 text-[11px] font-black leading-none text-white">{{ dealBadge(p) }}</span>
                   </div>
                   <div v-if="lowStock(p)" class="flex items-center gap-1.5">
