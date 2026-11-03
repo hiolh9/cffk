@@ -118,6 +118,12 @@ export const adminPages = {
     pageTitle: "税务中心",
     description: "税种、未报义务、申报批次与到期提醒",
   },
+  supplierWallet: {
+    title: "预存款对账",
+    path: "/accounting/wallet",
+    pageTitle: "供应商预存款对账",
+    description: "Top-up、平台费、月度对账单与 API 扣款 CSV（Invoice 自邮箱下载）。",
+  },
   users: {
     title: "用户管理",
     path: "/users",
@@ -239,6 +245,7 @@ export const adminNavigation = {
   settlements: adminPages.settlements,
   pnl: adminPages.pnl,
   tax: adminPages.tax,
+  supplierWallet: adminPages.supplierWallet,
   users: adminPages.users,
   blog: adminPages.blog,
   blogEdit: adminPages.blogEdit,
@@ -340,6 +347,7 @@ export function getAdminBreadcrumb(pathname: string, basePath: string) {
     adminNavigation.settlements,
     adminNavigation.pnl,
     adminNavigation.tax,
+    adminNavigation.supplierWallet,
     adminNavigation.users,
     adminNavigation.blog,
     adminPages.blogEdit,
