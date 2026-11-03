@@ -1,6 +1,6 @@
 <template>
   <main class="flex min-h-screen flex-col bg-[#f2f4f8] text-foreground dark:bg-background">
-  
+    <!-- Slim top bar: site notice -->
     <div v-if="site.notice" class="border-b border-border bg-background">
       <div class="mx-auto flex max-w-[1280px] items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground">
         <MegaphoneIcon class="size-3.5 shrink-0 text-brand" />
@@ -8,7 +8,7 @@
       </div>
     </div>
 
-   
+    <!-- Main nav -->
     <header class="sticky top-0 z-50 border-b border-border bg-background">
       <div class="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-3 px-3">
         <StorefrontBrand />
@@ -33,7 +33,7 @@
       </nav>
     </header>
 
-  
+    <!-- Hero cover -->
     <section v-if="!isFiltering && (bannerSlides.length || dealProducts.length)" class="relative overflow-hidden">
       <div v-if="currentBanner" class="pointer-events-none absolute inset-0">
         <img :key="currentBanner.id" :src="currentBanner.image" alt="" class="absolute inset-0 size-full scale-125 object-cover opacity-40 blur-3xl" />
@@ -83,37 +83,51 @@
           </template>
         </div>
 
-      
-        <div v-if="dealProducts.length" class="mt-4 rounded-xl bg-card p-3 shadow-sm sm:p-4">
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <h2 class="flex items-center gap-1.5 text-base font-bold">
-                <ZapIcon class="size-4 fill-red-500 text-red-500" />
-                {{ L("flashDeals", "Flash Deals") }}
-              </h2>
-              <p class="m-0 mt-0.5 truncate text-xs text-muted-foreground">{{ L("flashDealsSub", "Limited time only!") }}</p>
+        <!-- Flash deals -->
+        <div v-if="dealProducts.length" class="mt-4 overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-red-500/20">
+          <div class="relative flex items-center justify-between gap-3 overflow-hidden bg-gradient-to-r from-red-600 via-red-500 to-orange-500 px-3 py-2.5 text-white sm:px-4">
+            <span class="deal-shine pointer-events-none absolute inset-y-0 left-0 w-1/6 bg-white/25" />
+            <div class="relative flex min-w-0 items-center gap-2">
+              <ZapIcon class="deal-bolt size-6 shrink-0 fill-yellow-300 text-yellow-300 drop-shadow" />
+              <div class="min-w-0">
+                <h2 class="m-0 text-lg font-black uppercase italic leading-none tracking-wide sm:text-xl">{{ L("flashDeals", "Flash Deals") }}</h2>
+                <p class="m-0 mt-1 hidden truncate text-[11px] text-white/85 sm:block">{{ L("flashDealsSub", "Limited time only!") }}</p>
+              </div>
             </div>
-            <div class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-              <span class="hidden sm:inline">{{ L("endsIn", "Ends in") }}</span>
-              <div class="flex items-center gap-0.5 font-mono text-xs font-semibold tabular-nums">
-                <span class="rounded bg-foreground px-1.5 py-0.5 text-background">{{ flashCountdown.h }}</span>:
-                <span class="rounded bg-foreground px-1.5 py-0.5 text-background">{{ flashCountdown.m }}</span>:
-                <span class="rounded bg-foreground px-1.5 py-0.5 text-background">{{ flashCountdown.s }}</span>
+            <div class="relative flex shrink-0 items-center gap-1.5 text-xs">
+              <span class="hidden text-white/90 sm:inline">{{ L("endsIn", "Ends in") }}</span>
+              <div class="flex items-center gap-0.5 font-mono text-[13px] font-extrabold tabular-nums">
+                <span class="rounded bg-white px-1.5 py-0.5 text-red-600 shadow-sm">{{ flashCountdown.h }}</span>
+                <span>:</span>
+                <span class="rounded bg-white px-1.5 py-0.5 text-red-600 shadow-sm">{{ flashCountdown.m }}</span>
+                <span>:</span>
+                <span class="rounded bg-white px-1.5 py-0.5 text-red-600 shadow-sm">{{ flashCountdown.s }}</span>
               </div>
             </div>
           </div>
-          <ul class="m-0 grid list-none auto-cols-[248px] grid-flow-col grid-rows-2 gap-3 overflow-x-auto p-0 pb-1 [scrollbar-width:none] lg:grid-rows-1 [&::-webkit-scrollbar]:hidden">
-            <li v-for="p in dealProducts" :key="'d' + p.id">
-              <a :href="'/product/' + p.slug" class="group flex items-center gap-2.5 rounded-lg border border-border bg-background p-2 transition hover:border-brand/50">
-                <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-[54px] shrink-0 rounded-lg bg-muted object-cover" loading="lazy" width="54" height="54" />
-                <div class="min-w-0 flex-1">
-                  <h3 class="line-clamp-1 text-[13px] font-medium">{{ p.name }}</h3>
-                  <p v-if="p.subtitle" class="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">{{ p.subtitle }}</p>
+
+          <ul class="m-0 flex list-none gap-3 overflow-x-auto bg-gradient-to-b from-red-50/70 to-card p-3 [scrollbar-width:none] dark:from-red-500/10 [&::-webkit-scrollbar]:hidden">
+            <li v-for="p in dealProducts" :key="'d' + p.id" class="w-[136px] shrink-0 sm:w-[160px]">
+              <a
+                :href="'/product/' + p.slug"
+                class="hue-card group flex h-full flex-col rounded-xl p-2 ring-1 ring-black/5 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-red-500/30 dark:ring-white/10"
+                :style="hueStyle(p.coverImage)"
+              >
+                <div class="relative aspect-square overflow-hidden rounded-lg bg-white/60 dark:bg-black/20">
+                  <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-full object-cover transition duration-300 group-hover:scale-105" loading="lazy" />
+                  <span v-if="dealBadge(p)" class="absolute left-0 top-2 rounded-r bg-gradient-to-r from-red-600 to-orange-500 py-0.5 pl-1.5 pr-2 text-[12px] font-black text-white shadow">{{ dealBadge(p) }}</span>
                 </div>
-                <div class="shrink-0 text-right">
-                  <span v-if="dealBadge(p)" class="inline-block rounded bg-red-500 px-1.5 py-0.5 text-[11px] font-bold text-white">{{ dealBadge(p) }}</span>
-                  <span v-else-if="lowStock(p)" class="inline-block text-[11px] font-medium text-red-500">{{ t(L("itemsLeft", "{count} left"), { count: p.availableStock }) }}</span>
-                  <p class="m-0 mt-0.5 text-sm font-bold tabular-nums"><span class="mr-px text-[10px] font-semibold text-muted-foreground">RM</span>{{ p.price }}</p>
+                <h3 class="mt-2 line-clamp-1 text-[13px] font-medium">{{ p.name }}</h3>
+                <p class="m-0 mt-0.5 text-lg font-black tabular-nums leading-tight text-red-600"><span class="mr-px text-[11px] font-bold">RM</span>{{ p.price }}</p>
+                <div class="mt-1.5 h-7">
+                  <template v-if="lowStock(p)">
+                    <div class="h-1.5 overflow-hidden rounded-full bg-red-500/15">
+                      <div class="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-500" :style="{ width: Math.max(10, ((p.availableStock ?? 0) / 20) * 100) + '%' }" />
+                    </div>
+                    <p class="m-0 mt-0.5 flex items-center gap-0.5 text-[10px] font-bold text-red-500">
+                      <FlameIcon class="size-3" />{{ t(L("itemsLeft", "{count} left"), { count: p.availableStock }) }}
+                    </p>
+                  </template>
                 </div>
               </a>
             </li>
@@ -134,18 +148,22 @@
         />
       </div>
 
+      <!-- Featured columns: one per category, each row tinted with the icon's dominant colour -->
       <section v-if="!isFiltering && featuredColumns.length" class="-mx-3 flex snap-x gap-3 overflow-x-auto px-3 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
         <div v-for="col in featuredColumns" :key="'col' + col.id" class="w-[86%] shrink-0 snap-start rounded-xl bg-card p-3 shadow-sm md:w-auto">
-          <div class="flex items-center justify-between gap-2">
-            <h3 class="line-clamp-1 text-[15px] font-bold">{{ col.title }}</h3>
+          <div class="mb-1 flex items-center justify-between gap-2">
+            <h3 class="flex items-center gap-2 text-[15px] font-bold">
+              <span class="h-4 w-1 rounded-full bg-brand" />
+              <span class="line-clamp-1">{{ col.title }}</span>
+            </h3>
             <button v-if="col.id !== null" type="button" class="flex shrink-0 items-center text-xs text-brand hover:underline" @click="openCategory(col.id)">
               {{ L("viewAll", "View all") }}<ChevronRightIcon class="size-3.5" />
             </button>
           </div>
-          <ul class="m-0 mt-1 list-none p-0">
-            <li v-for="p in col.products" :key="'c' + p.id" class="border-t border-border first:border-t-0">
-              <a :href="'/product/' + p.slug" class="group flex items-center gap-3 py-2.5">
-                <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-[52px] shrink-0 rounded-xl bg-muted object-cover" loading="lazy" width="52" height="52" />
+          <ul class="m-0 list-none space-y-1.5 p-0">
+            <li v-for="p in col.products" :key="'c' + p.id">
+              <a :href="'/product/' + p.slug" class="hue-row group flex items-center gap-3 rounded-xl p-2 transition hover:brightness-[0.98]" :style="hueStyle(p.coverImage)">
+                <img :src="p.coverImage || defaultProductImage" :alt="p.name" class="size-[52px] shrink-0 rounded-xl bg-white/60 object-cover shadow-sm dark:bg-black/20" loading="lazy" width="52" height="52" />
                 <div class="min-w-0 flex-1">
                   <h4 class="line-clamp-1 text-[13px] font-medium group-hover:text-brand">{{ p.name }}</h4>
                   <p class="m-0 mt-1 flex items-center gap-2 text-xs">
@@ -153,6 +171,7 @@
                     <span :class="stockClass(p)">{{ stockLabel(p) }}</span>
                   </p>
                 </div>
+                <span v-if="dealBadge(p)" class="shrink-0 rounded bg-red-500 px-1.5 py-0.5 text-[11px] font-bold text-white">{{ dealBadge(p) }}</span>
               </a>
             </li>
           </ul>
@@ -175,8 +194,12 @@
 
         <ul v-if="sortedProducts.length" class="m-0 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           <li v-for="p in sortedProducts" :key="p.id">
-            <a :href="'/product/' + p.slug" class="group flex h-full flex-col rounded-xl bg-card p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <div class="relative aspect-square overflow-hidden rounded-lg bg-muted">
+            <a
+              :href="'/product/' + p.slug"
+              class="hue-card group flex h-full flex-col rounded-xl p-2 shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md dark:ring-white/10"
+              :style="hueStyle(p.coverImage)"
+            >
+              <div class="relative aspect-square overflow-hidden rounded-lg bg-white/60 dark:bg-black/20">
                 <img
                   :src="p.coverImage || defaultProductImage"
                   :alt="p.name"
@@ -184,7 +207,7 @@
                   :class="p.availableStock === 0 ? 'opacity-50 grayscale' : ''"
                   loading="lazy"
                 />
-                <span v-if="dealBadge(p)" class="absolute left-1.5 top-1.5 rounded bg-red-500 px-1.5 py-0.5 text-[11px] font-bold text-white">{{ dealBadge(p) }}</span>
+                <span v-if="dealBadge(p)" class="absolute left-0 top-2 rounded-r bg-gradient-to-r from-red-600 to-orange-500 py-0.5 pl-1.5 pr-2 text-[11px] font-black text-white shadow">{{ dealBadge(p) }}</span>
               </div>
               <div class="flex flex-1 flex-col px-0.5 pb-0.5 pt-2">
                 <h3 class="line-clamp-2 text-[13px] font-medium leading-snug group-hover:text-brand">{{ p.name }}</h3>
@@ -206,8 +229,8 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { ChevronLeftIcon, ChevronRightIcon, MegaphoneIcon, SearchIcon, ZapIcon } from "@lucide/vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { ChevronLeftIcon, ChevronRightIcon, FlameIcon, MegaphoneIcon, SearchIcon, ZapIcon } from "@lucide/vue";
 import { useData } from "vike-vue/useData";
 import { usePageContext } from "vike-vue/usePageContext";
 import PublicNav from "@/components/storefront/PublicNav.vue";
@@ -254,6 +277,66 @@ const sortOptions: { key: SortKey; labelKey: string; fallback: string }[] = [
   { key: "asc", labelKey: "sortPriceAsc", fallback: "Price ↑" },
   { key: "desc", labelKey: "sortPriceDesc", fallback: "Price ↓" },
 ];
+
+/* ---------- dominant colour of each cover image (computed in the browser) ---------- */
+// image url -> "#rrggbb", or "" when it could not be read (CORS / load error / blank image)
+const hues = reactive<Record<string, string>>({});
+
+function sampleHue(src: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous"; // the image host must send CORS headers, otherwise we fall back silently
+    img.decoding = "async";
+    img.onload = () => {
+      try {
+        const S = 24;
+        const canvas = document.createElement("canvas");
+        canvas.width = S;
+        canvas.height = S;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return resolve("");
+        ctx.drawImage(img, 0, 0, S, S);
+        const px = ctx.getImageData(0, 0, S, S).data;
+        let r = 0, g = 0, b = 0, w = 0;
+        for (let i = 0; i < px.length; i += 4) {
+          if (px[i + 3] < 128) continue; // transparent
+          const R = px[i], G = px[i + 1], B = px[i + 2];
+          const max = Math.max(R, G, B);
+          const min = Math.min(R, G, B);
+          if (max > 245 && min > 235) continue; // white background
+          if (max < 20) continue; // near black
+          const sat = (max - min) / max;
+          const weight = sat * sat + 0.03; // favour vivid pixels over grey ones
+          r += R * weight;
+          g += G * weight;
+          b += B * weight;
+          w += weight;
+        }
+        if (!w) return resolve("");
+        resolve("#" + [r, g, b].map((v) => Math.round(v / w).toString(16).padStart(2, "0")).join(""));
+      } catch {
+        resolve(""); // tainted canvas
+      }
+    };
+    img.onerror = () => resolve("");
+    img.src = src;
+  });
+}
+
+async function ensureHues(urls: string[]) {
+  const todo = [...new Set(urls)].filter((u) => !(u in hues));
+  todo.forEach((u) => (hues[u] = "")); // mark as in-flight so we never sample twice
+  for (let i = 0; i < todo.length; i += 4) {
+    const chunk = todo.slice(i, i + 4);
+    const results = await Promise.all(chunk.map(sampleHue));
+    chunk.forEach((u, j) => (hues[u] = results[j]));
+  }
+}
+
+function hueStyle(src: string | null | undefined) {
+  const h = hues[src || defaultProductImage];
+  return h ? { "--hue": h } : undefined;
+}
 
 /* ---------- products ---------- */
 const isFiltering = computed(() => query.value.trim() !== "" || selectedCategory.value !== null);
@@ -405,7 +488,9 @@ function stockClass(product: Product) {
   return product.availableStock === 0 ? "font-medium text-red-500" : "text-muted-foreground";
 }
 
-/* ---------- timers ---------- */
+/* ---------- lifecycle ---------- */
+const imgOf = (p: Product) => p.coverImage || defaultProductImage;
+
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 let bannerTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
@@ -415,9 +500,60 @@ onMounted(() => {
   bannerTimer = setInterval(() => {
     if (!paused.value && bannerSlides.value.length > 1) nextBanner(1);
   }, 5700);
+
+  // sample colours for what is on screen first, then the product grid
+  ensureHues([
+    ...dealProducts.value.map(imgOf),
+    ...featuredColumns.value.flatMap((c) => c.products.map(imgOf)),
+  ]);
+  ensureHues(sortedProducts.value.slice(0, 48).map(imgOf));
+  watch(
+    () => sortedProducts.value.slice(0, 48).map(imgOf),
+    (urls) => ensureHues(urls),
+  );
 });
 onBeforeUnmount(() => {
   if (tickTimer) clearInterval(tickTimer);
   if (bannerTimer) clearInterval(bannerTimer);
 });
 </script>
+
+<style>
+/* Tint from the image's dominant colour (--hue, set from JS) fading into the surface colour.
+   Only applies once --hue exists, so un-sampled items keep the plain card background. */
+.hue-row,
+.hue-card {
+  --hue-base: #ffffff;
+}
+.dark .hue-row,
+.dark .hue-card {
+  --hue-base: #171b26;
+}
+.hue-row[style*="--hue"] {
+  background-image: linear-gradient(100deg, color-mix(in srgb, var(--hue) 26%, var(--hue-base)), var(--hue-base) 72%);
+}
+.hue-card[style*="--hue"] {
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--hue) 24%, var(--hue-base)), var(--hue-base) 64%);
+}
+.hue-card:not([style*="--hue"]) {
+  background-color: var(--hue-base);
+}
+
+/* Flash-deal motion */
+@keyframes deal-shine {
+  0% { transform: translateX(-160%) skewX(-20deg); }
+  55%, 100% { transform: translateX(700%) skewX(-20deg); }
+}
+@keyframes deal-bolt {
+  0%, 100% { opacity: 1; }
+  45% { opacity: 0.5; }
+  50% { opacity: 1; }
+  58% { opacity: 0.6; }
+}
+.deal-shine { animation: deal-shine 3.4s ease-in-out infinite; }
+.deal-bolt { animation: deal-bolt 1.8s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .deal-shine,
+  .deal-bolt { animation: none; }
+}
+</style>
