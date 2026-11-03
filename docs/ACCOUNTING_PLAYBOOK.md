@@ -320,3 +320,58 @@ Net Profit = Gross Profit + GL Expense SUM + Other Income SUM − Gateway Fees +
 - 充预存时把整笔充值当 COGS。  
 - 淘宝只按「CNY×BNM」入账却与银行 MYR 对不上且不留汇差。  
 - 物理删除订单来「改成本」；只更新 COGS 字段并写 audit。
+
+## 供应商预存款（MooGold 等）自我合规
+
+### 原则
+- **发票**：你从邮箱自行下载 Top-up Invoice（系统不读邮箱）。
+- **银行**：保留转账水单，金额与 Invoice 一致。
+- **系统**：GL 记充值与平台费；订单记 API 扣款 COGS；月末导出 CSV + 对账单。
+
+### 系统怎么记
+
+| 事件 | 记哪里 | Type | Amount_MYR | 抵税 |
+|------|--------|------|------------|------|
+| 充值预存（付完 Invoice） | `acctGeneralLedger` | `Prepayment` | **-1000**（出银行/转预存） | 否（资产，不进 P&L） |
+| API 发货扣预存 | `order` + `acctSale` | COGS | **+80** 等成本 | 进 COGS |
+| 钱包扣会员费 | `acctGeneralLedger` | `Expense` + 描述含 `[Platform_Fee]` | **-50** | **是** |
+
+余额公式：
+
+```text
+期末余额 = 期初 + 本月充值 - 本月 API 扣款(COGS) - 本月平台费
+```
+
+### 后台操作（接口）
+
+1. `onRecordSupplierTopup` — 填 Invoice 号、金额、日期、`supplierKey=moogold`
+2. `onRecordSupplierPlatformFee` — 月底发现被扣会员费时补录
+3. `onGetSupplierWalletStatement` — 传入上月期末作 `openingBalanceMyr`
+4. `onExportSupplierCogsCsv` — 下载当月 API 扣款明细
+
+### 每月文件夹（自建）
+
+```text
+2026-11_Supplier_Records/
+  1_Topup_Invoice.pdf（邮箱下载）
+  2_Bank_Transfer.png
+  3_API_Deductions.csv（系统导出）
+  4_Wallet_Statement.txt（系统生成）
+  5_API_success_logs（可选）
+```
+
+### 对账单示例
+
+```text
+MOOGOLD Wallet Statement (Month: 2026-11)
+Opening Balance,500.00
+(+) Top-up,1000.00
+(-) API Deductions (COGS),800.00
+(-) Platform / Membership Fees,50.00
+Closing Balance,650.00
+```
+
+### 禁止
+- 把平台费记进 COGS
+- 把充值记成费用
+- 无 Invoice 号的充值备注（描述里必须带 Invoice 编号）
