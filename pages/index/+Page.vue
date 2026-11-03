@@ -33,9 +33,9 @@
       </nav>
     </header>
 
-    <!-- Hero cover -->
-    <section v-if="!isFiltering && (bannerSlides.length || dealProducts.length)" class="hero-band relative overflow-hidden border-b border-black/[0.08] dark:border-border">
-<div class="relative mx-auto max-w-[1280px] px-3 pb-4 pt-3 sm:pt-5">
+    <!-- Hero: banner only — boundary sits under banner -->
+    <section v-if="!isFiltering && bannerSlides.length" class="hero-band relative overflow-hidden border-b border-black/[0.1] dark:border-border">
+      <div class="relative mx-auto max-w-[1280px] px-3 pb-3 pt-3 sm:pb-4 sm:pt-5">
         <!-- Slider -->
         <div v-if="bannerSlides.length" class="group relative -mx-3" @mouseenter="paused = true" @mouseleave="paused = false">
           <div
@@ -78,8 +78,14 @@
           </template>
         </div>
 
+      </div>
+    </section>
+
+    <!-- Product area starts here (Flash + rest) — shared products-band -->
+    <div v-if="!isFiltering && dealProducts.length" class="products-band">
+      <div class="relative mx-auto max-w-[1280px] px-3 pt-4 sm:pt-5">
         <!-- Flash deals -->
-        <div v-if="dealProducts.length" class="surface mt-4 rounded-xl bg-card p-3 ring-1 ring-black/[0.05] sm:p-4 dark:ring-white/10">
+        <div class="surface rounded-xl bg-card p-3 ring-1 ring-black/[0.05] sm:p-4 dark:ring-white/10">
           <div class="mb-3 flex items-center justify-between gap-3">
             <div class="flex min-w-0 items-center gap-2.5">
               <span class="flex shrink-0 items-center gap-1 rounded-lg bg-gradient-to-r from-red-600 to-orange-500 py-1 pl-2 pr-2.5 text-white shadow-sm">
@@ -131,9 +137,9 @@
           </ul>
         </div>
       </div>
-    </section>
+    </div>
 
-    <div class="mx-auto w-full max-w-[1280px] flex-1 space-y-4 px-3 pb-10" :class="isFiltering ? 'pt-4' : ''">
+    <div class="mx-auto w-full max-w-[1280px] flex-1 space-y-4 px-3 pb-10 products-band" :class="isFiltering ? 'pt-4' : ''">
       <!-- Mobile search -->
       <div class="relative md:hidden" :class="isFiltering ? '' : '-mt-1'">
         <SearchIcon class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -604,20 +610,21 @@ onBeforeUnmount(() => {
   background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 14px 14px;
 }
-/* Clear split under hero */
+/* Clear split UNDER BANNER only (not under Flash) */
 .hero-band {
   background: linear-gradient(180deg, #e8ecf3 0%, #eef1f6 100%);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 8px 20px -16px rgba(15, 23, 42, 0.35);
 }
 .dark .hero-band {
-  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 .products-band {
   background-color: #f7f8fb;
-  border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 .dark .products-band {
   background-color: transparent;
-  border-top-color: rgba(255, 255, 255, 0.08);
 }
 /* Raised surface: tight contact shadow + wide soft shadow */
 .surface {
