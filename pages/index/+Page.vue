@@ -23,7 +23,7 @@
       <section v-if="bannerSlides.length" class="relative sm:mt-2 sm:overflow-hidden sm:rounded-lg">
         <div class="flex transition-transform duration-500 ease-out" :style="{ transform: 'translateX(-' + bannerIndex * 100 + '%)' }">
           <a v-for="slide in bannerSlides" :key="slide.id" :href="slide.href" class="relative block w-full shrink-0">
-            <div class="aspect-[2.4/1] bg-[#e5e9ef] sm:aspect-[3.2/1] dark:bg-muted">
+            <div class="h-[18vh] max-h-[25vh] min-h-[88px] w-full bg-[#e5e9ef] sm:h-[20vh] sm:max-h-[22vh] dark:bg-muted">
               <img :src="slide.image" :alt="slide.title" class="h-full w-full object-cover" loading="lazy" />
               <div class="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
               <div v-if="slide.title" class="absolute bottom-0 p-3 sm:p-4">
