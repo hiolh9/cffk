@@ -12,6 +12,7 @@ import { notifyOrderEmailEvents } from "@/server/email/order-events";
 import { writeAuditLog } from "./audit";
 import { allocateInvoiceNo } from "./invoice";
 import { ledgerToCsv, listLedgerRows } from "./ledger";
+import { normalizeAdminContactEmail, assertAdminSupplierValidate } from "@/server/order/admin-validate";
 import {
   recordPrepaymentTopup,
   recordPlatformFeeFromWallet,
@@ -83,14 +84,15 @@ export const onListAuditLog = telefuncAction(async (input?: {
 export const onCreateManualBankOrder = telefuncAction(async (input: {
   productSkuId: number;
   quantity: number;
-  contactEmail: string;
+  contactEmail?: string;
   amountCents?: number;
   buyerNote?: string;
+  validateFields?: Record<string, string>;
+  skipValidate?: boolean;
 }) => {
   const { database, db, user, runtime } = requireAdmin();
   if (!input?.productSkuId || !input?.quantity || input.quantity < 1) appError("ORDER_INPUT_INVALID");
-  const email = input.contactEmail?.trim().toLowerCase();
-  if (!email || !email.includes("@")) appError("EMAIL_INVALID");
+  const email = normalizeAdminContactEmail(input.contactEmail);
 
   const [sku] = await db
     .select({
@@ -108,7 +110,9 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
     .where(eq(productSku.id, input.productSkuId))
     .limit(1);
   if (!sku) appError("PRODUCT_SKU_NOT_FOUND");
-
+  if ((sku.fulfillmentSource ?? "LOCAL") === "SUPPLIER" && input.skipValidate !== true) {
+    await assertAdminSupplierValidate(database, sku.id, input.validateFields ?? {});
+  }
   const unitPrice = sku.price;
   const quantity = input.quantity;
   const amount = input.amountCents ?? unitPrice * quantity;
