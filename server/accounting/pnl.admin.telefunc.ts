@@ -99,3 +99,14 @@ export const onExportMonthlyPack = telefuncAction(async (input: { yearMonth: str
     throw cause;
   }
 });
+
+// Append to server/accounting/pnl.admin.telefunc.ts
+import { computeAnnualPnL, annualPnlToCsv } from "./pnl";
+
+export const onGenerateAnnualPnL = telefuncAction(async (input: { year: number }) => {
+  const { database } = requireAdmin();
+  const year = Number(input?.year);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) appError("DATE_INVALID");
+  const pnl = await computeAnnualPnL(database, year);
+  return { pnl, csv: annualPnlToCsv(pnl) };
+});
