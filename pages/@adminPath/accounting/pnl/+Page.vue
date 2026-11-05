@@ -70,7 +70,19 @@
             {{ exporting ? "打包中..." : "一键导出当月全表" }}
           </Button>
         </div>
-
+        <section class="mt-8 space-y-3 rounded-xl border p-4">
+  <h2 class="text-base font-semibold">年度 P&L 汇总</h2>
+  <p class="text-sm text-muted-foreground">将 1–12 月加总，用于年底报税（月度逻辑不变）。</p>
+  <div class="flex flex-wrap items-end gap-2">
+    <label class="text-sm">
+      年份
+      <Input v-model.number="annualYear" type="number" class="mt-1 w-28" min="2020" max="2100" />
+    </label>
+    <Button type="button" @click="generateAnnual">生成年度汇总</Button>
+    <Button type="button" variant="outline" :disabled="!annualCsv" @click="downloadAnnual">下载 CSV</Button>
+  </div>
+  <pre v-if="annualCsv" class="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs">{{ annualCsv }}</pre>
+</section>
         <table v-if="pnl" class="mt-4 w-full text-sm">
           <tbody>
             <tr class="border-t"><td class="py-2">Sales Revenue</td><td class="text-right font-medium">{{ fmt(pnl.salesRevenueMyr) }}</td></tr>
@@ -132,6 +144,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
 import {
+  onGenerateMonthlyPnL,
+  onGenerateAnnualPnL,
   onCreateGlEntry,
   onExportMonthlyPack,
   onGenerateMonthlyPnL,
@@ -297,4 +311,22 @@ async function exportPack() {
 onMounted(() => {
   void load();
 });
+const annualYear = ref(new Date().getFullYear());
+const annualCsv = ref("");
+
+async function generateAnnual() {
+  const res = await runTelefunc(() => onGenerateAnnualPnL({ year: annualYear.value }));
+  annualCsv.value = (res as { csv?: string }).csv || "";
+  toast.success(`已生成 ${annualYear.value} 年度 P&L`);
+}
+
+function downloadAnnual() {
+  if (!annualCsv.value) return;
+  const blob = new Blob([annualCsv.value], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `pnl-annual-${annualYear.value}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 </script>
