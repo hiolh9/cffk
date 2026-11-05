@@ -148,7 +148,6 @@ import {
   onGenerateAnnualPnL,
   onCreateGlEntry,
   onExportMonthlyPack,
-  onGenerateMonthlyPnL,
   onListGlEntries,
 } from "@/server/accounting/pnl.admin.telefunc";
 
