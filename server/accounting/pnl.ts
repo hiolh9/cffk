@@ -278,3 +278,70 @@ export async function createGlEntry(
   });
   return { entryId, type, amountMyr: round2(input.amountMyr), isTaxDeductible: deductible };
 }
+
+
+export type AnnualPnL = {
+  year: number;
+  months: MonthlyPnL[];
+  salesRevenueMyr: number;
+  cogsMyr: number;
+  grossProfitMyr: number;
+  gatewayFeesMyr: number;
+  operatingExpensesMyr: number;
+  glExpensesMyr: number;
+  otherIncomeMyr: number;
+  realisedFxGainLossMyr: number;
+  netProfitMyr: number;
+  excluded: MonthlyPnL["excluded"];
+};
+
+/** Sum of 12 monthly P&Ls for calendar year (YYYY). */
+export async function computeAnnualPnL(database: D1Database, year: number): Promise<AnnualPnL> {
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) throw new Error("YEAR_INVALID");
+  const months: MonthlyPnL[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const yearMonth = `${year}-${String(m).padStart(2, "0")}`;
+    months.push(await computeMonthlyPnL(database, yearMonth));
+  }
+  const sum = (pick: (p: MonthlyPnL) => number) => round2(months.reduce((a, p) => a + pick(p), 0));
+  return {
+    year,
+    months,
+    salesRevenueMyr: sum((p) => p.salesRevenueMyr),
+    cogsMyr: sum((p) => p.cogsMyr),
+    grossProfitMyr: sum((p) => p.grossProfitMyr),
+    gatewayFeesMyr: sum((p) => p.gatewayFeesMyr),
+    operatingExpensesMyr: sum((p) => p.operatingExpensesMyr),
+    glExpensesMyr: sum((p) => p.glExpensesMyr),
+    otherIncomeMyr: sum((p) => p.otherIncomeMyr),
+    realisedFxGainLossMyr: sum((p) => p.realisedFxGainLossMyr),
+    netProfitMyr: sum((p) => p.netProfitMyr),
+    excluded: {
+      ownerDrawingsMyr: sum((p) => p.excluded.ownerDrawingsMyr),
+      prepaymentsMyr: sum((p) => p.excluded.prepaymentsMyr),
+      capitalInjectionMyr: sum((p) => p.excluded.capitalInjectionMyr),
+      assetTransferMyr: sum((p) => p.excluded.assetTransferMyr),
+    },
+  };
+}
+
+export function annualPnlToCsv(pnl: AnnualPnL): string {
+  const lines = [
+    `Annual P&L,${pnl.year}`,
+    `Sales Revenue,${pnl.salesRevenueMyr}`,
+    `COGS,${pnl.cogsMyr}`,
+    `Gross Profit,${pnl.grossProfitMyr}`,
+    `Gateway Fees,${pnl.gatewayFeesMyr}`,
+    `Operating Expenses (GL),${pnl.glExpensesMyr}`,
+    `Other Income,${pnl.otherIncomeMyr}`,
+    `Realised FX Gain/Loss,${pnl.realisedFxGainLossMyr}`,
+    `Net Profit,${pnl.netProfitMyr}`,
+    "",
+    "Month,Revenue,COGS,Gross,GatewayFees,OpEx,OtherIncome,FX,Net",
+    ...pnl.months.map(
+      (m) =>
+        `${m.yearMonth},${m.salesRevenueMyr},${m.cogsMyr},${m.grossProfitMyr},${m.gatewayFeesMyr},${m.glExpensesMyr},${m.otherIncomeMyr},${m.realisedFxGainLossMyr},${m.netProfitMyr}`,
+    ),
+  ];
+  return lines.join("\n");
+}
