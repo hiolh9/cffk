@@ -12,7 +12,7 @@ import {
 } from "./pnl";
 import { writeAuditLog } from "./audit";
 import { buildMonthlyExportPack } from "./monthly-export";
-
+import { computeAnnualPnL, annualPnlToCsv } from "./pnl";
 export const onListGlEntries = telefuncAction(async () => {
   const { db } = requireAdmin();
   const items = await db.select().from(acctGeneralLedger).orderBy(desc(acctGeneralLedger.entryDate)).limit(200);
@@ -99,9 +99,6 @@ export const onExportMonthlyPack = telefuncAction(async (input: { yearMonth: str
     throw cause;
   }
 });
-
-// Append to server/accounting/pnl.admin.telefunc.ts
-import { computeAnnualPnL, annualPnlToCsv } from "./pnl";
 
 export const onGenerateAnnualPnL = telefuncAction(async (input: { year: number }) => {
   const { database } = requireAdmin();
