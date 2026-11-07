@@ -44,6 +44,7 @@
     </header>
 
     <!-- Hero banners -->
+    <Transition name="fade-up">
     <section v-if="!isFiltering && bannerSlides.length" class="hero-band relative overflow-hidden" :aria-label="L('featured', 'Featured')">
       <div class="relative mx-auto max-w-[1280px] px-3 pb-3 pt-3 sm:pt-5">
         <div class="group relative -mx-3" @mouseenter="paused = true" @mouseleave="paused = false" @focusin="paused = true" @focusout="paused = false">
@@ -56,8 +57,8 @@
               v-for="(slide, i) in bannerSlides"
               :key="slide.id"
               :href="slide.href"
-              class="relative h-40 w-[86%] shrink-0 snap-center overflow-hidden rounded-2xl bg-muted shadow-sm outline-none transition-opacity duration-300 focus-visible:ring-2 focus-visible:ring-brand sm:h-44 sm:w-[78%] lg:h-[200px] lg:w-[1000px]"
-              :class="i === bannerIndex ? 'opacity-100' : 'opacity-50'"
+              class="relative h-40 w-[86%] shrink-0 snap-center overflow-hidden rounded-2xl bg-muted shadow-sm outline-none transition-[opacity,transform] duration-500 ease-out focus-visible:ring-2 focus-visible:ring-brand sm:h-44 sm:w-[78%] lg:h-[200px] lg:w-[1000px]"
+              :class="i === bannerIndex ? 'scale-100 opacity-100' : 'scale-[0.97] opacity-50'"
               :tabindex="i === bannerIndex ? 0 : -1"
             >
               <img :src="slide.image" :alt="slide.title" class="size-full object-cover" :loading="i === 0 ? 'eager' : 'lazy'" />
@@ -90,6 +91,7 @@
         </div>
       </div>
     </section>
+    </Transition>
 
     <div class="mx-auto w-full max-w-[1280px] flex-1 space-y-8 px-3 pb-10 pt-5">
       <!-- Mobile search -->
@@ -105,6 +107,7 @@
       </div>
 
       <!-- Flash deals: title left, countdown and link right, horizontal cards below -->
+      <Transition name="fade-up">
       <section v-if="!isFiltering && dealProducts.length" aria-labelledby="flash-title">
         <div class="mb-3 flex items-end justify-between gap-3">
           <div class="min-w-0">
@@ -133,8 +136,10 @@
           </li>
         </ul>
       </section>
+      </Transition>
 
       <!-- Popular by category: two panels per row, items laid out horizontally -->
+      <Transition name="fade-up">
       <div v-if="shownColumns.length" class="grid gap-3 md:grid-cols-2">
         <section v-for="col in shownColumns" :key="'col' + col.id" class="surface rounded-2xl bg-card p-4 ring-1 ring-black/[0.04] dark:ring-white/10">
           <div class="mb-2 flex items-center justify-between gap-2">
@@ -150,6 +155,7 @@
           </ul>
         </section>
       </div>
+      </Transition>
 
       <!-- All products / search results: horizontal rows -->
       <section id="all-products" class="scroll-mt-28">
@@ -165,11 +171,11 @@
           </div>
         </div>
 
-        <ul v-if="sortedProducts.length" class="m-0 grid list-none grid-cols-1 gap-2.5 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <TransitionGroup v-if="sortedProducts.length" tag="ul" name="list" class="m-0 grid list-none grid-cols-1 gap-2.5 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <li v-for="p in sortedProducts" :key="p.id">
             <ProductRow v-bind="tileProps(p)" />
           </li>
-        </ul>
+        </TransitionGroup>
 
         <div v-else class="rounded-2xl bg-card px-4 py-14 text-center ring-1 ring-black/[0.05] dark:ring-white/10">
           <p class="m-0 text-sm text-muted-foreground">{{ messages.storefront.noProducts }}</p>
@@ -486,7 +492,7 @@ const flashCountdown = computed(() => {
 /* ---------- class helpers ---------- */
 function chipClass(active: boolean) {
   return [
-    "shrink-0 rounded-full px-4 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
+    "shrink-0 rounded-full px-4 py-1.5 text-sm font-medium outline-none transition-[background-color,color,box-shadow] duration-200 ease-out focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1",
     active ? "bg-brand text-white shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground",
   ];
 }
@@ -529,6 +535,44 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
+/* Motion: one easing curve everywhere; only transform and opacity are animated. */
+html {
+  scroll-behavior: smooth;
+}
+.fade-up-enter-active {
+  transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1), transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.fade-up-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-up-leave-active {
+  display: none; /* leave instantly so the layout below never jumps mid-animation */
+}
+.list-enter-active {
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.list-enter-from {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.list-leave-active {
+  display: none; /* lets remaining items glide into place via .list-move */
+}
+.list-move {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .fade-up-enter-active,
+  .list-enter-active,
+  .list-move {
+    transition: none;
+  }
+}
+
 /* Page texture: soft dots only */
 .page-bg {
   --paper: #f1f3f8;
