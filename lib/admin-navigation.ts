@@ -124,6 +124,12 @@ export const adminPages = {
     pageTitle: "供应商预存款对账",
     description: "Top-up、平台费、月度对账单与 API 扣款 CSV（Invoice 自邮箱下载）。",
   },
+  taxNexus: {
+    title: "税务国别看板",
+    path: "/accounting/tax-nexus",
+    pageTitle: "税务国别分流",
+    description: "MY/出口/他国滚动 12 个月与门槛进度。",
+  },
   users: {
     title: "用户管理",
     path: "/users",
