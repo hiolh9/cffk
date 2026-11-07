@@ -18,7 +18,7 @@ import { createSupplierOrder } from "@/server/supplier/purchase";
 import { processSupplierOrder } from "@/server/supplier/process";
 import { assertSupplierSkuOrderable } from "@/server/supplier/eligibility";
 import { createObligationsForOrder } from "@/server/accounting/tax-service";
-
+import { applyTaxNexusToPaidOrder } from "@/server/tax/apply-tax-nexus";
 const DELIVERY_LEASE_MS = 5 * 60 * 1000;
 
 type ContactType = "EMAIL" | "QQ" | "TELEGRAM" | "OTHER";
@@ -144,6 +144,9 @@ export async function createOrder(database: D1Database, input: CreateOrderInput,
   if (amount > 0 && input.allowPendingPayment === false) fail("PAYMENT_ADAPTER_NOT_AVAILABLE");
   const orderNo = generateOrderNo();
   const paymentChannel = normalizePaymentChannel(input.paymentProvider, input.paymentChannel);
+  const ipCountry = (ctx as any)?.request?.cf?.country ?? null;
+// insert order 时带上：
+  customerIpCountry: ipCountry,
   const statements: D1PreparedStatement[] = [
     database.prepare("INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, unitPrice, quantity, amount, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
       orderNo, ownerUserId, item.id, sku.id, item.name, sku.name, sku.price, quantity, amount, input.contactType, contactValue,
@@ -225,6 +228,12 @@ export async function confirmOrderPayment(database: D1Database, orderId: number)
     database.prepare("UPDATE `order` SET status = 'PAID', paymentStatus = 'PAID', paidAt = ?, updatedAt = ? WHERE id = ? AND status = 'PENDING' AND paymentStatus = 'UNPAID'").bind(now, now, orderId),
     database.prepare("INSERT INTO transactionGuard (id, value) VALUES (1, changes()) ON CONFLICT(id) DO UPDATE SET value = excluded.value"),
   );
+  try {
+    await applyTaxNexusToPaidOrder(database, orderId);
+  } catch (e) {
+    console.error("tax-nexus", e);
+    // 不阻断发货；税务字段可事后补
+  }
   if (record.fulfillmentSource === "LOCAL" && (record.deliveryType === "CARD_AUTO" || record.deliveryType === "FIXED_CARD")) {
     statements.push(database.prepare("INSERT INTO automaticDeliveryJob (orderId, status, attemptCount, createdAt, updatedAt) SELECT id, 'PENDING', 0, ?, ? FROM `order` WHERE id = ? AND paymentStatus = 'PAID' ON CONFLICT(orderId) DO NOTHING").bind(now, now, orderId));
   }
