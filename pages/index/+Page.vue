@@ -241,6 +241,31 @@ const sortOptions: { key: SortKey; labelKey: string; fallback: string }[] = [
 // image url -> "#rrggbb", or "" when it could not be read (CORS / load error / blank image)
 const hues = reactive<Record<string, string>>({});
 
+// Keep the icon's hue but pull saturation and lightness into a band where every card tints evenly
+// (a dark icon no longer makes a muddy row, a pale one no longer vanishes).
+function normaliseHue(r: number, g: number, b: number): string {
+  const R = r / 255, G = g / 255, B = b / 255;
+  const max = Math.max(R, G, B), min = Math.min(R, G, B);
+  let h = 0;
+  const d = max - min;
+  if (d) {
+    if (max === R) h = ((G - B) / d) % 6;
+    else if (max === G) h = (B - R) / d + 2;
+    else h = (R - G) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  const l0 = (max + min) / 2;
+  const s0 = d === 0 ? 0 : d / (1 - Math.abs(2 * l0 - 1));
+  const s = s0 < 0.12 ? s0 : Math.min(0.85, Math.max(0.45, s0)); // greys stay neutral
+  const l = Math.min(0.58, Math.max(0.42, l0));
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const [r1, g1, b1] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return "#" + [r1 + m, g1 + m, b1 + m].map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+}
+
 function sampleHue(src: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -272,7 +297,7 @@ function sampleHue(src: string): Promise<string> {
           w += weight;
         }
         if (!w) return resolve("");
-        resolve("#" + [r, g, b].map((v) => Math.round(v / w).toString(16).padStart(2, "0")).join(""));
+        resolve(normaliseHue(r / w, g / w, b / w));
       } catch {
         resolve(""); // tainted canvas
       }
