@@ -89,18 +89,16 @@
           </template>
         </div>
 
-        <!-- Trust strip: answers "is it fast and safe?" before the first tap -->
-        <ul class="m-0 mt-3 grid list-none grid-cols-3 gap-2 p-0 sm:gap-3">
-          <li v-for="item in trust" :key="item.title" class="flex items-center gap-2 rounded-xl bg-card px-2.5 py-2 ring-1 ring-black/[0.05] dark:ring-white/10">
-            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
-              <component :is="item.icon" class="size-4" />
-            </span>
+        <!-- How it works: a real sequence, so numbering is meaningful. No service promises. -->
+        <ol class="m-0 mt-3 grid list-none grid-cols-3 gap-2 p-0 sm:gap-3">
+          <li v-for="(step, i) in steps" :key="step.title" class="flex items-center gap-2 rounded-xl bg-card px-2.5 py-2 ring-1 ring-black/[0.05] dark:ring-white/10">
+            <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-bold text-white">{{ i + 1 }}</span>
             <span class="min-w-0">
-              <span class="block truncate text-xs font-semibold sm:text-[13px]">{{ item.title }}</span>
-              <span class="hidden truncate text-[11px] text-muted-foreground sm:block">{{ item.sub }}</span>
+              <span class="block truncate text-xs font-semibold sm:text-[13px]">{{ step.title }}</span>
+              <span class="hidden truncate text-[11px] text-muted-foreground sm:block">{{ step.sub }}</span>
             </span>
           </li>
-        </ul>
+        </ol>
       </div>
     </section>
 
@@ -163,7 +161,7 @@
       </section>
 
       <!-- All games / search results -->
-      <section id="all-products" class="scroll-mt-28">
+      <section id="all-products" class="surface scroll-mt-28 rounded-2xl bg-card p-3 ring-1 ring-black/[0.04] sm:p-4 dark:ring-white/10">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div class="flex min-w-0 items-baseline gap-2">
             <h2 class="m-0 shrink-0 text-lg font-bold">{{ currentTitle }}</h2>
@@ -182,7 +180,7 @@
           </li>
         </ul>
 
-        <div v-else class="rounded-2xl bg-card px-4 py-14 text-center ring-1 ring-black/[0.05] dark:ring-white/10">
+        <div v-else class="px-4 py-14 text-center">
           <p class="m-0 text-sm text-muted-foreground">{{ messages.storefront.noProducts }}</p>
           <button v-if="isFiltering" type="button" class="mt-3 inline-flex items-center gap-1 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2" @click="clearFilters">
             <XIcon class="size-4" />{{ L("clearFilters", "Clear search and filters") }}
@@ -197,7 +195,7 @@
 
 <script lang="ts" setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { ChevronLeftIcon, ChevronRightIcon, HeadsetIcon, MegaphoneIcon, SearchIcon, ShieldCheckIcon, XIcon, ZapIcon } from "@lucide/vue";
+import { ChevronLeftIcon, ChevronRightIcon, MegaphoneIcon, SearchIcon, XIcon, ZapIcon } from "@lucide/vue";
 import { useData } from "vike-vue/useData";
 import { usePageContext } from "vike-vue/usePageContext";
 import PublicNav from "@/components/storefront/PublicNav.vue";
@@ -234,8 +232,8 @@ const sort = ref<SortKey>("default");
  * isn't in your message files yet. Keys to add to every locale:
  *   flashDeals, flashDealsSub, endsIn, itemsLeft ("{count} left"), viewAll,
  *   hotProducts, sortPopular, sortPriceAsc, sortPriceDesc, sortBy, searchGames,
- *   categories, featured, clearFilters, trustInstant, trustInstantSub,
- *   trustSecure, trustSecureSub, trustSupport, trustSupportSub, fromPrice
+ *   categories, featured, clearFilters, searchResults, allGames,
+ *   stepPick, stepPickSub, stepEnter, stepEnterSub, stepPay, stepPaySub
  */
 function L(key: string, fallback: string): string {
   const sf = messages.value.storefront as unknown as Record<string, string | undefined>;
@@ -248,11 +246,11 @@ const sortOptions: { key: SortKey; labelKey: string; fallback: string }[] = [
   { key: "desc", labelKey: "sortPriceDesc", fallback: "Price ↓" },
 ];
 
-// Confirm these claims match what the platform really offers before shipping.
-const trust = computed(() => [
-  { icon: ZapIcon, title: L("trustInstant", "Instant top-up"), sub: L("trustInstantSub", "Delivered in seconds") },
-  { icon: ShieldCheckIcon, title: L("trustSecure", "Secure payment"), sub: L("trustSecureSub", "Pay with trusted methods") },
-  { icon: HeadsetIcon, title: L("trustSupport", "24/7 support"), sub: L("trustSupportSub", "Help whenever you need it") },
+// Describes the ordering flow only; no delivery-time or support promises.
+const steps = computed(() => [
+  { title: L("stepPick", "Pick a game"), sub: L("stepPickSub", "Choose a top-up item") },
+  { title: L("stepEnter", "Enter details"), sub: L("stepEnterSub", "Add your account info") },
+  { title: L("stepPay", "Pay"), sub: L("stepPaySub", "Complete your order") },
 ]);
 
 /* ---------- dominant colour of each cover image (computed in the browser) ---------- */
