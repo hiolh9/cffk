@@ -148,6 +148,7 @@ const menuGroups = computed(() => {
       { title: adminPages.pnl.title, path: adminPages.pnl.path, icon: BookOpenIcon },
       { title: adminPages.tax.title, path: adminPages.tax.path, icon: BookOpenIcon },
       { title: adminPages.supplierWallet.title, path: adminPages.supplierWallet.path, icon: BookOpenIcon },
+      { title: adminPages.taxNexus.title, path: adminPages.taxNexus.path, icon: BookOpenIcon },
     ]),
     g("用户与内容", [
       { title: adminPages.users.title, path: adminPages.users.path, icon: UsersIcon },
