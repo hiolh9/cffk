@@ -19,6 +19,7 @@ import { processSupplierOrder } from "@/server/supplier/process";
 import { assertSupplierSkuOrderable } from "@/server/supplier/eligibility";
 import { createObligationsForOrder } from "@/server/accounting/tax-service";
 import { applyTaxNexusToPaidOrder } from "@/server/tax/apply-tax-nexus";
+import { getContext } from "telefunc";
 const DELIVERY_LEASE_MS = 5 * 60 * 1000;
 
 type ContactType = "EMAIL" | "QQ" | "TELEGRAM" | "OTHER";
@@ -144,17 +145,21 @@ export async function createOrder(database: D1Database, input: CreateOrderInput,
   if (amount > 0 && input.allowPendingPayment === false) fail("PAYMENT_ADAPTER_NOT_AVAILABLE");
   const orderNo = generateOrderNo();
   const paymentChannel = normalizePaymentChannel(input.paymentProvider, input.paymentChannel);
-  const ipCountry = (ctx as any)?.request?.cf?.country ?? null;
-// insert order 时带上：
-  customerIpCountry: ipCountry,
+  let ipCountry: string | null = null;
+try {
+  const ctx = getContext();
+  ipCountry = (ctx as { request?: { cf?: { country?: string } } })?.request?.cf?.country ?? null;
+} catch {
+  ipCountry = null;
+}
   const statements: D1PreparedStatement[] = [
-    database.prepare("INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, unitPrice, quantity, amount, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
+    database.prepare("INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, unitPrice, quantity, amount, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, customerIpCountry, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
       orderNo, ownerUserId, item.id, sku.id, item.name, sku.name, sku.price, quantity, amount, input.contactType, contactValue,
       input.contactType === "EMAIL" ? normalizeOrderEmail(contactValue) : null, input.buyerNote?.trim() || null,
       addressSnapshotJson, input.paymentProvider, paymentChannel, sku.fulfillmentSource, sku.deliveryType,
       sku.deliveryType === "FIXED_CARD" ? sku.fixedDeliveryContent!.trim() : null, reservePhysical ? 1 : 0,
       discountId, discountCodeValue, discountId === null ? null : originalAmount, discountId === null ? null : discountAmount,
-      now, now,
+      ipCountry, now, now,
     ),
   ];
   if (reservePhysical) {
