@@ -167,7 +167,7 @@
   </main>
 </template>
 <script lang="ts" setup>
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { toTypedSchema } from "@vee-validate/zod";
 import { Field as VeeField, useForm } from "vee-validate";
 import { z } from "zod";
@@ -203,7 +203,7 @@ import { onPreviewDiscount } from "@/server/discount/preview.telefunc";
 import { onCreatePayment } from "@/server/payment/checkout.telefunc";
 import type { PaymentChannel, PaymentProviderKind } from "@/server/payment/registry";
 import type { Data } from "./+data.server";
-import { watch, onMounted } from "vue";
+
 
 function buyerFormStorageKey(productId: number | string, skuId: number | string) {
   return `cffk:buyer-form:${productId}:${skuId}`;
