@@ -63,11 +63,23 @@ export function normalizeCountry(code: string | null | undefined): string | null
  * Final consumption / tax residency:
  * prefer card issuing country (payment network evidence), else IP country.
  */
+/**
+ * 1) IP == MY 或 BIN(card) == MY → Tax_Residency = MY（本地应税）
+ * 2) 仅当 IP != MY 且 BIN != MY 且 IP === BIN → 记该国（如 AU）
+ * 3) 缺一边、或两边都非 MY 但不一致 → null（不记外国区，走出口/待补证据）
+ */
 export function resolveTaxResidency(
   ipCountry: string | null | undefined,
   cardCountry: string | null | undefined,
 ): string | null {
-  return normalizeCountry(cardCountry) || normalizeCountry(ipCountry);
+  const ip = normalizeCountry(ipCountry);
+  const bin = normalizeCountry(cardCountry);
+
+  if (ip === "MY" || bin === "MY") return "MY";
+
+  if (ip && bin && ip === bin) return ip;
+
+  return null;
 }
 
 export type TaxCalcInput = {
