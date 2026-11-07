@@ -203,6 +203,62 @@ import { onPreviewDiscount } from "@/server/discount/preview.telefunc";
 import { onCreatePayment } from "@/server/payment/checkout.telefunc";
 import type { PaymentChannel, PaymentProviderKind } from "@/server/payment/registry";
 import type { Data } from "./+data.server";
+import { watch, onMounted } from "vue";
+
+function buyerFormStorageKey(productId: number | string, skuId: number | string) {
+  return `cffk:buyer-form:${productId}:${skuId}`;
+}
+
+function loadSavedBuyerForm(productId: number | string, skuId: number | string) {
+  try {
+    const raw = localStorage.getItem(buyerFormStorageKey(productId, skuId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveBuyerForm(productId: number | string, skuId: number | string, values: Record<string, string>) {
+  try {
+    // 不存空值；可选：跳过 password 字段
+    const cleaned: Record<string, string> = {};
+    for (const [k, v] of Object.entries(values || {})) {
+      const t = String(v ?? "").trim();
+      if (t) cleaned[k] = t;
+    }
+    if (Object.keys(cleaned).length) {
+      localStorage.setItem(buyerFormStorageKey(productId, skuId), JSON.stringify(cleaned));
+    }
+  } catch {
+    /* private mode 等忽略 */
+  }
+}
+
+// 进入页面 / 切换 SKU 时预填
+watch(
+  selectedSkuId,
+  (skuId) => {
+    const productId = data.id; // 按你页面里的产品 id 字段改
+    const saved = loadSavedBuyerForm(productId, skuId);
+    formValues.value = { ...saved };
+  },
+  { immediate: true },
+);
+
+// 用户改表单时写入（可 debounce）
+watch(
+  formValues,
+  (v) => {
+    const productId = data.id;
+    saveBuyerForm(productId, selectedSkuId.value, v);
+  },
+  { deep: true },
+);
+
+// 下单成功后再存一次更稳（在 submit 成功回调里）
+// saveBuyerForm(data.id, selectedSkuId.value, formValues.value);
 const { messages, t } = useStorefrontPreferences();
 const data = useData<Data>();
 const coverLoaded = ref(false);
