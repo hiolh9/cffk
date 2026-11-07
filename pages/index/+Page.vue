@@ -43,7 +43,7 @@
       </nav>
     </header>
 
-    <!-- Hero: game art banners -->
+    <!-- Hero banners -->
     <section v-if="!isFiltering && bannerSlides.length" class="hero-band relative overflow-hidden" :aria-label="L('featured', 'Featured')">
       <div class="relative mx-auto max-w-[1280px] px-3 pb-3 pt-3 sm:pt-5">
         <div class="group relative -mx-3" @mouseenter="paused = true" @mouseleave="paused = false" @focusin="paused = true" @focusout="paused = false">
@@ -88,21 +88,10 @@
             </div>
           </template>
         </div>
-
-        <!-- How it works: a real sequence, so numbering is meaningful. No service promises. -->
-        <ol class="m-0 mt-3 grid list-none grid-cols-3 gap-2 p-0 sm:gap-3">
-          <li v-for="(step, i) in steps" :key="step.title" class="flex items-center gap-2 rounded-xl bg-card px-2.5 py-2 ring-1 ring-black/[0.05] dark:ring-white/10">
-            <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-bold text-white">{{ i + 1 }}</span>
-            <span class="min-w-0">
-              <span class="block truncate text-xs font-semibold sm:text-[13px]">{{ step.title }}</span>
-              <span class="hidden truncate text-[11px] text-muted-foreground sm:block">{{ step.sub }}</span>
-            </span>
-          </li>
-        </ol>
       </div>
     </section>
 
-    <div class="mx-auto w-full max-w-[1280px] flex-1 space-y-5 px-3 pb-10 pt-4">
+    <div class="mx-auto w-full max-w-[1280px] flex-1 space-y-8 px-3 pb-10 pt-5">
       <!-- Mobile search -->
       <div class="relative md:hidden">
         <SearchIcon class="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -115,60 +104,59 @@
         />
       </div>
 
-      <!-- Flash deals: one horizontal rail of the same tile used everywhere -->
-      <section v-if="!isFiltering && dealProducts.length" class="deal-panel relative overflow-hidden rounded-2xl p-3 shadow-lg sm:p-4">
-        <div class="relative mb-3 flex items-center justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-2.5">
-            <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/40">
-              <ZapIcon class="deal-bolt size-5 fill-yellow-300 text-yellow-300" />
-            </span>
-            <div class="min-w-0">
-              <h2 class="m-0 text-xl font-extrabold leading-tight text-white sm:text-2xl">{{ L("flashDeals", "Flash deals") }}</h2>
-              <p class="m-0 hidden truncate text-xs text-white/85 sm:block">{{ L("flashDealsSub", "Limited time only") }}</p>
-            </div>
+      <!-- Flash deals: title left, countdown and link right, horizontal cards below -->
+      <section v-if="!isFiltering && dealProducts.length" aria-labelledby="flash-title">
+        <div class="mb-3 flex items-end justify-between gap-3">
+          <div class="min-w-0">
+            <h2 id="flash-title" class="m-0 text-xl font-bold leading-tight">{{ L("flashDeals", "Flash deals") }}</h2>
+            <p class="m-0 mt-0.5 truncate text-xs text-muted-foreground">{{ L("flashDealsSub", "Limited time only") }}</p>
           </div>
-          <div class="flex shrink-0 items-center gap-2 text-xs text-white/90" role="timer" :aria-label="L('endsIn', 'Ends in')">
-            <span class="hidden sm:inline">{{ L("endsIn", "Ends in") }}</span>
-            <div class="flex items-center gap-1 font-mono text-sm font-bold tabular-nums">
-              <span class="min-w-8 rounded-lg bg-white px-1.5 py-1 text-center text-red-600 shadow-sm">{{ flashCountdown.h }}</span>
-              <span class="text-white">:</span>
-              <span class="min-w-8 rounded-lg bg-white px-1.5 py-1 text-center text-red-600 shadow-sm">{{ flashCountdown.m }}</span>
-              <span class="text-white">:</span>
-              <span class="min-w-8 rounded-lg bg-white px-1.5 py-1 text-center text-red-600 shadow-sm">{{ flashCountdown.s }}</span>
+          <div class="flex shrink-0 items-center gap-3">
+            <div class="flex items-center gap-1.5 text-xs text-muted-foreground" role="timer" :aria-label="L('endsIn', 'Ends in')">
+              <span class="hidden sm:inline">{{ L("endsIn", "Ends in") }}</span>
+              <div class="flex items-center gap-0.5 font-mono text-[13px] font-bold tabular-nums">
+                <span class="rounded-md bg-red-600 px-1.5 py-0.5 text-white">{{ flashCountdown.h }}</span>
+                <span class="text-red-600">:</span>
+                <span class="rounded-md bg-red-600 px-1.5 py-0.5 text-white">{{ flashCountdown.m }}</span>
+                <span class="text-red-600">:</span>
+                <span class="rounded-md bg-red-600 px-1.5 py-0.5 text-white">{{ flashCountdown.s }}</span>
+              </div>
             </div>
+            <a href="#all-products" class="hidden h-9 items-center gap-1 rounded-lg border border-border px-3 text-sm font-medium transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand sm:inline-flex">
+              {{ L("viewAll", "View all") }}<ChevronRightIcon class="size-4" />
+            </a>
           </div>
         </div>
-        <ul class="relative m-0 grid list-none auto-cols-[272px] grid-flow-col grid-rows-2 gap-2.5 overflow-x-auto p-0 pb-2 [scrollbar-width:none] sm:auto-cols-[288px] [&::-webkit-scrollbar]:hidden">
-          <li v-for="p in dealProducts" :key="'d' + p.id" class="snap-start">
+        <ul class="m-0 flex list-none snap-x gap-3 overflow-x-auto p-0 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <li v-for="p in dealProducts" :key="'d' + p.id" class="w-[250px] shrink-0 snap-start sm:w-[272px] lg:w-[calc((100%-48px)/5)]">
             <DealCard v-bind="tileProps(p)" />
           </li>
         </ul>
       </section>
 
-      <!-- Popular by category -->
-      <section v-for="col in shownColumns" :key="'col' + col.id" class="surface rounded-2xl bg-card p-3 ring-1 ring-black/[0.04] sm:p-4 dark:ring-white/10">
-        <div class="mb-1 flex items-center justify-between gap-2">
-          <h2 class="m-0 flex items-center gap-2 text-base font-bold">
-            <span class="h-4 w-1 shrink-0 rounded-full bg-brand" />
-            <span class="line-clamp-1">{{ col.title }}</span>
-          </h2>
-          <button v-if="col.id !== null" type="button" class="flex shrink-0 items-center rounded-md text-xs font-medium text-brand hover:underline focus-visible:ring-2 focus-visible:ring-brand" @click="openCategory(col.id)">
-            {{ L("viewAll", "View all") }}<ChevronRightIcon class="size-3.5" />
-          </button>
-        </div>
-        <ul class="m-0 flex list-none snap-x gap-1 overflow-x-auto p-0 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <li v-for="p in col.products" :key="'c' + p.id" class="w-[136px] shrink-0 snap-start sm:w-[160px]">
-            <ProductTile v-bind="tileProps(p)" />
-          </li>
-        </ul>
-      </section>
+      <!-- Popular by category: two panels per row, items laid out horizontally -->
+      <div v-if="shownColumns.length" class="grid gap-3 md:grid-cols-2">
+        <section v-for="col in shownColumns" :key="'col' + col.id" class="surface rounded-2xl bg-card p-4 ring-1 ring-black/[0.04] dark:ring-white/10">
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <h2 class="m-0 line-clamp-1 text-base font-bold">{{ col.title }}</h2>
+            <button v-if="col.id !== null" type="button" class="flex shrink-0 items-center rounded-md text-xs font-medium text-muted-foreground transition hover:text-brand focus-visible:ring-2 focus-visible:ring-brand" @click="openCategory(col.id)">
+              {{ L("viewAll", "View all") }}<ChevronRightIcon class="size-3.5" />
+            </button>
+          </div>
+          <ul class="m-0 grid list-none grid-cols-2 gap-x-2 gap-y-1 p-0 lg:grid-cols-3">
+            <li v-for="p in col.products" :key="'c' + p.id">
+              <ProductRow v-bind="tileProps(p)" compact />
+            </li>
+          </ul>
+        </section>
+      </div>
 
-      <!-- All games / search results -->
-      <section id="all-products" class="surface scroll-mt-28 rounded-2xl bg-card p-3 ring-1 ring-black/[0.04] sm:p-4 dark:ring-white/10">
-        <div class="mb-3 flex items-center justify-between gap-3">
-          <div class="flex min-w-0 items-baseline gap-2">
-            <h2 class="m-0 shrink-0 text-lg font-bold">{{ currentTitle }}</h2>
-            <span class="truncate text-xs text-muted-foreground">{{ t(messages.storefront.relatedProducts, { count: visibleProducts.length }) }}</span>
+      <!-- All products / search results: horizontal rows -->
+      <section id="all-products" class="scroll-mt-28">
+        <div class="mb-3 flex items-end justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="m-0 text-xl font-bold leading-tight">{{ currentTitle }}</h2>
+            <p class="m-0 mt-0.5 truncate text-xs text-muted-foreground">{{ t(messages.storefront.relatedProducts, { count: visibleProducts.length }) }}</p>
           </div>
           <div class="flex shrink-0 rounded-lg bg-muted p-0.5 text-xs" role="group" :aria-label="L('sortBy', 'Sort by')">
             <button v-for="s in sortOptions" :key="s.key" type="button" :class="sortClass(sort === s.key)" :aria-pressed="sort === s.key" @click="sort = s.key">
@@ -177,13 +165,13 @@
           </div>
         </div>
 
-        <ul v-if="sortedProducts.length" class="m-0 grid list-none grid-cols-3 gap-x-1 gap-y-3 p-0 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+        <ul v-if="sortedProducts.length" class="m-0 grid list-none grid-cols-1 gap-2.5 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <li v-for="p in sortedProducts" :key="p.id">
-            <ProductTile v-bind="tileProps(p)" />
+            <ProductRow v-bind="tileProps(p)" />
           </li>
         </ul>
 
-        <div v-else class="px-4 py-14 text-center">
+        <div v-else class="rounded-2xl bg-card px-4 py-14 text-center ring-1 ring-black/[0.05] dark:ring-white/10">
           <p class="m-0 text-sm text-muted-foreground">{{ messages.storefront.noProducts }}</p>
           <button v-if="isFiltering" type="button" class="mt-3 inline-flex items-center gap-1 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2" @click="clearFilters">
             <XIcon class="size-4" />{{ L("clearFilters", "Clear search and filters") }}
@@ -198,13 +186,13 @@
 
 <script lang="ts" setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { ChevronLeftIcon, ChevronRightIcon, MegaphoneIcon, SearchIcon, XIcon, ZapIcon } from "@lucide/vue";
+import { ChevronLeftIcon, ChevronRightIcon, MegaphoneIcon, SearchIcon, XIcon } from "@lucide/vue";
 import { useData } from "vike-vue/useData";
 import { usePageContext } from "vike-vue/usePageContext";
 import PublicNav from "@/components/storefront/PublicNav.vue";
 import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
 import StorefrontFooter from "@/components/storefront/StorefrontFooter.vue";
-import ProductTile from "@/components/storefront/ProductTile.vue";
+import ProductRow from "@/components/storefront/ProductRow.vue";
 import DealCard from "@/components/storefront/DealCard.vue";
 import { Input } from "@/components/ui/input";
 import type { Data } from "./+data.server";
@@ -236,8 +224,7 @@ const sort = ref<SortKey>("default");
  * isn't in your message files yet. Keys to add to every locale:
  *   flashDeals, flashDealsSub, endsIn, itemsLeft ("{count} left"), viewAll,
  *   hotProducts, sortPopular, sortPriceAsc, sortPriceDesc, sortBy, searchGames,
- *   categories, featured, clearFilters, searchResults, allGames,
- *   stepPick, stepPickSub, stepEnter, stepEnterSub, stepPay, stepPaySub
+ *   categories, featured, clearFilters, searchResults, allGames
  */
 function L(key: string, fallback: string): string {
   const sf = messages.value.storefront as unknown as Record<string, string | undefined>;
@@ -249,13 +236,6 @@ const sortOptions: { key: SortKey; labelKey: string; fallback: string }[] = [
   { key: "asc", labelKey: "sortPriceAsc", fallback: "Price ↑" },
   { key: "desc", labelKey: "sortPriceDesc", fallback: "Price ↓" },
 ];
-
-// Describes the ordering flow only; no delivery-time or support promises.
-const steps = computed(() => [
-  { title: L("stepPick", "Pick a game"), sub: L("stepPickSub", "Choose a top-up item") },
-  { title: L("stepEnter", "Enter details"), sub: L("stepEnterSub", "Add your account info") },
-  { title: L("stepPay", "Pay"), sub: L("stepPaySub", "Complete your order") },
-]);
 
 /* ---------- dominant colour of each cover image (computed in the browser) ---------- */
 // image url -> "#rrggbb", or "" when it could not be read (CORS / load error / blank image)
@@ -346,10 +326,10 @@ const dealProducts = computed(() => data.products.slice(0, 10));
 const featuredColumns = computed<{ id: number | null; title: string; products: Product[] }[]>(() => {
   const cols = data.categories
     .slice(0, 4)
-    .map((c) => ({ id: c.id as number | null, title: c.name, products: data.products.filter((p) => p.categoryId === c.id).slice(0, 10) }))
+    .map((c) => ({ id: c.id as number | null, title: c.name, products: data.products.filter((p) => p.categoryId === c.id).slice(0, 6) }))
     .filter((c) => c.products.length > 0);
   if (cols.length) return cols;
-  return data.products.length ? [{ id: null, title: L("hotProducts", "Hot products"), products: data.products.slice(0, 10) }] : [];
+  return data.products.length ? [{ id: null, title: L("hotProducts", "Hot products"), products: data.products.slice(0, 6) }] : [];
 });
 
 const shownColumns = computed(() => (isFiltering.value ? [] : featuredColumns.value));
@@ -363,7 +343,7 @@ function clearFilters() {
   selectedCategory.value = null;
 }
 
-/* ---------- tile props ---------- */
+/* ---------- card props ---------- */
 function dealBadge(product: Product) {
   const m = product.subtitle?.match(/(\d+)\s*%/);
   return m ? "-" + m[1] + "%" : null;
@@ -506,7 +486,7 @@ onMounted(() => {
     }, 5700);
   }
 
-  // sample colours for what is on screen first, then the grid
+  // sample colours for what is on screen first, then the full list
   ensureHues([
     ...dealProducts.value.map(imgOf),
     ...featuredColumns.value.flatMap((c) => c.products.map(imgOf)),
@@ -552,30 +532,5 @@ onBeforeUnmount(() => {
 }
 .dark .surface {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 30px -18px rgba(0, 0, 0, 0.7);
-}
-
-/* Flash-deal panel: the single loud block on the page. Everything else stays quiet. */
-.deal-panel {
-  background:
-    radial-gradient(60% 120% at 100% 0%, rgba(255, 214, 102, 0.45), transparent 60%),
-    radial-gradient(50% 100% at 0% 100%, rgba(255, 255, 255, 0.14), transparent 60%),
-    linear-gradient(105deg, #dc2626 0%, #ef4444 45%, #f97316 100%);
-}
-.dark .deal-panel {
-  background:
-    radial-gradient(60% 120% at 100% 0%, rgba(251, 146, 60, 0.35), transparent 60%),
-    linear-gradient(105deg, #991b1b 0%, #b91c1c 50%, #c2410c 100%);
-}
-
-/* The one moving accent: the flash-deal bolt */
-@keyframes deal-bolt {
-  0%, 100% { opacity: 1; }
-  45% { opacity: 0.5; }
-  50% { opacity: 1; }
-  58% { opacity: 0.6; }
-}
-.deal-bolt { animation: deal-bolt 1.8s steps(1) infinite; }
-@media (prefers-reduced-motion: reduce) {
-  .deal-bolt { animation: none; }
 }
 </style>
