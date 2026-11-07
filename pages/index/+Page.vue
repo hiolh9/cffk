@@ -116,31 +116,31 @@
       </div>
 
       <!-- Flash deals: one horizontal rail of the same tile used everywhere -->
-      <section v-if="!isFiltering && dealProducts.length" class="surface rounded-2xl bg-card p-3 ring-1 ring-black/[0.05] sm:p-4 dark:ring-white/10">
-        <div class="mb-2 flex items-center justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-2">
-            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-600 to-orange-500 text-white">
-              <ZapIcon class="deal-bolt size-4 fill-yellow-300 text-yellow-300" />
+      <section v-if="!isFiltering && dealProducts.length" class="deal-panel relative overflow-hidden rounded-2xl p-3 shadow-lg sm:p-4">
+        <div class="relative mb-3 flex items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-2.5">
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/40">
+              <ZapIcon class="deal-bolt size-5 fill-yellow-300 text-yellow-300" />
             </span>
             <div class="min-w-0">
-              <h2 class="m-0 text-base font-bold leading-tight">{{ L("flashDeals", "Flash deals") }}</h2>
-              <p class="m-0 hidden truncate text-xs text-muted-foreground sm:block">{{ L("flashDealsSub", "Limited time only") }}</p>
+              <h2 class="m-0 text-xl font-extrabold leading-tight text-white sm:text-2xl">{{ L("flashDeals", "Flash deals") }}</h2>
+              <p class="m-0 hidden truncate text-xs text-white/85 sm:block">{{ L("flashDealsSub", "Limited time only") }}</p>
             </div>
           </div>
-          <div class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground" role="timer" :aria-label="L('endsIn', 'Ends in')">
-            <span>{{ L("endsIn", "Ends in") }}</span>
-            <div class="flex items-center gap-0.5 font-mono text-[13px] font-bold tabular-nums">
-              <span class="rounded-md bg-foreground px-1.5 py-0.5 text-background">{{ flashCountdown.h }}</span>
-              <span>:</span>
-              <span class="rounded-md bg-foreground px-1.5 py-0.5 text-background">{{ flashCountdown.m }}</span>
-              <span>:</span>
-              <span class="rounded-md bg-foreground px-1.5 py-0.5 text-background">{{ flashCountdown.s }}</span>
+          <div class="flex shrink-0 items-center gap-2 text-xs text-white/90" role="timer" :aria-label="L('endsIn', 'Ends in')">
+            <span class="hidden sm:inline">{{ L("endsIn", "Ends in") }}</span>
+            <div class="flex items-center gap-1 font-mono text-sm font-bold tabular-nums">
+              <span class="min-w-8 rounded-lg bg-white px-1.5 py-1 text-center text-red-600 shadow-sm">{{ flashCountdown.h }}</span>
+              <span class="text-white">:</span>
+              <span class="min-w-8 rounded-lg bg-white px-1.5 py-1 text-center text-red-600 shadow-sm">{{ flashCountdown.m }}</span>
+              <span class="text-white">:</span>
+              <span class="min-w-8 rounded-lg bg-white px-1.5 py-1 text-center text-red-600 shadow-sm">{{ flashCountdown.s }}</span>
             </div>
           </div>
         </div>
-        <ul class="m-0 flex list-none snap-x gap-1 overflow-x-auto p-0 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <li v-for="p in dealProducts" :key="'d' + p.id" class="w-[136px] shrink-0 snap-start sm:w-[160px]">
-            <ProductTile v-bind="tileProps(p)" />
+        <ul class="relative m-0 grid list-none auto-cols-[272px] grid-flow-col grid-rows-2 gap-2.5 overflow-x-auto p-0 pb-2 [scrollbar-width:none] sm:auto-cols-[288px] [&::-webkit-scrollbar]:hidden">
+          <li v-for="p in dealProducts" :key="'d' + p.id" class="snap-start">
+            <DealCard v-bind="tileProps(p)" />
           </li>
         </ul>
       </section>
@@ -148,7 +148,10 @@
       <!-- Popular by category -->
       <section v-for="col in shownColumns" :key="'col' + col.id" class="surface rounded-2xl bg-card p-3 ring-1 ring-black/[0.04] sm:p-4 dark:ring-white/10">
         <div class="mb-1 flex items-center justify-between gap-2">
-          <h2 class="m-0 line-clamp-1 text-base font-bold">{{ col.title }}</h2>
+          <h2 class="m-0 flex items-center gap-2 text-base font-bold">
+            <span class="h-4 w-1 shrink-0 rounded-full bg-brand" />
+            <span class="line-clamp-1">{{ col.title }}</span>
+          </h2>
           <button v-if="col.id !== null" type="button" class="flex shrink-0 items-center rounded-md text-xs font-medium text-brand hover:underline focus-visible:ring-2 focus-visible:ring-brand" @click="openCategory(col.id)">
             {{ L("viewAll", "View all") }}<ChevronRightIcon class="size-3.5" />
           </button>
@@ -202,6 +205,7 @@ import PublicNav from "@/components/storefront/PublicNav.vue";
 import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
 import StorefrontFooter from "@/components/storefront/StorefrontFooter.vue";
 import ProductTile from "@/components/storefront/ProductTile.vue";
+import DealCard from "@/components/storefront/DealCard.vue";
 import { Input } from "@/components/ui/input";
 import type { Data } from "./+data.server";
 import { useStorefrontPreferences } from "@/lib/storefront-preferences";
@@ -548,6 +552,19 @@ onBeforeUnmount(() => {
 }
 .dark .surface {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 30px -18px rgba(0, 0, 0, 0.7);
+}
+
+/* Flash-deal panel: the single loud block on the page. Everything else stays quiet. */
+.deal-panel {
+  background:
+    radial-gradient(60% 120% at 100% 0%, rgba(255, 214, 102, 0.45), transparent 60%),
+    radial-gradient(50% 100% at 0% 100%, rgba(255, 255, 255, 0.14), transparent 60%),
+    linear-gradient(105deg, #dc2626 0%, #ef4444 45%, #f97316 100%);
+}
+.dark .deal-panel {
+  background:
+    radial-gradient(60% 120% at 100% 0%, rgba(251, 146, 60, 0.35), transparent 60%),
+    linear-gradient(105deg, #991b1b 0%, #b91c1c 50%, #c2410c 100%);
 }
 
 /* The one moving accent: the flash-deal bolt */
