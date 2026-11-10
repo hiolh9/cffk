@@ -48,6 +48,9 @@ export const productV2 = sqliteTable(
     customSchemaJson: text("customSchemaJson"),
     ratingValue: text("ratingValue"),
     reviewCount: integer("reviewCount"),
+    taxCategory: text("taxCategory", { enum: ["Digital_Goods", "Digital_Service"] })
+    .notNull()
+    .default("Digital_Goods"),
     createdAt,
     updatedAt,
   },
