@@ -370,6 +370,28 @@ Opening Balance,500.00
 (-) Platform / Membership Fees,50.00
 Closing Balance,650.00
 ```
+# 账目如何区分 + 证据待补
+
+## 两类产品
+| taxCategory | 例子 | MY SST 门槛 | 代收 SST |
+|-------------|------|-------------|----------|
+| Digital_Goods | TikTok 钻石等 | **不计入** 50 万服务门槛 | 永远 0 |
+| Digital_Service | 剪映会员等 | **仅 MY 本地** 计入门槛 | 超门槛后 MY 单可能 8% |
+
+## 每月导出三份（分开存文件夹）
+1. `sst-local-service-YYYY-MM.csv` — RMCD 服务应税监控
+2. `digital-goods-local-YYYY-MM.csv` — 本地商品转售（立场非 SST 应税供应）单独存档
+3. `export-all-YYYY-MM.csv` — 非 MY
+
+## 所得税 LHDN
+三行收入都进 P&L 收入侧：Local Service + Local Goods + Export。  
+SST_Amount 只做 **负债**，不进收入。
+
+## 证据待补（无 BIN / IP 冲突）
+本引擎对 SST：**缺失或冲突先按 MY**（偏保守，门槛不会少计）。  
+文件夹注明 `EVIDENCE_PENDING`，网关接入后用 BIN 重算或更正说明。  
+出口要稳：需要 IP 与 BIN 都非 MY 且一致。
+
 
 ### 禁止
 - 把平台费记进 COGS
