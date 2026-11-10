@@ -233,12 +233,27 @@ export async function confirmOrderPayment(database: D1Database, orderId: number)
     database.prepare("UPDATE `order` SET status = 'PAID', paymentStatus = 'PAID', paidAt = ?, updatedAt = ? WHERE id = ? AND status = 'PENDING' AND paymentStatus = 'UNPAID'").bind(now, now, orderId),
     database.prepare("INSERT INTO transactionGuard (id, value) VALUES (1, changes()) ON CONFLICT(id) DO UPDATE SET value = excluded.value"),
   );
+    try {
+    await database.batch(statements);
+  } catch {
+    const [current] = await db.select({ paymentStatus: order.paymentStatus }).from(order).where(eq(order.id, orderId)).limit(1);
+    if (current?.paymentStatus !== "PAID") return { outcome: "NOT_PAYABLE" };
+  }
+
+  // ↓↓↓ 在这里：batch 成功、订单已是 PAID 之后
   try {
     await applyTaxNexusToPaidOrder(database, orderId);
   } catch (e) {
     console.error("tax-nexus", e);
-    // 不阻断发货；税务字段可事后补
   }
+  try {
+    await applyProductTaxCategoryToPaidOrder(database, orderId);
+  } catch (e) {
+    console.error("tax-category", e);
+  }
+  // ↑↑↑
+
+  
   if (record.fulfillmentSource === "LOCAL" && (record.deliveryType === "CARD_AUTO" || record.deliveryType === "FIXED_CARD")) {
     statements.push(database.prepare("INSERT INTO automaticDeliveryJob (orderId, status, attemptCount, createdAt, updatedAt) SELECT id, 'PENDING', 0, ?, ? FROM `order` WHERE id = ? AND paymentStatus = 'PAID' ON CONFLICT(orderId) DO NOTHING").bind(now, now, orderId));
   }
