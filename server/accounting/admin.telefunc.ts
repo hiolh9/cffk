@@ -20,7 +20,8 @@ import {
   exportMonthlySupplierCogsCsv,
   formatWalletStatementText,
 } from "./supplier-wallet";
-
+import { applyTaxNexusToPaidOrder } from "@/server/tax/apply-tax-nexus";
+import { applyProductTaxCategoryToPaidOrder } from "@/server/tax/apply-tax-category";
 export const onListAccountingLedger = telefuncAction(async (input?: {
   startDate?: string;
   endDate?: string;
@@ -89,12 +90,15 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
   buyerNote?: string;
   validateFields?: Record<string, string>;
   skipValidate?: boolean;
+  /** 税务用：客户 IP/地区，默认 MY（后台本地单） */
+  customerIpCountry?: string | null;
+  cardIssuingCountry?: string | null;
 }) => {
   const { database, db, user, runtime } = requireAdmin();
   if (!input?.productSkuId || !input?.quantity || input.quantity < 1) appError("ORDER_INPUT_INVALID");
   const email = normalizeAdminContactEmail(input.contactEmail);
 
-  const [sku] = await db
+    const [sku] = await db
     .select({
       id: productSku.id,
       productId: productSku.productId,
@@ -104,6 +108,7 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
       fulfillmentSource: productSku.fulfillmentSource,
       fixedDeliveryContent: productSku.fixedDeliveryContent,
       productName: productV2.name,
+      taxCategory: productV2.taxCategory,
     })
     .from(productSku)
     .innerJoin(productV2, eq(productV2.id, productSku.productId))
@@ -119,7 +124,12 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
   const orderNo = await generateOrderNo(database);
   const invoiceNo = await allocateInvoiceNo(database);
   const now = new Date();
-
+  const productTaxCategory =
+    sku.taxCategory === "Digital_Service" ? "Digital_Service" : "Digital_Goods";
+  const ipCountry = (input.customerIpCountry || "MY").toUpperCase().slice(0, 2);
+  const cardCountry = input.cardIssuingCountry
+    ? String(input.cardIssuingCountry).toUpperCase().slice(0, 2)
+    : null;
   const [created] = await db
     .insert(order)
     .values({
@@ -148,23 +158,45 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
       paymentStatus: "PAID",
       deliveryStatus: "NOT_DELIVERED",
       paidAt: now,
+      productTaxCategory,
+      customerIpCountry: ipCountry,
+      cardIssuingCountry: cardCountry,
       createdAt: now,
       updatedAt: now,
     })
     .returning();
 
-  if (!created) appError("ORDER_CREATE_FAILED");
+    if (!created) appError("ORDER_CREATE_FAILED");
 
   await writeAuditLog(database, {
     actorUserId: user.id,
     action: "MANUAL_BANK_ORDER_CREATED",
     entityType: "order",
     entityId: String(created.id),
-    after: { orderNo, invoiceNo, amount, email },
+    after: { orderNo, invoiceNo, amount, email, productTaxCategory, ipCountry },
   });
+
+  // 与前台 confirmOrderPayment 一致：先税务，再发货
+  try {
+    await applyTaxNexusToPaidOrder(database, created.id, {
+      ipCountry,
+      cardCountry,
+    });
+  } catch (e) {
+    console.error("tax-nexus-manual", e);
+  }
+  try {
+    await applyProductTaxCategoryToPaidOrder(database, created.id, {
+      ipCountry,
+      cardCountry,
+    });
+  } catch (e) {
+    console.error("tax-category-manual", e);
+  }
 
   try {
     if ((sku.fulfillmentSource ?? "LOCAL") === "SUPPLIER") {
+      
       const supplierTask = await createSupplierOrder(database, created.id);
       if (supplierTask?.id) await processSupplierOrder(database, supplierTask.id, runtime);
     } else {
