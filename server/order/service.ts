@@ -18,7 +18,6 @@ import { createSupplierOrder } from "@/server/supplier/purchase";
 import { processSupplierOrder } from "@/server/supplier/process";
 import { assertSupplierSkuOrderable } from "@/server/supplier/eligibility";
 import { createObligationsForOrder } from "@/server/accounting/tax-service";
-import { applyTaxNexusToPaidOrder } from "@/server/tax/apply-tax-nexus";
 import { getContext } from "telefunc";
 import { applyTaxNexusToPaidOrder } from "@/server/tax/apply-tax-nexus";
 import { applyProductTaxCategoryToPaidOrder } from "@/server/tax/apply-tax-category";
