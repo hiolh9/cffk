@@ -116,7 +116,10 @@ export async function createOrder(database: D1Database, input: CreateOrderInput,
   const [item] = await db.select().from(productV2).where(and(eq(productV2.id, productId), eq(productV2.status, "ACTIVE"))).limit(1);
   if (!item) fail("PRODUCT_NOT_AVAILABLE");
   const sku = await getProductSku(db, item.id, positiveInteger(input.productSkuId, "PRODUCT_SKU_ID"));
-
+  const productTaxCategory =
+  (item as { taxCategory?: string }).taxCategory === "Digital_Service"
+    ? "Digital_Service"
+    : "Digital_Goods";
   const isSupplier = sku.fulfillmentSource === "SUPPLIER";
   if (isSupplier && sku.deliveryType !== "SUPPLIER") fail("SUPPLIER_FULFILLMENT_INVALID");
   if (!isSupplier && sku.deliveryType === "SUPPLIER") fail("PRODUCT_DELIVERY_TYPE_INVALID");
@@ -155,14 +158,38 @@ try {
   ipCountry = null;
 }
   const statements: D1PreparedStatement[] = [
-    database.prepare("INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, unitPrice, quantity, amount, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, customerIpCountry, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
-      orderNo, ownerUserId, item.id, sku.id, item.name, sku.name, sku.price, quantity, amount, input.contactType, contactValue,
-      input.contactType === "EMAIL" ? normalizeOrderEmail(contactValue) : null, input.buyerNote?.trim() || null,
-      addressSnapshotJson, input.paymentProvider, paymentChannel, sku.fulfillmentSource, sku.deliveryType,
-      sku.deliveryType === "FIXED_CARD" ? sku.fixedDeliveryContent!.trim() : null, reservePhysical ? 1 : 0,
-      discountId, discountCodeValue, discountId === null ? null : originalAmount, discountId === null ? null : discountAmount,
-      ipCountry, now, now,
-    ),
+    database.prepare(
+  "INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, unitPrice, quantity, amount, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, productTaxCategory, customerIpCountry, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+).bind(
+  orderNo,
+  ownerUserId,
+  item.id,
+  sku.id,
+  item.name,
+  sku.name,
+  sku.price,
+  quantity,
+  amount,
+  input.contactType,
+  contactValue,
+  input.contactType === "EMAIL" ? normalizeOrderEmail(contactValue) : null,
+  input.buyerNote?.trim() || null,
+  addressSnapshotJson,
+  input.paymentProvider,
+  paymentChannel,
+  sku.fulfillmentSource,
+  sku.deliveryType,
+  sku.deliveryType === "FIXED_CARD" ? sku.fixedDeliveryContent!.trim() : null,
+  reservePhysical ? 1 : 0,
+  discountId,
+  discountCodeValue,
+  discountId === null ? null : originalAmount,
+  discountId === null ? null : discountAmount,
+  productTaxCategory, // ← 新增
+  ipCountry,
+  now,
+  now,
+),
   ];
   if (reservePhysical) {
     statements.push(
