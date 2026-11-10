@@ -41,6 +41,8 @@ export const productFormSchema = z.object({
   ratingValue: z.string().trim().max(8),
   reviewCount: z.number().int().min(0).max(1_000_000),
   status: z.enum(productStatuses),
+  taxCategory: z.enum(["Digital_Goods", "Digital_Service"]),
+  
   sort: z.number().int().min(0),
 });
 
@@ -73,6 +75,8 @@ export function defaultProductForm(categoryId: number | null = null): ProductFor
     customSchemaJson: "",
     ratingValue: "",
     reviewCount: 0,
+   
+    taxCategory: "Digital_Goods",
     status: "DRAFT",
     sort: 0,
   };
@@ -108,6 +112,10 @@ export function productDetailToForm(item: ProductDetail["product"]): ProductForm
     customSchemaJson: p.customSchemaJson ?? "",
     ratingValue: item.ratingValue ?? "",
     reviewCount: item.reviewCount ?? 0,
+    taxCategory:
+      (item as { taxCategory?: string }).taxCategory === "Digital_Service"
+        ? "Digital_Service"
+        : "Digital_Goods",
     status: item.status,
     sort: item.sort,
   };
@@ -163,6 +171,7 @@ export function formToSaveInput(
     customSchemaJson: form.customSchemaJson || null,
     ratingValue: form.ratingValue,
     reviewCount: form.reviewCount,
+    taxCategory: form.taxCategory,
     status: form.status,
     sort: form.sort,
     deliveryType,
