@@ -168,6 +168,21 @@
                           <SelectItem value="INACTIVE">停用</SelectItem>
                         </SelectContent>
                       </Select>
+                  <label class="text-sm font-medium">税务分类（SST）</label>
+<VeeField name="taxCategory">
+  <Select v-model="taxCategory">
+    <SelectTrigger class="w-full">
+      <SelectValue placeholder="选择税务分类" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="Digital_Goods">Digital_Goods（数字商品，如钻石充值，不进 SST 服务门槛）</SelectItem>
+      <SelectItem value="Digital_Service">Digital_Service（数字服务，如剪映会员，MY 计入 SST 门槛）</SelectItem>
+    </SelectContent>
+  </Select>
+</VeeField>
+<p class="text-xs text-muted-foreground">
+  钻石等选 Goods；软件会员选 Service。仅影响马来西亚 SST 口径，所得税收入仍按订单记账。
+</p>
                     </td>
                     <td class="whitespace-nowrap p-3">
                       <div class="flex gap-2">
@@ -376,7 +391,10 @@ const editing = computed(() => Boolean(props.productId));
 const isSupplierProduct = computed(
   () => skuDrafts.value.length > 0 && skuDrafts.value.every((sku) => sku.fulfillmentSource === "SUPPLIER"),
 );
-
+const taxCategory = computed({
+  get: () => values.taxCategory,
+  set: (value) => setFieldValue("taxCategory", value as ProductForm["taxCategory"]),
+});
 const status = computed({
   get: () => values.status,
   set: (value) => setFieldValue("status", value as ProductForm["status"]),
