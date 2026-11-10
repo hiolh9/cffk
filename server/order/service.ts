@@ -20,6 +20,8 @@ import { assertSupplierSkuOrderable } from "@/server/supplier/eligibility";
 import { createObligationsForOrder } from "@/server/accounting/tax-service";
 import { applyTaxNexusToPaidOrder } from "@/server/tax/apply-tax-nexus";
 import { getContext } from "telefunc";
+import { applyTaxNexusToPaidOrder } from "@/server/tax/apply-tax-nexus";
+import { applyProductTaxCategoryToPaidOrder } from "@/server/tax/apply-tax-category";
 const DELIVERY_LEASE_MS = 5 * 60 * 1000;
 
 type ContactType = "EMAIL" | "QQ" | "TELEGRAM" | "OTHER";
