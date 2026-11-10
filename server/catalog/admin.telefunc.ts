@@ -218,6 +218,7 @@ async function internalOnSaveProduct(input: {
   seoDescriptionEn?: string | null;
   seoKeywords?: string | null;
   customSchemaJson?: string | null;
+  
   status: ProductStatus;
   sort: number;
   skus: ProductSkuInput[];
@@ -301,6 +302,8 @@ async function internalOnSaveProduct(input: {
     customSchemaJson: input.customSchemaJson != null && String(input.customSchemaJson).trim()
       ? String(input.customSchemaJson).slice(0, 50_000)
       : null,
+    taxCategory:
+      input.taxCategory === "Digital_Service" ? "Digital_Service" : "Digital_Goods",
     status: input.status,
     sort: nonNegativeInteger(input.sort, "PRODUCT_SORT_INVALID"),
     updatedAt: new Date(),
