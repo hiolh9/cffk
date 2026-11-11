@@ -1,4 +1,5 @@
-import { and, desc, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, gt, lt, or, sql } from "drizzle-orm";
+import { order } from "@/database/drizzle/schema";
 import { createDrizzleDb } from "@/database/drizzle";
 import { auditLog } from "@/database/drizzle/schema-accounting";
 import {
@@ -219,6 +220,74 @@ export async function buildMonthlyExportPack(
       content: "Order_ID,Date,Product_Desc,Deduction_Amount_MYR,COGS_Source\n",
     });
   }
+    // —— 13 当月退款 / 部分退款清单（解释银行进账 vs 报表收入差额）——
+  const refundRows = await db
+    .select({
+      orderNo: order.orderNo,
+      invoiceNo: order.invoiceNo,
+      paidAt: order.paidAt,
+      refundedAt: order.refundedAt,
+      refundAmountCents: order.refundAmountCents,
+      refundReason: order.refundReason,
+      paymentStatus: order.paymentStatus,
+      amount: order.amount,
+      buyerNote: order.buyerNote,
+      productTaxCategory: order.productTaxCategory,
+      taxResidencyRegion: order.taxResidencyRegion,
+    })
+    .from(order)
+    .where(
+      and(
+        gt(order.refundAmountCents, 0),
+        or(
+          and(gte(order.refundedAt, from), lt(order.refundedAt, to)),
+          // refundedAt 为空时，用 paidAt 落在当月且已有退款金额（兜底）
+          and(
+            sql`${order.refundedAt} IS NULL`,
+            gte(order.paidAt, from),
+            lt(order.paidAt, to),
+          ),
+        ),
+      ),
+    )
+    .orderBy(order.refundedAt, order.orderNo);
+
+  const refundCsv = toCsv(
+    [
+      "Order_ID",
+      "Invoice",
+      "Paid_At",
+      "Refunded_At",
+      "Refund_Amount_MYR",
+      "Order_Gross_Cents",
+      "Payment_Status",
+      "Refund_Reason",
+      "Gateway_Refund_Ref",
+      "Buyer_Note",
+      "Product_Tax_Category",
+      "Tax_Residency",
+    ],
+    refundRows.map((r) => [
+      r.orderNo,
+      r.invoiceNo ?? "",
+      r.paidAt ? new Date(r.paidAt).toISOString() : "",
+      r.refundedAt ? new Date(r.refundedAt).toISOString() : "",
+      ((r.refundAmountCents ?? 0) / 100).toFixed(2),
+      r.amount ?? 0,
+      r.paymentStatus ?? "",
+      r.refundReason ?? "",
+      "", // 网关退款流水号：有字段后再映射；可暂写在 Refund_Reason
+      r.buyerNote ?? "",
+      r.productTaxCategory ?? "",
+      r.taxResidencyRegion ?? "",
+    ]),
+  );
+
+  files.push({
+    filename: `${prefix}-13_refunds.csv`,
+    rowCount: refundRows.length,
+    content: refundCsv,
+  });
   const manifest = [
     `Sparkpay Monthly Accounting Pack`,
     `Period: ${yearMonth}`,
@@ -236,10 +305,11 @@ export async function buildMonthlyExportPack(
     `- Owner_Drawing and Prepayment never enter P&L.`,
     `- Revenue uses monthly average FX locked at transaction date.`,
     `- Realised FX uses settlement date bank receipt.`,
-        `- 09 SST service local = Digital_Service + taxResidency MY only (SST threshold).`,
+    `- 09 SST service local = Digital_Service + taxResidency MY only (SST threshold).`,
     `- 10 Digital goods local = Digital_Goods + MY (archive separately; not SST service base).`,
     `- 11 Export with productTaxCategory (non-MY).`,
     `- 12 Supplier prepaid COGS deductions for the month.`,
+    `- 13 Refunds: refundAmountCents > 0 in month (supports bank vs revenue reconciliation).`,
   ].join("\n");
 
   files.unshift({
