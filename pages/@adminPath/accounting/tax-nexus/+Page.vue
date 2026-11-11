@@ -5,11 +5,26 @@
       滚动 12 个月税务国别分流。判定：IP 或发卡国任一为 MY → 本地应税；仅当 IP 与 BIN 均非 MY 且一致时记入他国；否则不记外国区（出口/待补证据）。
     </p>
 
-    <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2">
       <Button variant="outline" :disabled="loading" @click="load">刷新看板</Button>
       <Input v-model="yearMonth" class="w-36" placeholder="2026-11" />
-      <Button variant="outline" :disabled="loading" @click="exportLocal">导出大马本地 CSV</Button>
+      <Button variant="outline" :disabled="loading" @click="exportLocal">导出大马本地(全部) CSV</Button>
       <Button variant="outline" :disabled="loading" @click="exportExempt">导出出口免税 CSV</Button>
+    </div>
+
+    <div class="flex flex-wrap gap-2 rounded-xl border bg-muted/30 p-3">
+      <p class="w-full text-xs text-muted-foreground">
+        按商品税务分类（需订单已有 productTaxCategory）：SST 只用 Service；Goods 单独存档。
+      </p>
+      <Button variant="secondary" :disabled="loading" @click="exportSstService">
+        导出 SST服务本地 CSV
+      </Button>
+      <Button variant="secondary" :disabled="loading" @click="exportDigitalGoods">
+        导出数字商品本地 CSV
+      </Button>
+      <Button variant="secondary" :disabled="loading" @click="exportCategoryExempt">
+        导出出口(含分类) CSV
+      </Button>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -61,7 +76,14 @@ import {
   onExportMyLocalSalesCsv,
   onExportExemptSalesCsv,
 } from "@/server/tax/nexus.admin.telefunc";
-
+import {
+  onGetTaxNexusDashboard,
+  onExportMyLocalSalesCsv,
+  onExportExemptSalesCsv,
+  onExportSstLocalServiceCsv,
+  onExportDigitalGoodsLocalCsv,
+  onExportCategoryExemptCsv,
+} from "@/server/tax/nexus.admin.telefunc";
 type Row = {
   region: string;
   grossMyrApprox: number;
@@ -111,6 +133,25 @@ async function exportExempt() {
   download(`export-exempt-${yearMonth.value}.csv`, res.csv || "");
   toast.success("已导出出口免税证明");
 }
+async function exportSstService() {
+  const ym = yearMonth.value.trim();
+  const res = (await runTelefunc(() => onExportSstLocalServiceCsv({ yearMonth: ym }))) as { csv?: string };
+  download(`sst-local-service-${ym}.csv`, res.csv || "");
+  toast.success("已导出 SST 服务本地（Digital_Service + MY）");
+}
 
+async function exportDigitalGoods() {
+  const ym = yearMonth.value.trim();
+  const res = (await runTelefunc(() => onExportDigitalGoodsLocalCsv({ yearMonth: ym }))) as { csv?: string };
+  download(`digital-goods-local-${ym}.csv`, res.csv || "");
+  toast.success("已导出数字商品本地（Digital_Goods + MY）");
+}
+
+async function exportCategoryExempt() {
+  const ym = yearMonth.value.trim();
+  const res = (await runTelefunc(() => onExportCategoryExemptCsv({ yearMonth: ym }))) as { csv?: string };
+  download(`export-with-category-${ym}.csv`, res.csv || "");
+  toast.success("已导出出口订单（含商品税务分类）");
+}
 onMounted(load);
 </script>
