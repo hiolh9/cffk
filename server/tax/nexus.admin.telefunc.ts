@@ -4,7 +4,11 @@ import { requireAdmin } from "@/server/telefunc-context";
 import { appError } from "@/lib/app-error";
 import { DEFAULT_NEXUS_RULES, evaluateTaxForNewOrder, sumRolling12mGrossMyr } from "./nexus-engine";
 import { exportExemptOrdersCsv, exportMyLocalSalesCsv, rolling12mByRegion } from "./nexus-reports";
-
+import {
+  exportSSTLocalServiceSales,
+  exportDigitalGoodsLocalSales,
+  exportExportExemptAll,
+} from "./category-reports";
 export const onGetTaxNexusDashboard = telefuncAction(async () => {
   const { database } = requireAdmin();
   const rows = await rolling12mByRegion(database);
@@ -44,4 +48,24 @@ export const onPreviewOrderTax = telefuncAction(async (input: {
 }) => {
   const { database } = requireAdmin();
   return evaluateTaxForNewOrder(database, input);
+});
+/** MY + Digital_Service only（SST / RMCD 服务口径） */
+export const onExportSstLocalServiceCsv = telefuncAction(async (input: { yearMonth: string }) => {
+  const { database } = requireAdmin();
+  if (!/^\d{4}-\d{2}$/.test(input?.yearMonth || "")) appError("DATE_INVALID");
+  return { csv: await exportSSTLocalServiceSales(database, input.yearMonth) };
+});
+
+/** MY + Digital_Goods（商品转售单独存档，不进 SST 服务门槛） */
+export const onExportDigitalGoodsLocalCsv = telefuncAction(async (input: { yearMonth: string }) => {
+  const { database } = requireAdmin();
+  if (!/^\d{4}-\d{2}$/.test(input?.yearMonth || "")) appError("DATE_INVALID");
+  return { csv: await exportDigitalGoodsLocalSales(database, input.yearMonth) };
+});
+
+/** 非 MY，保留 productTaxCategory */
+export const onExportCategoryExemptCsv = telefuncAction(async (input: { yearMonth: string }) => {
+  const { database } = requireAdmin();
+  if (!/^\d{4}-\d{2}$/.test(input?.yearMonth || "")) appError("DATE_INVALID");
+  return { csv: await exportExportExemptAll(database, input.yearMonth) };
 });
