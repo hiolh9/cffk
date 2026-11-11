@@ -11,7 +11,12 @@ import {
   fxMonthlyRate,
 } from "@/database/drizzle/schema-settlement";
 import { computeMonthlyPnL, pnlToCsv } from "./pnl";
-
+import {
+  exportSSTLocalServiceSales,
+  exportDigitalGoodsLocalSales,
+  exportExportExemptAll,
+} from "@/server/tax/category-reports";
+import { exportMonthlySupplierCogsCsv } from "@/server/accounting/supplier-wallet";
 function monthBounds(yearMonth: string): { from: Date; to: Date } {
   const [y, m] = yearMonth.split("-").map(Number);
   if (!y || !m || m < 1 || m > 12) throw new Error("YEAR_MONTH_INVALID");
@@ -172,7 +177,48 @@ export async function buildMonthlyExportPack(
   });
 
   const [snap] = await db.select().from(acctPnLSnapshot).where(sql`${acctPnLSnapshot.yearMonth} = ${yearMonth}`).limit(1);
+    // —— 税务：Goods / Service / 出口（同一 yearMonth）——
+  const sstServiceCsv = await exportSSTLocalServiceSales(database, yearMonth);
+  const sstServiceRows = Math.max(0, sstServiceCsv.split("\n").length - 1);
+  files.push({
+    filename: `${prefix}-09_tax_sst_local_service.csv`,
+    rowCount: sstServiceRows,
+    content: sstServiceCsv,
+  });
 
+  const goodsLocalCsv = await exportDigitalGoodsLocalSales(database, yearMonth);
+  const goodsLocalRows = Math.max(0, goodsLocalCsv.split("\n").length - 1);
+  files.push({
+    filename: `${prefix}-10_tax_digital_goods_local.csv`,
+    rowCount: goodsLocalRows,
+    content: goodsLocalCsv,
+  });
+
+  const exportCatCsv = await exportExportExemptAll(database, yearMonth);
+  const exportCatRows = Math.max(0, exportCatCsv.split("\n").length - 1);
+  files.push({
+    filename: `${prefix}-11_tax_export_with_category.csv`,
+    rowCount: exportCatRows,
+    content: exportCatCsv,
+  });
+
+  // —— 供应商预存款 COGS（无数据时仍给空表头文件，方便归档习惯）——
+  try {
+    const cogsCsv = await exportMonthlySupplierCogsCsv(database, yearMonth);
+    const cogsRows = Math.max(0, cogsCsv.split("\n").filter((l) => l.trim()).length - 1);
+    files.push({
+      filename: `${prefix}-12_supplier_cogs_prepaid.csv`,
+      rowCount: cogsRows,
+      content: cogsCsv,
+    });
+  } catch (e) {
+    console.error("monthly-pack-cogs", e);
+    files.push({
+      filename: `${prefix}-12_supplier_cogs_prepaid.csv`,
+      rowCount: 0,
+      content: "Order_ID,Date,Product_Desc,Deduction_Amount_MYR,COGS_Source\n",
+    });
+  }
   const manifest = [
     `Sparkpay Monthly Accounting Pack`,
     `Period: ${yearMonth}`,
@@ -190,6 +236,10 @@ export async function buildMonthlyExportPack(
     `- Owner_Drawing and Prepayment never enter P&L.`,
     `- Revenue uses monthly average FX locked at transaction date.`,
     `- Realised FX uses settlement date bank receipt.`,
+        `- 09 SST service local = Digital_Service + taxResidency MY only (SST threshold).`,
+    `- 10 Digital goods local = Digital_Goods + MY (archive separately; not SST service base).`,
+    `- 11 Export with productTaxCategory (non-MY).`,
+    `- 12 Supplier prepaid COGS deductions for the month.`,
   ].join("\n");
 
   files.unshift({
