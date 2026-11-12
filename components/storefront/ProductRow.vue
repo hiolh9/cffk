@@ -1,47 +1,59 @@
 <template>
+  <!-- Full row: a deep, icon-coloured card. Compact row: a calm list item for use inside panels. -->
   <a
     :href="href"
-    class="row group flex items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-brand"
-    :class="[compact ? 'row-compact rounded-xl p-1.5' : 'row-full rounded-2xl p-3', hue ? 'has-hue' : '']"
+    class="row group outline-none"
+    :class="[
+      compact
+        ? 'row-compact flex items-center gap-3 rounded-xl p-2 focus-visible:ring-2 focus-visible:ring-brand'
+        : 'row-full relative flex items-center gap-3 rounded-2xl p-2.5 text-white sm:gap-3.5 sm:p-3 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+      hue ? 'has-hue' : '',
+      soldOut ? 'is-sold' : '',
+    ]"
     :style="hue ? { '--hue': hue } : undefined"
   >
     <div
-      class="icon relative shrink-0 overflow-hidden bg-muted"
-      :class="compact ? 'size-12 rounded-xl' : 'size-[68px] rounded-2xl sm:size-[76px]'"
+      class="icon relative shrink-0 overflow-hidden bg-black/20"
+      :class="compact ? 'size-12 rounded-xl' : 'size-16 rounded-2xl sm:size-20 sm:rounded-[18px]'"
     >
       <img
         :src="image"
         :alt="name"
         class="size-full object-cover"
-        :class="soldOut ? 'opacity-50 grayscale' : ''"
+        :class="soldOut ? 'opacity-60 grayscale' : ''"
         loading="lazy"
-        :width="compact ? 48 : 76"
-        :height="compact ? 48 : 76"
+        :width="compact ? 48 : 80"
+        :height="compact ? 48 : 80"
       />
     </div>
 
-    <div class="min-w-0 flex-1">
-      <h3 class="line-clamp-2 font-semibold leading-snug" :class="compact ? 'text-[13px]' : 'text-sm'">{{ name }}</h3>
-      <p v-if="subtitle && !compact" class="m-0 mt-0.5 line-clamp-1 text-xs text-foreground/65">{{ subtitle }}</p>
-
-      <div v-if="compact" class="mt-1 flex flex-wrap items-center gap-x-2 text-xs">
-        <span class="font-bold tabular-nums"><span class="mr-px text-[10px] font-semibold text-foreground/60">RM</span>{{ price }}</span>
-        <span v-if="soldOut" class="font-medium text-red-500">{{ stockLabel }}</span>
+    <!-- Compact -->
+    <div v-if="compact" class="min-w-0 flex-1">
+      <h3 class="line-clamp-2 text-sm font-semibold leading-snug">{{ name }}</h3>
+      <p class="m-0 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+        <span class="font-bold tabular-nums"><span class="mr-0.5 text-[10px] font-semibold text-muted-foreground">RM</span>{{ price }}</span>
+        <span v-if="badge" class="rounded bg-red-600 px-1 py-0.5 text-[10px] font-bold leading-none text-white">{{ badge }}</span>
+        <span v-if="soldOut" class="font-medium text-muted-foreground">{{ stockLabel }}</span>
         <span v-else-if="lowStock" class="font-medium text-red-500">{{ lowStockLabel }}</span>
-      </div>
-
-      <div v-else class="mt-2 flex items-center justify-between gap-2">
-        <span class="price rounded-lg px-2 py-1 text-[13px] font-bold leading-none tabular-nums">
-          <span class="mr-px text-[10px] font-semibold opacity-70">RM</span>{{ price }}
-        </span>
-        <span v-if="soldOut" class="text-xs font-semibold text-red-500">{{ stockLabel }}</span>
-        <span v-else-if="badge" class="rounded-md bg-red-600 px-1.5 py-1 text-[11px] font-bold leading-none text-white shadow-sm">{{ badge }}</span>
-        <span v-else-if="lowStock" class="text-xs font-semibold text-red-500">{{ lowStockLabel }}</span>
-        <span v-else-if="stockLabel" class="truncate text-[11px] text-foreground/60">{{ stockLabel }}</span>
-      </div>
+      </p>
     </div>
 
-    <span v-if="badge && compact" class="shrink-0 self-start rounded-md bg-red-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">{{ badge }}</span>
+    <!-- Full -->
+    <div v-else class="flex min-w-0 flex-1 flex-col justify-between self-stretch py-0.5">
+      <div>
+        <h3 class="line-clamp-2 text-sm font-semibold leading-snug">{{ name }}</h3>
+        <p v-if="subtitle" class="m-0 mt-0.5 line-clamp-1 text-xs text-white/70">{{ subtitle }}</p>
+      </div>
+      <div class="mt-2 flex items-end justify-between gap-2">
+        <span class="text-[17px] font-extrabold leading-none tabular-nums">
+          <span class="mr-0.5 text-[11px] font-semibold text-white/70">RM</span>{{ price }}
+        </span>
+        <span v-if="soldOut" class="text-[11px] font-semibold text-white/70">{{ stockLabel }}</span>
+        <span v-else-if="badge" class="rounded-md bg-white px-1.5 py-1 text-[11px] font-extrabold leading-none text-red-600 shadow-sm">{{ badge }}</span>
+        <span v-else-if="lowStock" class="text-[11px] font-bold text-amber-200">{{ lowStockLabel }}</span>
+        <span v-else-if="stockLabel" class="truncate text-[11px] text-white/60">{{ stockLabel }}</span>
+      </div>
+    </div>
   </a>
 </template>
 
@@ -65,80 +77,69 @@ defineProps<{
 
 <style scoped>
 /*
- * Smoothness rules used here:
- *  - Gradients can't be transitioned, so the colour wash lives on ::before and FADES in by opacity
- *    when the icon colour arrives (no sudden colour pop).
- *  - The hover shadow lives on ::after and fades by opacity (no box-shadow repaint animation).
- *  - Only transform and opacity are ever animated; hover effects only on devices that can hover.
+ * Colour recipe (works in light AND dark themes, so no theme selectors are needed):
+ * the card is always a deep shade of the icon's colour with white text. A neutral slate card shows first and the
+ * coloured layer fades in over it once the icon colour is known. Only transform/opacity animate.
  */
 .row {
-  --h: var(--hue, #94a3b8);
-  --base: #ffffff;
-  --strong: 44%;
-  --soft: 18%;
-  position: relative;
-  isolation: isolate;
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  --h: var(--hue, #64748b);
+  --deep: color-mix(in oklab, var(--h) 38%, #070a12);
+  --mid: color-mix(in oklab, var(--h) 62%, #070a12);
   -webkit-tap-highlight-color: transparent;
 }
-:global(.dark) .row {
-  --base: #141925;
-  --strong: 52%;
-  --soft: 22%;
+.row img {
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
 }
-.row::before,
-.row::after {
+
+/* ---------- full ---------- */
+.row-full {
+  isolation: isolate;
+  background: linear-gradient(115deg, #2c3446, #161b27);
+  box-shadow: 0 10px 22px -16px rgb(8 12 24 / 0.7);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.row-full::before,
+.row-full::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
 }
-.row::before {
+.row-full::before {
   z-index: -1;
-  background: linear-gradient(115deg, color-mix(in srgb, var(--h) var(--strong), var(--base)) 0%, color-mix(in srgb, var(--h) var(--soft), var(--base)) 100%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--h) 45%, transparent);
+  background:
+    radial-gradient(90% 150% at 0% 0%, rgb(255 255 255 / 0.2), transparent 62%),
+    linear-gradient(115deg, var(--mid), var(--deep));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
   opacity: 0;
   transition: opacity 0.7s ease;
 }
-.row.has-hue::before {
+.row-full.has-hue::before {
   opacity: 1;
 }
-.row::after {
+.row-full::after {
   z-index: -2;
-  box-shadow: 0 16px 26px -14px color-mix(in srgb, var(--h) 90%, transparent);
+  box-shadow: 0 20px 32px -14px color-mix(in oklab, var(--h) 75%, transparent);
   opacity: 0;
   transition: opacity 0.35s ease;
 }
-
-.row-full {
-  background-color: var(--base);
-  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.2);
-}
 .row-full .icon {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55), 0 8px 16px -8px color-mix(in srgb, var(--h) 90%, #000);
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.28), 0 10px 18px -8px rgb(0 0 0 / 0.55);
 }
-:global(.dark) .row-full .icon {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18), 0 8px 16px -8px rgba(0, 0, 0, 0.7);
-}
-.price {
-  background: color-mix(in srgb, var(--h) 30%, var(--base));
+.row-full.is-sold {
+  filter: saturate(0.3) brightness(0.9);
 }
 
-/* Compact rows: lighter wash, no lift */
+/* ---------- compact ---------- */
 .row-compact {
-  --strong: 18%;
-  --soft: 8%;
+  transition: background-color 0.25s ease;
 }
-.row-compact::before {
-  box-shadow: none;
+.row-compact .icon {
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.06), 0 6px 14px -6px color-mix(in oklab, var(--h) 75%, transparent);
 }
-.row-compact::after {
-  display: none;
-}
-
-.row img {
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+.row-compact.is-sold {
+  opacity: 0.6;
 }
 
 @media (hover: hover) {
@@ -149,11 +150,10 @@ defineProps<{
     opacity: 1;
   }
   .row:hover img {
-    transform: scale(1.06);
+    transform: scale(1.07);
   }
-  .row-compact:hover::before {
-    --strong: 30%;
-    --soft: 16%;
+  .row-compact:hover {
+    background-color: color-mix(in oklab, var(--h) 13%, transparent);
   }
 }
 .row-full:active {
@@ -162,9 +162,10 @@ defineProps<{
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .row,
-  .row::before,
-  .row::after,
+  .row-full,
+  .row-full::before,
+  .row-full::after,
+  .row-compact,
   .row img {
     transition: none;
   }
