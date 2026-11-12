@@ -13,7 +13,14 @@
         <label class="grid gap-1 text-sm">日期<input v-model="topup.date" type="date" class="h-9 rounded-md border px-2" /></label>
         <label class="grid gap-1 text-sm">金额 MYR<input v-model.number="topup.amount" type="number" step="0.01" class="h-9 rounded-md border px-2" /></label>
         <label class="grid gap-1 text-sm sm:col-span-2">Invoice #<input v-model="topup.invoice" class="h-9 rounded-md border px-2" placeholder="Invoice #12345" /></label>
-        <label class="grid gap-1 text-sm">供应商<input v-model="topup.supplier" class="h-9 rounded-md border px-2" placeholder="moogold" /></label>
+        <label class="grid gap-1 text-sm">
+          供应商
+          <select v-model="topup.supplier" class="h-9 rounded-md border bg-background px-2">
+            <option v-for="s in supplierOptions" :key="s.key" :value="s.key">
+              {{ s.label }} ({{ s.key }})
+            </option>
+          </select>
+        </label>
       </div>
       <button type="button" class="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white" :disabled="busy" @click="saveTopup">保存充值</button>
     </section>
@@ -23,6 +30,14 @@
       <div class="grid gap-2 sm:grid-cols-2">
         <label class="grid gap-1 text-sm">日期<input v-model="fee.date" type="date" class="h-9 rounded-md border px-2" /></label>
         <label class="grid gap-1 text-sm">金额 MYR<input v-model.number="fee.amount" type="number" step="0.01" class="h-9 rounded-md border px-2" /></label>
+        <label class="grid gap-1 text-sm">
+          供应商
+          <select v-model="fee.supplier" class="h-9 rounded-md border bg-background px-2">
+            <option v-for="s in supplierOptions" :key="s.key" :value="s.key">
+              {{ s.label }} ({{ s.key }})
+            </option>
+          </select>
+        </label>
         <label class="grid gap-1 text-sm sm:col-span-2">备注<input v-model="fee.note" class="h-9 rounded-md border px-2" placeholder="Monthly membership" /></label>
       </div>
       <button type="button" class="rounded-lg border px-3 py-2 text-sm font-medium" :disabled="busy" @click="saveFee">保存平台费</button>
@@ -33,7 +48,14 @@
       <div class="grid gap-2 sm:grid-cols-3">
         <label class="grid gap-1 text-sm">月份<input v-model="stmt.ym" type="month" class="h-9 rounded-md border px-2" /></label>
         <label class="grid gap-1 text-sm">期初余额<input v-model.number="stmt.opening" type="number" step="0.01" class="h-9 rounded-md border px-2" /></label>
-        <label class="grid gap-1 text-sm">供应商<input v-model="stmt.supplier" class="h-9 rounded-md border px-2" /></label>
+        <label class="grid gap-1 text-sm">
+          供应商
+          <select v-model="stmt.supplier" class="h-9 rounded-md border bg-background px-2">
+            <option v-for="s in supplierOptions" :key="s.key" :value="s.key">
+              {{ s.label }} ({{ s.key }})
+            </option>
+          </select>
+        </label>
       </div>
       <div class="flex flex-wrap gap-2">
         <button type="button" class="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white" :disabled="busy" @click="loadStmt">生成对账单</button>
@@ -45,7 +67,7 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from "vue";
+import { reactive, ref, onMounted } from "vue";
 import { toast } from "vue-sonner";
 import { runTelefunc } from "@/lib/telefunc-client";
 import {
@@ -54,15 +76,58 @@ import {
   onGetSupplierWalletStatement,
   onExportSupplierCogsCsv,
 } from "@/server/accounting/admin.telefunc";
+import { onListSupplierAccounts } from "@/server/supplier/admin.telefunc";
 
 const busy = ref(false);
 const stmtText = ref("");
+
+type SupplierOption = { key: string; label: string };
+const supplierOptions = ref<SupplierOption[]>([]);
+
 const topup = reactive({ date: new Date().toISOString().slice(0, 10), amount: 0, invoice: "", supplier: "moogold" });
 const fee = reactive({ date: new Date().toISOString().slice(0, 10), amount: 0, note: "Monthly membership fee", supplier: "moogold" });
 const stmt = reactive({
   ym: new Date().toISOString().slice(0, 7),
   opening: 0,
   supplier: "moogold",
+});
+
+async function loadSuppliers() {
+  try {
+    const res = await runTelefunc(() => onListSupplierAccounts({}));
+    const list = 
+      (res as { items?: Array<{ provider?: string; name?: string; enabled?: boolean }> })?.items ??
+      (res as { accounts?: Array<{ provider?: string; name?: string; enabled?: boolean }> })?.accounts ??
+      (Array.isArray(res) ? res : []);
+
+    const map = new Map<string, string>();
+    for (const a of list) {
+      if (a.enabled === false) continue;
+      const key = String(a.provider || "").trim().toLowerCase();
+      if (!key) continue;
+      if (!map.has(key)) {
+        map.set(key, a.name?.trim() || key);
+      }
+    }
+
+    if (map.size > 0) {
+      supplierOptions.value = [...map.entries()].map(([key, label]) => ({ key, label }));
+    } else {
+      supplierOptions.value = [{ key: "moogold", label: "MooGold" }];
+    }
+
+    // 确保默认选中的 key 在列表内，不在则兜底选第一项
+    const firstKey = supplierOptions.value[0].key;
+    if (!supplierOptions.value.some(s => s.key === topup.supplier)) topup.supplier = firstKey;
+    if (!supplierOptions.value.some(s => s.key === fee.supplier)) fee.supplier = firstKey;
+    if (!supplierOptions.value.some(s => s.key === stmt.supplier)) stmt.supplier = firstKey;
+  } catch {
+    supplierOptions.value = [{ key: "moogold", label: "MooGold" }];
+  }
+}
+
+onMounted(() => {
+  loadSuppliers();
 });
 
 async function saveTopup() {
@@ -91,7 +156,7 @@ async function saveFee() {
         onRecordSupplierPlatformFee({
           entryDate: fee.date,
           amountMyr: fee.amount,
-          supplierKey: "moogold",
+          supplierKey: fee.supplier,
           description: fee.note,
         }),
       { successMessage: "平台费已记入 GL (Expense)" },
