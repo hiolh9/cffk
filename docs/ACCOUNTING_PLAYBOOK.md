@@ -3,8 +3,9 @@
 > 币种主账本：MYR。外币销售按「交易日月度平均汇率」确认收入；网关打款按「结算日」记已实现汇兑损益。
 > 原则：**不删订单，只改状态；每笔改动留 auditLog。**
 
-【分】订单金额、SKU 价、开单 amountCents、退款 cents、手续费 cents
-【元】General Ledger amountMyr、结算到账、P&L、COGS 录入 cogsAmountMyr、
+>【分】订单金额、SKU 价、开单 amountCents、退款 cents、手续费 cents
+
+>【元】General Ledger amountMyr、结算到账、P&L、COGS 录入 cogsAmountMyr、
      供应商充值 amountMyr、会计 sales/settlement 各 *Myr 字段
 ---
 
