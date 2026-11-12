@@ -1,35 +1,43 @@
 <template>
   <a
     :href="href"
-    class="deal group flex h-full flex-col outline-none focus-visible:ring-2 focus-visible:ring-brand"
-    :class="hue ? 'has-hue' : ''"
+    class="deal group relative flex h-full flex-col gap-3.5 rounded-3xl p-4 text-white outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    :class="[hue ? 'has-hue' : '', soldOut ? 'is-sold' : '']"
     :style="hue ? { '--hue': hue } : undefined"
   >
-    <div class="flex items-center gap-3 p-3">
-      <div class="icon size-16 shrink-0 overflow-hidden rounded-2xl bg-muted">
+    <div class="flex items-center gap-3.5">
+      <div class="icon size-[76px] shrink-0 overflow-hidden rounded-[20px] bg-black/20">
         <img
           :src="image"
           :alt="name"
           class="size-full object-cover"
-          :class="soldOut ? 'opacity-50 grayscale' : ''"
+          :class="soldOut ? 'opacity-60 grayscale' : ''"
           loading="lazy"
-          width="64"
-          height="64"
+          width="76"
+          height="76"
         />
       </div>
       <div class="min-w-0 flex-1">
-        <h3 class="line-clamp-1 text-sm font-semibold">{{ name }}</h3>
-        <p v-if="subtitle" class="m-0 mt-0.5 line-clamp-1 text-xs text-foreground/65">{{ subtitle }}</p>
+        <h3 class="line-clamp-2 text-[15px] font-bold leading-snug">{{ name }}</h3>
+        <p v-if="subtitle" class="m-0 mt-1 line-clamp-1 text-xs text-white/70">{{ subtitle }}</p>
       </div>
     </div>
 
-    <div class="mt-auto flex items-center justify-between gap-2 px-3 pb-3">
-      <span class="price rounded-lg px-2 py-1 text-[13px] font-bold leading-none tabular-nums">
-        <span class="mr-px text-[10px] font-semibold opacity-70">RM</span>{{ price }}
-      </span>
-      <span v-if="soldOut" class="text-xs font-semibold text-red-500">{{ stockLabel }}</span>
-      <span v-else-if="badge" class="rounded-md bg-red-600 px-2 py-1 text-xs font-bold leading-none text-white shadow-sm">{{ badge }}</span>
-      <span v-else-if="lowStock" class="text-xs font-semibold text-red-500">{{ lowStockLabel }}</span>
+    <div class="mt-auto">
+      <div class="flex items-end justify-between gap-2">
+        <span class="text-[26px] font-black leading-none tabular-nums">
+          <span class="mr-0.5 text-sm font-semibold text-white/70">RM</span>{{ price }}
+        </span>
+        <span v-if="soldOut" class="text-xs font-semibold text-white/70">{{ stockLabel }}</span>
+        <span v-else-if="badge" class="rounded-lg bg-white px-2 py-1 text-[13px] font-extrabold leading-none text-red-600 shadow-sm">{{ badge }}</span>
+      </div>
+
+      <div v-if="lowStock && !soldOut" class="mt-3 flex items-center gap-2">
+        <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-black/30">
+          <div class="h-full rounded-full bg-amber-300" :style="{ width: Math.max(12, ((stock ?? 0) / 20) * 100) + '%' }" />
+        </div>
+        <span class="shrink-0 text-[11px] font-bold text-amber-200">{{ lowStockLabel }}</span>
+      </div>
     </div>
   </a>
 </template>
@@ -52,20 +60,16 @@ defineProps<{
 </script>
 
 <style scoped>
-/* Same recipe as the list rows: colour wash fades in, hover shadow fades, only transform/opacity animate. */
+/* Same recipe as the product rows, a step richer: deep icon-coloured card, white text, colour fades in. */
 .deal {
-  --h: var(--hue, #94a3b8);
-  --base: #ffffff;
-  position: relative;
+  --h: var(--hue, #64748b);
+  --deep: color-mix(in oklab, var(--h) 34%, #070a12);
+  --mid: color-mix(in oklab, var(--h) 68%, #070a12);
   isolation: isolate;
-  border-radius: 1rem;
-  background-color: var(--base);
-  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.2);
+  background: linear-gradient(125deg, #2c3446, #161b27);
+  box-shadow: 0 14px 28px -18px rgb(8 12 24 / 0.75);
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   -webkit-tap-highlight-color: transparent;
-}
-:global(.dark) .deal {
-  --base: #141925;
 }
 .deal::before,
 .deal::after {
@@ -77,44 +81,40 @@ defineProps<{
 }
 .deal::before {
   z-index: -1;
-  background: linear-gradient(125deg, color-mix(in srgb, var(--h) 46%, var(--base)) 0%, color-mix(in srgb, var(--h) 18%, var(--base)) 100%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--h) 45%, transparent);
+  background:
+    radial-gradient(80% 110% at 0% 0%, rgb(255 255 255 / 0.24), transparent 60%),
+    linear-gradient(125deg, var(--mid), var(--deep));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16);
   opacity: 0;
   transition: opacity 0.7s ease;
-}
-:global(.dark) .deal::before {
-  background: linear-gradient(125deg, color-mix(in srgb, var(--h) 54%, var(--base)) 0%, color-mix(in srgb, var(--h) 22%, var(--base)) 100%);
 }
 .deal.has-hue::before {
   opacity: 1;
 }
 .deal::after {
   z-index: -2;
-  box-shadow: 0 16px 26px -14px color-mix(in srgb, var(--h) 90%, transparent);
+  box-shadow: 0 24px 36px -16px color-mix(in oklab, var(--h) 80%, transparent);
   opacity: 0;
   transition: opacity 0.35s ease;
 }
 .deal .icon {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55), 0 8px 16px -8px color-mix(in srgb, var(--h) 90%, #000);
-}
-:global(.dark) .deal .icon {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18), 0 8px 16px -8px rgba(0, 0, 0, 0.7);
-}
-.price {
-  background: color-mix(in srgb, var(--h) 30%, var(--base));
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.3), 0 12px 20px -8px rgb(0 0 0 / 0.55);
 }
 .deal img {
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+}
+.deal.is-sold {
+  filter: saturate(0.3) brightness(0.9);
 }
 @media (hover: hover) {
   .deal:hover {
-    transform: translateY(-3px);
+    transform: translateY(-4px);
   }
   .deal:hover::after {
     opacity: 1;
   }
   .deal:hover img {
-    transform: scale(1.06);
+    transform: scale(1.07);
   }
 }
 .deal:active {
