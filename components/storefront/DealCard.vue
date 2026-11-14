@@ -5,6 +5,8 @@
     :class="[hue ? 'has-hue' : '', soldOut ? 'is-sold' : '']"
     :style="hue ? { '--hue': hue } : undefined"
   >
+    <span class="art" aria-hidden="true"><img :src="image" alt="" /></span>
+    <span class="sheen" aria-hidden="true"><i /></span>
     <div class="flex items-center gap-3.5">
       <div class="icon size-[76px] shrink-0 overflow-hidden rounded-[20px] bg-black/20">
         <img
@@ -113,10 +115,59 @@ defineProps<{
   .deal:hover::after {
     opacity: 1;
   }
-  .deal:hover img {
+  .deal:hover .icon img {
     transform: scale(1.07);
   }
 }
+/* Blurred copy of the game icon glows behind the card: gives every card its own texture and keeps working
+   even when the icon colour cannot be read. Fades out toward the text. */
+.art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 80%);
+  mask-image: linear-gradient(90deg, #000 0%, transparent 80%);
+}
+.art img {
+  position: absolute;
+  left: -8%;
+  top: -35%;
+  width: 62%;
+  height: 170%;
+  max-width: none;
+  object-fit: cover;
+  filter: blur(18px) saturate(1.7);
+  transform: scale(1.15);
+}
+/* One light sweep on hover; transform only. */
+.sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sheen i {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 36%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.2), transparent);
+  transform: translateX(-150%) skewX(-18deg);
+}
+@media (hover: hover) {
+    .deal:hover .sheen i {
+    transform: translateX(400%) skewX(-18deg);
+    transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
 .deal:active {
   transform: scale(0.985);
   transition-duration: 0.12s;
@@ -131,6 +182,9 @@ defineProps<{
   .deal:hover,
   .deal:active {
     transform: none;
+  }
+  .sheen {
+    display: none;
   }
 }
 </style>
