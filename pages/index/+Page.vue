@@ -43,10 +43,10 @@
       </nav>
     </header>
 
-    <!-- Hero stage: the page's backdrop takes the colours of whichever banner is showing -->
+    <!-- Stage: banners and flash deals share one dark backdrop that takes the colours of the banner on show -->
     <Transition name="fade-up">
-      <section v-if="!isFiltering && bannerSlides.length" class="stage relative isolate overflow-hidden" :aria-label="L('featured', 'Featured')">
-        <div class="hero-ambient absolute -inset-12 -z-20" aria-hidden="true">
+      <div v-if="showStage" class="stage relative isolate overflow-hidden bg-[#070a12]">
+        <div v-if="bannerSlides.length" class="hero-ambient absolute -inset-12 -z-20" aria-hidden="true">
           <img
             v-for="(slide, i) in bannerSlides"
             :key="'amb' + slide.id"
@@ -57,54 +57,88 @@
           />
         </div>
         <div class="absolute inset-0 -z-10 bg-[#070a12]/60" aria-hidden="true" />
-        <div class="stage-fade pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-28" aria-hidden="true" />
+        <div class="stage-fade pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-24" aria-hidden="true" />
 
-        <div class="relative mx-auto max-w-[1280px] px-3 pb-9 pt-5 sm:pt-7">
-          <div class="group relative -mx-3" @mouseenter="paused = true" @mouseleave="paused = false" @focusin="paused = true" @focusout="paused = false">
-            <div
-              ref="slidesEl"
-              class="relative flex snap-x snap-mandatory gap-3.5 overflow-x-auto scroll-smooth px-[7%] py-2 sm:px-[11%] lg:px-[calc(50%-500px)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              @scroll.passive="onBannerScroll"
-            >
-              <a
-                v-for="(slide, i) in bannerSlides"
-                :key="slide.id"
-                :href="slide.href"
-                class="relative h-40 w-[86%] shrink-0 snap-center overflow-hidden rounded-3xl bg-white/10 shadow-[0_24px_50px_-20px_rgba(0,0,0,0.8)] ring-1 ring-white/15 outline-none transition-[opacity,transform] duration-500 ease-out focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-[78%] lg:h-[200px] lg:w-[1000px]"
-                :class="i === bannerIndex ? 'scale-100 opacity-100' : 'scale-[0.96] opacity-55'"
-                :tabindex="i === bannerIndex ? 0 : -1"
+        <div class="relative mx-auto max-w-[1280px] px-3 pb-20 pt-5 sm:pt-7">
+          <!-- Banners -->
+          <section v-if="bannerSlides.length" :aria-label="L('featured', 'Featured')">
+            <div class="group relative -mx-3" @mouseenter="paused = true" @mouseleave="paused = false" @focusin="paused = true" @focusout="paused = false">
+              <div
+                ref="slidesEl"
+                class="relative flex snap-x snap-mandatory gap-3.5 overflow-x-auto scroll-smooth px-[7%] py-2 sm:px-[11%] lg:px-[calc(50%-500px)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                @scroll.passive="onBannerScroll"
               >
-                <img :src="slide.image" :alt="slide.title" class="size-full object-cover" :loading="i === 0 ? 'eager' : 'lazy'" />
-                <div v-if="slide.title" class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent px-5 pb-4 pt-16">
-                  <h2 class="m-0 line-clamp-1 text-base font-extrabold tracking-tight text-white sm:text-2xl">{{ slide.title }}</h2>
-                  <p v-if="slide.subtitle" class="m-0 mt-0.5 line-clamp-1 text-xs text-white/80 sm:text-sm">{{ slide.subtitle }}</p>
-                </div>
-              </a>
-            </div>
-            <template v-if="bannerSlides.length > 1">
-              <button type="button" class="absolute left-3 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65 focus-visible:ring-2 focus-visible:ring-white sm:flex lg:left-[calc(50%-548px)]" aria-label="Previous banner" @click.prevent="nextBanner(-1)">
-                <ChevronLeftIcon class="size-5" />
-              </button>
-              <button type="button" class="absolute right-3 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65 focus-visible:ring-2 focus-visible:ring-white sm:flex lg:right-[calc(50%-548px)]" aria-label="Next banner" @click.prevent="nextBanner(1)">
-                <ChevronRightIcon class="size-5" />
-              </button>
-              <div class="mt-3 flex justify-center">
-                <button
-                  v-for="(_, i) in bannerSlides"
-                  :key="i"
-                  type="button"
-                  class="flex h-4 items-center px-1"
-                  :aria-label="'Banner ' + (i + 1)"
-                  :aria-current="i === bannerIndex"
-                  @click.prevent="goTo(i)"
+                <a
+                  v-for="(slide, i) in bannerSlides"
+                  :key="slide.id"
+                  :href="slide.href"
+                  class="relative h-40 w-[86%] shrink-0 snap-center overflow-hidden rounded-3xl bg-white/10 shadow-[0_24px_50px_-20px_rgba(0,0,0,0.8)] ring-1 ring-white/15 outline-none transition-[opacity,transform] duration-500 ease-out focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-[78%] lg:h-[200px] lg:w-[1000px]"
+                  :class="i === bannerIndex ? 'scale-100 opacity-100' : 'scale-[0.96] opacity-55'"
+                  :tabindex="i === bannerIndex ? 0 : -1"
                 >
-                  <span class="block h-1.5 rounded-full transition-all duration-300" :class="i === bannerIndex ? 'w-7 bg-white' : 'w-1.5 bg-white/40'" />
-                </button>
+                  <img :src="slide.image" :alt="slide.title" class="size-full object-cover" :loading="i === 0 ? 'eager' : 'lazy'" />
+                  <div v-if="slide.title" class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent px-5 pb-4 pt-16">
+                    <h2 class="m-0 line-clamp-1 text-base font-extrabold tracking-tight text-white sm:text-2xl">{{ slide.title }}</h2>
+                    <p v-if="slide.subtitle" class="m-0 mt-0.5 line-clamp-1 text-xs text-white/80 sm:text-sm">{{ slide.subtitle }}</p>
+                  </div>
+                </a>
               </div>
-            </template>
-          </div>
+              <template v-if="bannerSlides.length > 1">
+                <button type="button" class="absolute left-3 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65 focus-visible:ring-2 focus-visible:ring-white sm:flex lg:left-[calc(50%-548px)]" aria-label="Previous banner" @click.prevent="nextBanner(-1)">
+                  <ChevronLeftIcon class="size-5" />
+                </button>
+                <button type="button" class="absolute right-3 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/65 focus-visible:ring-2 focus-visible:ring-white sm:flex lg:right-[calc(50%-548px)]" aria-label="Next banner" @click.prevent="nextBanner(1)">
+                  <ChevronRightIcon class="size-5" />
+                </button>
+                <div class="mt-3 flex justify-center">
+                  <button
+                    v-for="(_, i) in bannerSlides"
+                    :key="i"
+                    type="button"
+                    class="flex h-4 items-center px-1"
+                    :aria-label="'Banner ' + (i + 1)"
+                    :aria-current="i === bannerIndex"
+                    @click.prevent="goTo(i)"
+                  >
+                    <span class="block h-1.5 rounded-full transition-all duration-300" :class="i === bannerIndex ? 'w-7 bg-white' : 'w-1.5 bg-white/40'" />
+                  </button>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <!-- Flash deals -->
+          <section v-if="dealProducts.length" class="relative" :class="bannerSlides.length ? 'mt-9' : ''" aria-labelledby="flash-title">
+            <div class="pointer-events-none absolute -left-20 -top-16 size-72 rounded-full bg-orange-500/25 blur-3xl" aria-hidden="true" />
+            <div class="relative mb-3.5 flex items-end justify-between gap-3">
+              <div class="min-w-0">
+                <h2 id="flash-title" class="m-0 text-2xl font-extrabold leading-tight tracking-tight text-white">{{ L("flashDeals", "Flash deals") }}</h2>
+                <p class="m-0 mt-0.5 truncate text-sm text-white/65">{{ L("flashDealsSub", "Limited time only") }}</p>
+              </div>
+              <div class="flex shrink-0 items-center gap-3">
+                <div class="flex items-center gap-2 text-xs text-white/70" role="timer" :aria-label="L('endsIn', 'Ends in')">
+                  <span class="hidden sm:inline">{{ L("endsIn", "Ends in") }}</span>
+                  <div class="flex items-center gap-1 font-mono text-sm font-bold tabular-nums">
+                    <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.h }}</span>
+                    <span class="text-red-400">:</span>
+                    <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.m }}</span>
+                    <span class="text-red-400">:</span>
+                    <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.s }}</span>
+                  </div>
+                </div>
+                <a href="#all-products" class="hidden h-9 items-center gap-1 rounded-full border border-white/20 bg-white/10 px-4 text-sm font-medium text-white backdrop-blur transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white sm:inline-flex">
+                  {{ L("viewAll", "View all") }}<ChevronRightIcon class="size-4" />
+                </a>
+              </div>
+            </div>
+            <ul class="relative m-0 -mx-3 -mb-6 flex list-none scroll-pl-3 snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-10 pt-2 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+              <li v-for="p in dealProducts" :key="'d' + p.id" class="w-[276px] shrink-0 snap-start sm:w-[300px] lg:w-[calc((100%-36px)/4)]">
+                <DealCard v-bind="tileProps(p)" />
+              </li>
+            </ul>
+          </section>
         </div>
-      </section>
+      </div>
     </Transition>
 
     <div class="mx-auto w-full max-w-[1280px] flex-1 space-y-8 px-3 pb-12 pt-4">
@@ -119,38 +153,6 @@
           :aria-label="messages.storefront.searchProducts"
         />
       </div>
-
-      <!-- Flash deals -->
-      <Transition name="fade-up">
-        <section v-if="!isFiltering && dealProducts.length" aria-labelledby="flash-title">
-          <div class="mb-3.5 flex items-end justify-between gap-3">
-            <div class="min-w-0">
-              <h2 id="flash-title" class="m-0 text-2xl font-extrabold leading-tight tracking-tight">{{ L("flashDeals", "Flash deals") }}</h2>
-              <p class="m-0 mt-0.5 truncate text-sm text-muted-foreground">{{ L("flashDealsSub", "Limited time only") }}</p>
-            </div>
-            <div class="flex shrink-0 items-center gap-3">
-              <div class="flex items-center gap-2 text-xs text-muted-foreground" role="timer" :aria-label="L('endsIn', 'Ends in')">
-                <span class="hidden sm:inline">{{ L("endsIn", "Ends in") }}</span>
-                <div class="flex items-center gap-1 font-mono text-sm font-bold tabular-nums">
-                  <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.h }}</span>
-                  <span class="text-red-600">:</span>
-                  <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.m }}</span>
-                  <span class="text-red-600">:</span>
-                  <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.s }}</span>
-                </div>
-              </div>
-              <a href="#all-products" class="hidden h-9 items-center gap-1 rounded-full border border-border bg-card px-4 text-sm font-medium transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand sm:inline-flex">
-                {{ L("viewAll", "View all") }}<ChevronRightIcon class="size-4" />
-              </a>
-            </div>
-          </div>
-          <ul class="m-0 -mx-3 flex list-none scroll-pl-3 snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-10 pt-2 -mb-6 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
-            <li v-for="p in dealProducts" :key="'d' + p.id" class="w-[276px] shrink-0 snap-start sm:w-[300px] lg:w-[calc((100%-36px)/4)]">
-              <DealCard v-bind="tileProps(p)" />
-            </li>
-          </ul>
-        </section>
-      </Transition>
 
       <!-- Popular by category: calm lists, two panels per row -->
       <Transition name="fade-up">
@@ -381,6 +383,7 @@ const featuredColumns = computed<{ id: number | null; title: string; products: P
   return data.products.length ? [{ id: null, title: L("hotProducts", "Hot products"), products: data.products.slice(0, 6) }] : [];
 });
 
+const showStage = computed(() => !isFiltering.value && (bannerSlides.value.length > 0 || dealProducts.value.length > 0));
 const shownColumns = computed(() => (isFiltering.value ? [] : featuredColumns.value));
 
 function openCategory(id: number) {
