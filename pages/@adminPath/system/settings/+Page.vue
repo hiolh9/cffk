@@ -549,13 +549,24 @@ const saveSettings = handleSubmit(async (values) => {
   loading.value = true;
   error.value = null;
   try {
+    const {
+      maxOrderAmountRm,
+      maxDailyUserAmountRm,
+      newAccountMaxOrderRm,
+      ...rest
+    } = values;
+
     const payload = {
-      ...values,
-      maxOrderAmountCents: Math.round(Number(values.maxOrderAmountRm) * 100),
-      maxDailyUserAmountCents: Math.round(Number(values.maxDailyUserAmountRm) * 100),
-      newAccountMaxOrderCents: Math.round(Number(values.newAccountMaxOrderRm) * 100),
+      ...rest,
+      maxOrderAmountCents: Math.round(Number(maxOrderAmountRm) * 100),
+      maxDailyUserAmountCents: Math.round(Number(maxDailyUserAmountRm) * 100),
+      newAccountMaxOrderCents: Math.round(Number(newAccountMaxOrderRm) * 100),
     };
-    const settings = await runTelefunc(() => onSaveSiteSettings(payload as any), { successMessage: "站点设置已保存。" });
+
+    const settings = await runTelefunc(
+      () => onSaveSiteSettings(payload as any),
+      { successMessage: "站点设置已保存。" },
+    );
     resetForm({ values: toFormValues(settings) });
   } catch {
     // runTelefunc 已显示脱敏后的错误提示。
