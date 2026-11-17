@@ -39,6 +39,8 @@ export type CreateOrderInput = {
   address?: PaymentAddressInput;
   discountCode?: string;
   allowPendingPayment?: boolean;
+  /** 结账展示/收款币种，如 MYR、USD；默认 MYR */
+  currency?: string;
 };
 
 export type CreatedOrder = {
@@ -147,12 +149,10 @@ export async function createOrder(database: D1Database, input: CreateOrderInput,
   const now = Date.now();
   const amount = Math.max(0, originalAmount - discountAmount);
   if (amount > 0 && input.allowPendingPayment === false) fail("PAYMENT_ADAPTER_NOT_AVAILABLE");
-  const orderCurrency = (
-    (input as { currency?: string }).currency ||
-    "MYR"
-  )
+    const orderCurrency = (input.currency || "MYR")
     .toUpperCase()
-    .slice(0, 3);
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 3) || "MYR";
   const orderNo = generateOrderNo();
   const paymentChannel = normalizePaymentChannel(input.paymentProvider, input.paymentChannel);
   let ipCountry: string | null = null;
