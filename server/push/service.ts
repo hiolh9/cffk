@@ -466,13 +466,95 @@ export function orderQueryUrl(siteUrl: string | null | undefined, orderNo: strin
   return `${base}${path}?${query.toString()}`;
 }
 
+function formatMoneyMinor(amountMinor: number, currency: string) {
+  const code = (currency || "MYR").toUpperCase();
+  const major = (Number(amountMinor) || 0) / 100;
+  try {
+    return new Intl.NumberFormat("en-MY", {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(major);
+  } catch {
+    return `${code} ${major.toFixed(2)}`;
+  }
+}
+
 export async function orderPushVariables(database: D1Database, orderId: number) {
   const db = createDrizzleDb(database);
   const [[record], [settings], deliveries] = await Promise.all([
-    db.select({ orderNo: order.orderNo, ownerUserId: order.ownerUserId, contactEmail: order.contactValue, productName: order.productNameSnapshot, quantity: order.quantity, amount: order.amount, buyerNote: order.buyerNote }).from(order).where(eq(order.id, orderId)).limit(1),
-    db.select({ siteName: siteSetting.siteName, siteUrl: siteSetting.siteUrl, footerText: siteSetting.footerText, supportContact: siteSetting.supportContact }).from(siteSetting).where(eq(siteSetting.id, 1)).limit(1),
-    db.select({ contentSnapshot: orderDelivery.contentSnapshot }).from(orderDelivery).where(and(eq(orderDelivery.orderId, orderId), eq(orderDelivery.status, "SUCCESS"))),
+    db
+      .select({
+        orderNo: order.orderNo,
+        ownerUserId: order.ownerUserId,
+        contactEmail: order.contactValue,
+        productName: order.productNameSnapshot,
+        quantity: order.quantity,
+        amount: order.amount,
+        currency: order.currency,
+        buyerNote: order.buyerNote,
+        fulfillmentSourceSnapshot: order.fulfillmentSourceSnapshot,
+        deliveryStatus: order.deliveryStatus,
+        paymentStatus: order.paymentStatus,
+      })
+      .from(order)
+      .where(eq(order.id, orderId))
+      .limit(1),
+    db
+      .select({
+        siteName: siteSetting.siteName,
+        siteUrl: siteSetting.siteUrl,
+        footerText: siteSetting.footerText,
+        supportContact: siteSetting.supportContact,
+      })
+      .from(siteSetting)
+      .where(eq(siteSetting.id, 1))
+      .limit(1),
+    db
+      .select({ contentSnapshot: orderDelivery.contentSnapshot })
+      .from(orderDelivery)
+      .where(and(eq(orderDelivery.orderId, orderId), eq(orderDelivery.status, "SUCCESS"))),
   ]);
   if (!record) return null;
-  return { siteName: settings?.siteName || "CFFK", orderNo: record.orderNo, contactEmail: record.contactEmail || "未提供", productName: record.productName, quantity: record.quantity, amount: new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY" }).format(record.amount / 100), buyerNote: record.buyerNote || "无", deliveryItems: deliveryItemsFromSnapshots(deliveries.flatMap((item) => item.contentSnapshot ? [item.contentSnapshot] : [])), queryUrl: orderQueryUrl(settings?.siteUrl, record.orderNo, record.ownerUserId), footerText: settings?.footerText || "", supportContact: settings?.supportContact || "" };
+
+  const currency = (record.currency || "MYR").toUpperCase();
+  const amountFormatted = formatMoneyMinor(record.amount, currency);
+  const snapshots = deliveries.flatMap((item) =>
+    item.contentSnapshot ? [item.contentSnapshot] : [],
+  );
+  let deliveryItems = deliveryItemsFromSnapshots(snapshots);
+
+  // API / 供应商发货：本地无卡密快照时给可读说明
+  if (
+    (!snapshots.length || deliveryItems === "暂无发货内容") &&
+    (record.fulfillmentSourceSnapshot === "SUPPLIER" ||
+      record.fulfillmentSourceSnapshot === "API")
+  ) {
+    if (record.deliveryStatus === "DELIVERED" || record.deliveryStatus === "SUCCESS") {
+      deliveryItems =
+        "Your order has been submitted to the provider for fulfillment. Please check your game/account. If nothing arrives within the stated time, contact support with your order number.";
+    } else {
+      deliveryItems =
+        "Fulfillment is in progress. You will receive another notice when delivery completes.";
+    }
+  }
+
+  return {
+    siteName: settings?.siteName || "Sparkpay",
+    orderNo: record.orderNo,
+    contactEmail: record.contactEmail || "未提供",
+    productName: record.productName,
+    quantity: record.quantity,
+    // 展示用
+    amount: amountFormatted,
+    currency,
+    amountMinor: String(record.amount),
+    amountMajor: ((record.amount || 0) / 100).toFixed(2),
+    buyerNote: record.buyerNote || "无",
+    deliveryItems,
+    queryUrl: orderQueryUrl(settings?.siteUrl, record.orderNo, record.ownerUserId),
+    footerText: settings?.footerText || "",
+    supportContact: settings?.supportContact || "",
+  };
 }
