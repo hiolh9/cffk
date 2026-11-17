@@ -63,7 +63,6 @@ export const adminPages = {
     pageTitle: "卡密管理",
     description: "管理自动发货商品的卡密库存、批次与发售状态。",
   },
- 
   discounts: {
     title: "优惠券管理",
     path: "/catalog/discounts",
@@ -214,6 +213,12 @@ export const adminPages = {
     pageTitle: "站点设置",
     description: "站点名称、域名与基础开关。",
   },
+  regions: {
+    title: "区域与支付",
+    path: "/system/regions",
+    pageTitle: "区域 / 币种 / 支付",
+    description: "按国家配置展示币种、强制币种、支付方式与渠道加价；订单仍按实收币种入账并折算 MYR。",
+  },
   risk: {
     title: "风控",
     path: "/system/risk",
@@ -265,8 +270,8 @@ export const adminNavigation = {
   payments: adminPages.payments,
   paymentLogs: adminPages.paymentLogs,
   media: adminPages.media,
-   
   settings: adminPages.settings,
+  regions: adminPages.regions,
   risk: adminPages.risk,
   security: adminPages.security,
   tasks: adminPages.tasks,
@@ -302,6 +307,7 @@ export const adminNavigation = {
       adminPages.paymentLogs,
       adminPages.media,
       adminPages.settings,
+      adminPages.regions,
       adminPages.risk,
       adminPages.security,
       adminPages.tasks,
