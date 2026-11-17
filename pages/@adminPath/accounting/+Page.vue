@@ -55,8 +55,18 @@
             <Input v-model="manual.customerEmail" type="email" />
           </div>
           <div class="grid gap-1">
-            <Label>金额（可选）</Label>
+            <Label>金额（元，可选）</Label>
             <Input v-model.number="manual.grossAmount" type="number" step="0.01" min="0" placeholder="留空用商品价" />
+          </div>
+                    <div class="grid gap-1">
+            <Label>币种</Label>
+            <select v-model="manual.currency" class="h-9 rounded-md border bg-background px-2">
+              <option value="MYR">MYR（马币）</option>
+              <option value="SGD">SGD</option>
+              <option value="USD">USD</option>
+              <option value="AUD">AUD</option>
+              <option value="JPY">JPY</option>
+            </select>
           </div>
           <div class="grid gap-1">
             <Label>备注</Label>
@@ -176,12 +186,16 @@ async function createManual() {
   try {
     await runTelefunc(
       () =>
-        onCreateManualBankOrder({
+                onCreateManualBankOrder({
           productSkuId: manual.productSkuId,
           quantity: manual.quantity,
-          customerEmail: manual.customerEmail,
-          grossAmount: manual.grossAmount,
-          note: manual.note || undefined,
+          contactEmail: manual.customerEmail,
+          amountCents:
+            manual.grossAmount != null && manual.grossAmount !== ""
+              ? Math.round(Number(manual.grossAmount) * 100)
+              : undefined,
+          buyerNote: manual.note || undefined,
+          currency: manual.currency || "MYR",
         }),
       { successMessage: "手动开单成功，已触发履约" },
     );
