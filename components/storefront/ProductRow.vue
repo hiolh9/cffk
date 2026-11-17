@@ -18,7 +18,7 @@
     </template>
     <div
       class="icon relative shrink-0 overflow-hidden bg-black/20"
-      :class="compact ? 'size-12 rounded-xl' : 'size-16 rounded-2xl sm:size-20 sm:rounded-[18px]'"
+      :class="compact ? 'size-12 rounded-xl' : 'size-16 rounded-xl sm:size-20 sm:rounded-2xl'"
     >
       <img
         :src="image"
@@ -49,7 +49,7 @@
         <p v-if="subtitle" class="m-0 mt-0.5 line-clamp-1 text-xs text-white/70">{{ subtitle }}</p>
       </div>
       <div class="mt-2 flex items-end justify-between gap-2">
-        <span class="text-[17px] font-extrabold leading-none tabular-nums">
+        <span class="text-[17px] font-bold leading-none tabular-nums">
           <span class="mr-0.5 text-[11px] font-semibold text-white/70">RM</span>{{ price }}
         </span>
         <span v-if="soldOut" class="text-[11px] font-semibold text-white/70">{{ stockLabel }}</span>
@@ -87,8 +87,8 @@ defineProps<{
  */
 .row {
   --h: var(--hue, #64748b);
-  --deep: color-mix(in oklab, var(--h) 38%, #070a12);
-  --mid: color-mix(in oklab, var(--h) 62%, #070a12);
+  --deep: color-mix(in oklab, var(--h) 30%, #070a12);
+  --mid: color-mix(in oklab, var(--h) 52%, #070a12);
   -webkit-tap-highlight-color: transparent;
 }
 .row img {
@@ -113,7 +113,7 @@ defineProps<{
 .row-full::before {
   z-index: -1;
   background:
-    radial-gradient(90% 150% at 0% 0%, rgb(255 255 255 / 0.2), transparent 62%),
+    radial-gradient(90% 150% at 0% 0%, rgb(255 255 255 / 0.1), transparent 62%),
     linear-gradient(115deg, var(--mid), var(--deep));
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
   opacity: 0;
@@ -129,7 +129,7 @@ defineProps<{
   transition: opacity 0.35s ease;
 }
 .row-full .icon {
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.28), 0 10px 18px -8px rgb(0 0 0 / 0.55);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.22), 0 8px 16px -8px rgb(0 0 0 / 0.6);
 }
 .row-full.is-sold {
   filter: saturate(0.3) brightness(0.9);
@@ -169,7 +169,7 @@ defineProps<{
   border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.4;
   -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 80%);
   mask-image: linear-gradient(90deg, #000 0%, transparent 80%);
 }
