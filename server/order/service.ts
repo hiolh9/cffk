@@ -147,6 +147,12 @@ export async function createOrder(database: D1Database, input: CreateOrderInput,
   const now = Date.now();
   const amount = Math.max(0, originalAmount - discountAmount);
   if (amount > 0 && input.allowPendingPayment === false) fail("PAYMENT_ADAPTER_NOT_AVAILABLE");
+  const orderCurrency = (
+    (input as { currency?: string }).currency ||
+    "MYR"
+  )
+    .toUpperCase()
+    .slice(0, 3);
   const orderNo = generateOrderNo();
   const paymentChannel = normalizePaymentChannel(input.paymentProvider, input.paymentChannel);
   let ipCountry: string | null = null;
@@ -158,7 +164,7 @@ try {
 }
   const statements: D1PreparedStatement[] = [
     database.prepare(
-  "INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, unitPrice, quantity, amount, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, productTaxCategory, customerIpCountry, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, unitPrice, quantity, amount, currency, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, productTaxCategory, customerIpCountry, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 ).bind(
   orderNo,
   ownerUserId,
@@ -169,6 +175,7 @@ try {
   sku.price,
   quantity,
   amount,
+  orderCurrency,
   input.contactType,
   contactValue,
   input.contactType === "EMAIL" ? normalizeOrderEmail(contactValue) : null,
