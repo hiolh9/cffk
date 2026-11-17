@@ -87,6 +87,7 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
   quantity: number;
   contactEmail?: string;
   amountCents?: number;
+  currency?: string | null;
   buyerNote?: string;
   validateFields?: Record<string, string>;
   skipValidate?: boolean;
@@ -104,6 +105,7 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
       productId: productSku.productId,
       name: productSku.name,
       price: productSku.price,
+      
       deliveryType: productSku.deliveryType,
       fulfillmentSource: productSku.fulfillmentSource,
       fixedDeliveryContent: productSku.fixedDeliveryContent,
@@ -121,6 +123,7 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
   const unitPrice = sku.price;
   const quantity = input.quantity;
   const amount = input.amountCents ?? unitPrice * quantity;
+  const orderCurrency = (input.currency || "MYR").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3) || "MYR";
   const orderNo = await generateOrderNo(database);
   const invoiceNo = await allocateInvoiceNo(database);
   const now = new Date();
@@ -141,6 +144,7 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
       productNameSnapshot: sku.productName,
       productSkuNameSnapshot: sku.name,
       unitPrice,
+      currency: orderCurrency,
       quantity,
       amount,
       contactType: "EMAIL",
