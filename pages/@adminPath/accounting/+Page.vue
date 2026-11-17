@@ -120,7 +120,14 @@ const endDate = ref("");
 const query = ref("");
 const manualOpen = ref(false);
 const saving = ref(false);
-const manual = reactive({ productSkuId: 0, quantity: 1, customerEmail: "", grossAmount: undefined as number | undefined, note: "" });
+const manual = reactive({
+  productSkuId: 0,
+  quantity: 1,
+  customerEmail: "",
+  grossAmount: undefined as number | undefined,
+  currency: "MYR",
+  note: "",
+});
 
 function money(cents: number) {
   return (cents / 100).toFixed(2);
