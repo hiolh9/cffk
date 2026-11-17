@@ -1,14 +1,14 @@
 <template>
   <a
     :href="href"
-    class="deal group relative flex h-full flex-col gap-3.5 rounded-3xl p-4 text-white outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    class="deal group relative flex h-full flex-col gap-3.5 rounded-2xl p-4 text-white outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     :class="[hue ? 'has-hue' : '', soldOut ? 'is-sold' : '']"
     :style="hue ? { '--hue': hue } : undefined"
   >
     <span class="art" aria-hidden="true"><img :src="image" alt="" /></span>
     <span class="sheen" aria-hidden="true"><i /></span>
     <div class="flex items-center gap-3.5">
-      <div class="icon size-[76px] shrink-0 overflow-hidden rounded-[20px] bg-black/20">
+      <div class="icon size-[76px] shrink-0 overflow-hidden rounded-2xl bg-black/20">
         <img
           :src="image"
           :alt="name"
@@ -27,7 +27,7 @@
 
     <div class="mt-auto">
       <div class="flex items-end justify-between gap-2">
-        <span class="text-[26px] font-black leading-none tabular-nums">
+        <span class="text-2xl font-extrabold leading-none tabular-nums">
           <span class="mr-0.5 text-sm font-semibold text-white/70">RM</span>{{ price }}
         </span>
         <span v-if="soldOut" class="text-xs font-semibold text-white/70">{{ stockLabel }}</span>
@@ -65,8 +65,8 @@ defineProps<{
 /* Same recipe as the product rows, a step richer: deep icon-coloured card, white text, colour fades in. */
 .deal {
   --h: var(--hue, #64748b);
-  --deep: color-mix(in oklab, var(--h) 34%, #070a12);
-  --mid: color-mix(in oklab, var(--h) 68%, #070a12);
+  --deep: color-mix(in oklab, var(--h) 28%, #070a12);
+  --mid: color-mix(in oklab, var(--h) 56%, #070a12);
   isolation: isolate;
   background: linear-gradient(125deg, #2c3446, #161b27);
   box-shadow: 0 14px 28px -18px rgb(8 12 24 / 0.75);
@@ -84,7 +84,7 @@ defineProps<{
 .deal::before {
   z-index: -1;
   background:
-    radial-gradient(80% 110% at 0% 0%, rgb(255 255 255 / 0.24), transparent 60%),
+    radial-gradient(80% 110% at 0% 0%, rgb(255 255 255 / 0.12), transparent 60%),
     linear-gradient(125deg, var(--mid), var(--deep));
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16);
   opacity: 0;
@@ -100,7 +100,7 @@ defineProps<{
   transition: opacity 0.35s ease;
 }
 .deal .icon {
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.3), 0 12px 20px -8px rgb(0 0 0 / 0.55);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.24), 0 10px 18px -8px rgb(0 0 0 / 0.6);
 }
 .deal img {
   transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
@@ -128,7 +128,7 @@ defineProps<{
   border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.4;
   -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 80%);
   mask-image: linear-gradient(90deg, #000 0%, transparent 80%);
 }
