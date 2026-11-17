@@ -9,7 +9,6 @@
     <div class="mt-12 flex min-h-0 flex-1 flex-col overflow-y-auto sm:mt-14">
       <section class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-x-6 gap-y-4 px-3 pb-8 pt-3 sm:px-5 sm:pt-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr]">
         <div class="min-w-0 lg:col-start-1 lg:row-start-1">
-          <!-- SEAGM / store style: small icon left, text right -->
           <div class="flex items-start gap-3 rounded-xl border border-black/[0.05] bg-white p-3 sm:gap-4 sm:p-4 dark:border-border dark:bg-card">
             <button
               type="button"
@@ -378,7 +377,7 @@ async function submit() {
   eligibilityMessage.value = "";
   try {
     const deviceId = getOrCreateDeviceId();
-    const payload = {
+        const payload = {
       skuId: Number(selectedSku.value.id),
       quantity: quantity.value,
       contactEmail: contactValue.value,
@@ -387,6 +386,13 @@ async function submit() {
       discountCode: discountCode.value.trim() || undefined,
       paymentMethodKey: selectedMethod.value || undefined,
       deviceId,
+      // 新增：与当前展示价同一币种；暂时没有全局变量就先写死
+      currency: (typeof displayCurrency !== "undefined" && displayCurrency
+        ? String(displayCurrency)
+        : "MYR"
+      )
+        .toUpperCase()
+        .slice(0, 3),
     };
     const elig = await runTelefunc(() => onGetCheckoutEligibility({ skuId: payload.skuId, quantity: payload.quantity, deviceId }), { notifyError: false }).catch(() => null);
     if (elig && ((elig as { ok?: boolean }).ok === false || (elig as { blockers?: unknown[] }).blockers?.length)) {
