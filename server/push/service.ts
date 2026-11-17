@@ -496,7 +496,6 @@ export async function orderPushVariables(database: D1Database, orderId: number) 
         buyerNote: order.buyerNote,
         fulfillmentSourceSnapshot: order.fulfillmentSourceSnapshot,
         deliveryStatus: order.deliveryStatus,
-        paymentStatus: order.paymentStatus,
       })
       .from(order)
       .where(eq(order.id, orderId))
@@ -525,19 +524,17 @@ export async function orderPushVariables(database: D1Database, orderId: number) 
   );
   let deliveryItems = deliveryItemsFromSnapshots(snapshots);
 
-  // API / 供应商发货：本地无卡密快照时给可读说明
   if (
     (!snapshots.length || deliveryItems === "暂无发货内容") &&
-    (record.fulfillmentSourceSnapshot === "SUPPLIER" ||
-      record.fulfillmentSourceSnapshot === "API")
+    String(record.fulfillmentSourceSnapshot || "").toUpperCase().includes("SUPPLIER")
   ) {
-    if (record.deliveryStatus === "DELIVERED" || record.deliveryStatus === "SUCCESS") {
-      deliveryItems =
-        "Your order has been submitted to the provider for fulfillment. Please check your game/account. If nothing arrives within the stated time, contact support with your order number.";
-    } else {
-      deliveryItems =
-        "Fulfillment is in progress. You will receive another notice when delivery completes.";
-    }
+    const delivered =
+      record.deliveryStatus === "DELIVERED" ||
+      record.deliveryStatus === "SUCCESS" ||
+      record.deliveryStatus === "FULFILLED";
+    deliveryItems = delivered
+      ? "Your order has been submitted to the provider. Please check your account. Contact support with your order number if it does not arrive."
+      : "Fulfillment is in progress. You will be notified when delivery completes.";
   }
 
   return {
@@ -546,10 +543,9 @@ export async function orderPushVariables(database: D1Database, orderId: number) 
     contactEmail: record.contactEmail || "未提供",
     productName: record.productName,
     quantity: record.quantity,
-    // 展示用
     amount: amountFormatted,
     currency,
-    amountMinor: String(record.amount),
+    amountMinor: String(record.amount ?? 0),
     amountMajor: ((record.amount || 0) / 100).toFixed(2),
     buyerNote: record.buyerNote || "无",
     deliveryItems,
