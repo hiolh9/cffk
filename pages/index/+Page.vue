@@ -45,7 +45,7 @@
 
     <!-- Stage: banners and flash deals share one dark backdrop that takes the colours of the banner on show -->
     <Transition name="fade-up">
-      <div v-if="showStage" class="stage relative isolate overflow-hidden bg-[#070a12]">
+      <div v-if="showStage" class="stage relative isolate overflow-hidden rounded-b-[28px] bg-[#070a12] sm:rounded-b-[40px]">
         <div v-if="bannerSlides.length" class="hero-ambient absolute -inset-12 -z-20" aria-hidden="true">
           <img
             v-for="(slide, i) in bannerSlides"
@@ -56,30 +56,29 @@
             :class="i === bannerIndex ? 'opacity-100' : 'opacity-0'"
           />
         </div>
-        <div class="absolute inset-0 -z-10 bg-[#070a12]/60" aria-hidden="true" />
-        <div class="stage-fade pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-24" aria-hidden="true" />
+        <div class="absolute inset-0 -z-10 bg-[#070a12]/70" aria-hidden="true" />
 
-        <div class="relative mx-auto max-w-[1280px] px-3 pb-20 pt-5 sm:pt-7">
+        <div class="relative pb-9 pt-5 sm:pt-7">
           <!-- Banners -->
           <section v-if="bannerSlides.length" :aria-label="L('featured', 'Featured')">
-            <div class="group relative -mx-3" @mouseenter="paused = true" @mouseleave="paused = false" @focusin="paused = true" @focusout="paused = false">
+            <div class="group relative" @mouseenter="paused = true" @mouseleave="paused = false" @focusin="paused = true" @focusout="paused = false">
               <div
                 ref="slidesEl"
-                class="relative flex snap-x snap-mandatory gap-3.5 overflow-x-auto scroll-smooth px-[7%] py-2 sm:px-[11%] lg:px-[calc(50%-500px)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                class="relative flex snap-x snap-mandatory gap-3.5 overflow-x-auto scroll-smooth px-[7%] py-2 sm:px-[11%] lg:px-[calc(50%-500px)] xl:[mask-image:linear-gradient(90deg,transparent,#000_5%,#000_95%,transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 @scroll.passive="onBannerScroll"
               >
                 <a
                   v-for="(slide, i) in bannerSlides"
                   :key="slide.id"
                   :href="slide.href"
-                  class="relative h-40 w-[86%] shrink-0 snap-center overflow-hidden rounded-3xl bg-white/10 shadow-[0_24px_50px_-20px_rgba(0,0,0,0.8)] ring-1 ring-white/15 outline-none transition-[opacity,transform] duration-500 ease-out focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-[78%] lg:h-[200px] lg:w-[1000px]"
-                  :class="i === bannerIndex ? 'scale-100 opacity-100' : 'scale-[0.96] opacity-55'"
+                  class="relative h-40 w-[86%] shrink-0 snap-center overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10 outline-none transition-[opacity,transform] duration-500 ease-out focus-visible:ring-2 focus-visible:ring-white sm:h-44 sm:w-[78%] lg:h-[200px] lg:w-[1000px]"
+                  :class="i === bannerIndex ? 'scale-100 opacity-100' : 'scale-[0.97] opacity-60'"
                   :tabindex="i === bannerIndex ? 0 : -1"
                 >
                   <img :src="slide.image" :alt="slide.title" class="size-full object-cover" :loading="i === 0 ? 'eager' : 'lazy'" />
-                  <div v-if="slide.title" class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent px-5 pb-4 pt-16">
-                    <h2 class="m-0 line-clamp-1 text-base font-extrabold tracking-tight text-white sm:text-2xl">{{ slide.title }}</h2>
-                    <p v-if="slide.subtitle" class="m-0 mt-0.5 line-clamp-1 text-xs text-white/80 sm:text-sm">{{ slide.subtitle }}</p>
+                  <div v-if="slide.title" class="absolute bottom-3 left-3 max-w-[72%] rounded-xl bg-black/40 px-3.5 py-2 backdrop-blur-md sm:bottom-4 sm:left-4 sm:px-4 sm:py-2.5">
+                    <h2 class="m-0 line-clamp-1 text-sm font-bold tracking-tight text-white sm:text-lg">{{ slide.title }}</h2>
+                    <p v-if="slide.subtitle" class="m-0 mt-0.5 line-clamp-1 text-xs text-white/75">{{ slide.subtitle }}</p>
                   </div>
                 </a>
               </div>
@@ -108,22 +107,21 @@
           </section>
 
           <!-- Flash deals -->
-          <section v-if="dealProducts.length" class="relative" :class="bannerSlides.length ? 'mt-9' : ''" aria-labelledby="flash-title">
-            <div class="pointer-events-none absolute -left-20 -top-16 size-72 rounded-full bg-orange-500/25 blur-3xl" aria-hidden="true" />
+          <section v-if="dealProducts.length" class="relative mx-auto max-w-[1280px] px-3" :class="bannerSlides.length ? 'mt-9' : ''" aria-labelledby="flash-title">
             <div class="relative mb-3.5 flex items-end justify-between gap-3">
               <div class="min-w-0">
-                <h2 id="flash-title" class="m-0 text-2xl font-extrabold leading-tight tracking-tight text-white">{{ L("flashDeals", "Flash deals") }}</h2>
+                <h2 id="flash-title" class="m-0 text-xl font-bold leading-tight tracking-tight text-white sm:text-2xl">{{ L("flashDeals", "Flash deals") }}</h2>
                 <p class="m-0 mt-0.5 truncate text-sm text-white/65">{{ L("flashDealsSub", "Limited time only") }}</p>
               </div>
               <div class="flex shrink-0 items-center gap-3">
                 <div class="flex items-center gap-2 text-xs text-white/70" role="timer" :aria-label="L('endsIn', 'Ends in')">
                   <span class="hidden sm:inline">{{ L("endsIn", "Ends in") }}</span>
                   <div class="flex items-center gap-1 font-mono text-sm font-bold tabular-nums">
-                    <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.h }}</span>
-                    <span class="text-red-400">:</span>
-                    <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.m }}</span>
-                    <span class="text-red-400">:</span>
-                    <span class="rounded-md bg-red-600 px-1.5 py-1 text-white">{{ flashCountdown.s }}</span>
+                    <span class="rounded-md bg-white/10 px-1.5 py-1 text-white ring-1 ring-white/15">{{ flashCountdown.h }}</span>
+                    <span class="text-white/50">:</span>
+                    <span class="rounded-md bg-white/10 px-1.5 py-1 text-white ring-1 ring-white/15">{{ flashCountdown.m }}</span>
+                    <span class="text-white/50">:</span>
+                    <span class="rounded-md bg-white/10 px-1.5 py-1 text-white ring-1 ring-white/15">{{ flashCountdown.s }}</span>
                   </div>
                 </div>
                 <a href="#all-products" class="hidden h-9 items-center gap-1 rounded-full border border-white/20 bg-white/10 px-4 text-sm font-medium text-white backdrop-blur transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white sm:inline-flex">
@@ -141,7 +139,7 @@
       </div>
     </Transition>
 
-    <div class="mx-auto w-full max-w-[1280px] flex-1 space-y-8 px-3 pb-12 pt-4">
+    <div class="mx-auto w-full max-w-[1280px] flex-1 space-y-10 px-3 pb-12 pt-8">
       <!-- Mobile search -->
       <div class="relative md:hidden">
         <SearchIcon class="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -160,10 +158,10 @@
           <section
             v-for="col in shownColumns"
             :key="'col' + col.id"
-            class="group/panel surface rounded-3xl bg-card p-4 ring-1 ring-black/[0.05] sm:p-5 md:[&:nth-child(odd):last-child]:col-span-2 dark:ring-white/10"
+            class="group/panel surface rounded-2xl bg-card p-4 ring-1 ring-black/[0.05] sm:p-5 md:[&:nth-child(odd):last-child]:col-span-2 dark:ring-white/10"
           >
             <div class="mb-3 flex items-center justify-between gap-2">
-              <h2 class="m-0 line-clamp-1 text-lg font-extrabold tracking-tight">{{ col.title }}</h2>
+              <h2 class="m-0 line-clamp-1 text-lg font-bold tracking-tight">{{ col.title }}</h2>
               <button v-if="col.id !== null" type="button" class="flex shrink-0 items-center rounded-full border border-border px-3 py-1 text-xs font-medium transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand" @click="openCategory(col.id)">
                 {{ L("viewAll", "View all") }}<ChevronRightIcon class="size-3.5" />
               </button>
@@ -181,7 +179,7 @@
       <section id="all-products" class="scroll-mt-28">
         <div class="mb-3.5 flex items-end justify-between gap-3">
           <div class="min-w-0">
-            <h2 class="m-0 text-2xl font-extrabold leading-tight tracking-tight">{{ currentTitle }}</h2>
+            <h2 class="m-0 text-xl font-bold leading-tight tracking-tight sm:text-2xl">{{ currentTitle }}</h2>
             <p class="m-0 mt-0.5 truncate text-sm text-muted-foreground">{{ t(messages.storefront.relatedProducts, { count: visibleProducts.length }) }}</p>
           </div>
           <div class="flex shrink-0 rounded-full bg-muted p-1 text-xs" role="group" :aria-label="L('sortBy', 'Sort by')">
@@ -197,7 +195,7 @@
           </li>
         </TransitionGroup>
 
-        <div v-else class="rounded-3xl bg-card px-4 py-16 text-center ring-1 ring-black/[0.05] dark:ring-white/10">
+        <div v-else class="rounded-2xl bg-card px-4 py-16 text-center ring-1 ring-black/[0.05] dark:ring-white/10">
           <p class="m-0 text-sm text-muted-foreground">{{ messages.storefront.noProducts }}</p>
           <button v-if="isFiltering" type="button" class="mt-4 inline-flex items-center gap-1 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2" @click="clearFilters">
             <XIcon class="size-4" />{{ L("clearFilters", "Clear search and filters") }}
@@ -567,7 +565,7 @@ onBeforeUnmount(() => {
 
 /* Hero stage: the blurred banner art becomes the backdrop and fades into the page at the bottom. */
 .hero-ambient {
-  filter: blur(56px) saturate(1.6);
+  filter: blur(56px) saturate(1.2);
 }
 .stage-fade {
   background: linear-gradient(to bottom, transparent, var(--paper));
