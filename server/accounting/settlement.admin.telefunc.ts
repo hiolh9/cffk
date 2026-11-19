@@ -1,6 +1,6 @@
 import { desc } from "drizzle-orm";
 import { telefuncAction } from "@/server/telefunc-action";
-import { requireAdmin } from "@/server/telefunc-context";
+import { requireAdmin, requireAdminSecure } from "@/server/telefunc-context";
 import { appError } from "@/lib/app-error";
 import { fxMonthlyRate } from "@/database/drizzle/schema-settlement";
 import {
@@ -13,6 +13,7 @@ import {
   listAcctSettlements,
   listUnsettledAcctSales,
   markAcctSaleRefundOrVoid,
+  listZeroCogsSuccessSales,
 } from "./settlement";
 import { syncPreviousMonthBnmRates, upsertFxRates } from "./fx";
 import { writeAuditLog } from "./audit";
@@ -77,7 +78,7 @@ export const onCreateAcctSettlement = telefuncAction(async (input: {
   notes?: string;
   settlementId?: string;
 }) => {
-  const { database, adminUserId } = requireAdmin();
+  const { database, adminUserId } = await requireAdminSecure();
   const date = new Date(input.settlementDate);
   if (Number.isNaN(date.getTime())) appError("DATE_INVALID");
   if (!Array.isArray(input.orderIds) || !input.orderIds.length) appError("SETTLEMENT_NO_ORDERS");
@@ -112,7 +113,7 @@ export const onMarkAcctSaleRefundOrVoid = telefuncAction(async (input: {
   bankImpactMyr?: number;
   note?: string;
 }) => {
-  const { database, adminUserId } = requireAdmin();
+  const { database, adminUserId } = await requireAdminSecure();
   if (!input.orderId?.trim()) appError("ACCT_SALE_NOT_FOUND");
   if (input.type !== "REFUND" && input.type !== "VOID") appError("ACCT_REFUND_AMOUNT_INVALID");
   try {
@@ -146,7 +147,7 @@ export const onMarkAcctSaleRefundOrVoid = telefuncAction(async (input: {
 });
 
 export const onBackfillAcctSales = telefuncAction(async () => {
-  const { database, adminUserId } = requireAdmin();
+  const { database, adminUserId } = await requireAdminSecure();
   const result = await backfillAcctSalesFromPaidOrders(database, 500);
   await writeAuditLog(database, {
     actorUserId: adminUserId,
@@ -204,7 +205,7 @@ export const onUpsertFxRates = telefuncAction(async (input: {
   rates: Record<string, number>;
   source?: string;
 }) => {
-  const { database, adminUserId } = requireAdmin();
+  const { database, adminUserId } = await requireAdminSecure();
   if (!/^\d{4}-\d{2}$/.test(input.yearMonth)) appError("DATE_INVALID");
   await upsertFxRates(database, input.yearMonth, input.rates || {}, input.source || "MANUAL");
   await writeAuditLog(database, {
@@ -218,7 +219,7 @@ export const onUpsertFxRates = telefuncAction(async (input: {
 });
 
 export const onSyncBnmFxRates = telefuncAction(async () => {
-  const { database, adminUserId } = requireAdmin();
+  const { database, adminUserId } = await requireAdminSecure();
   const result = await syncPreviousMonthBnmRates(database);
   await writeAuditLog(database, {
     actorUserId: adminUserId,
@@ -228,4 +229,18 @@ export const onSyncBnmFxRates = telefuncAction(async () => {
     after: result.rates,
   });
   return result;
+});
+
+/** 关月检查：当月 Success 且 COGS=0 的销售 */
+export const onListZeroCogsSales = telefuncAction(async (input: { yearMonth: string }) => {
+  const { database } = requireAdmin();
+  if (!input?.yearMonth || !/^\d{4}-\d{2}$/.test(input.yearMonth.trim())) appError("DATE_INVALID");
+  try {
+    const items = await listZeroCogsSuccessSales(database, input.yearMonth.trim());
+    return { yearMonth: input.yearMonth.trim(), count: items.length, items };
+  } catch (cause) {
+    const msg = cause instanceof Error ? cause.message : "";
+    if (msg === "YEAR_MONTH_INVALID") appError("DATE_INVALID");
+    throw cause;
+  }
 });
