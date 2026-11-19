@@ -1,249 +1,173 @@
-# Sparkpay 记账与操作手册（完整版）
+# Sparkpay 记账操作手册（逐步点哪里版）
 
-> **主账本币种：MYR（令吉）**  
-> 外币销售：按**交易所属月**的 BNM 月均汇率确认 `Revenue_MYR`。  
-> 网关打款：按**结算到账日**记已实现汇兑损益。  
-> 原则：**不物理删除订单；只改状态；关键写操作留 auditLog；动账需管理员 2FA。**
+> 后台根地址：`https://你的域名/{adminPath}`  
+> 你线上目前是：`https://cffk.jevinhhh123.workers.dev/m6apjx1zq74476qewlcsp`  
+> 下文写 **`/{adminPath}/...`** 时，把 `{adminPath}` 换成你自己的后台路径。
 
-品牌对外名：**Sparkpay**（仓库/Worker 名可能仍为 cffk）。
+登录后台后，左侧菜单找这些名字；括号内是 URL 后缀：
+
+| 侧栏名称 | 打开地址 | 干什么 |
+|----------|----------|--------|
+| **账本对账** | `/{adminPath}/accounting` | 查订单账本、导出 CSV、**银行转账手动开单** |
+| **网关结算** | `/{adminPath}/accounting/settlements` | 录入网关到账、勾选订单、**BNM 汇率**、会计退款 |
+| **日记账与P&L** | `/{adminPath}/accounting/pnl` | 记广告/提款等、**生成月度/年度 P&L**、一键导出全表 |
+| **预存款对账** | `/{adminPath}/accounting/wallet` | MooGold 等充值、平台费、对账单、COGS CSV |
+| **税务中心** | `/{adminPath}/accounting/tax` | 税种与申报批次 |
+| **税务国别看板** | `/{adminPath}/accounting/tax-nexus` | MY / 出口 / 他国流水（若菜单有） |
+| **订单管理** | `/{adminPath}/orders` | 查单、退款、人工发货、补成本 |
+| **供应商订单** | `/{adminPath}/suppliers/orders` | 上游采购重试、对账 |
+
+**单位提醒**
+
+- **手动开单**金额框 = **元（块）**，系统会 ×100 存 cent。  
+- **网关结算 / 日记账 / 预存款** 的 MYR **一律是块**（100.00 = 一百令吉）。  
+- 写账需要 **管理员 + 2FA**。
 
 ---
 
-## 0. 先看：金额单位（最易错）
+## 0. BNM 汇率：会不会每个月自动抓？
 
-系统里有两套记法，**禁止混用**：
+### 答案：会（已接 Cron）
 
-| 层 | 单位 | 例子 |
-|----|------|------|
-| 业务订单 `order`、SKU 价、`amountCents`、退款 cents | **分（cent）** 整数 | `10000` = RM 100.00 |
-| 会计 `acctSale` / Settlement / GL / Wallet / P&L / CSV | **块（MYR 小数）** | `100.00` = RM 100 |
+系统在 **吉隆坡时间每月 2 号 01:00–01:05** 自动跑一次：
 
-| 场景 | 正确 | 错误 |
+- 抓取 **上个月** 的 BNM 参考汇率（多日采样平均）
+- 写入 `fxMonthlyRate`（USD/SGD/AUD/JPY/EUR/GBP/CNY 等）
+- 代码：`server/scheduled.ts` → `syncPreviousMonthBnmRates`
+- Worker：`wrangler.jsonc` 里每分钟 cron，但只有「2 号 1 点」才真正同步汇率
+
+**注意：**
+
+1. 自动抓的是 **上月**，不是未结束的当月。  
+2. 若失败或 0 个币种，看日志 `scheduled-bnm-fx-sync`，并手动点一次。  
+3. 审计仍建议每月存一份 BNM 官网 Monthly Average PDF（外部证据）。
+
+### 手动同步
+
+1. 打开 **网关结算** → `/{adminPath}/accounting/settlements`  
+2. 右侧 **「汇率（月均 → MYR）」** → **「同步上月 BNM」**  
+3. 成功示例：`已同步 2026-10，7 个币种`  
+
+### 手填汇率
+
+同页下方：年月 `2026-10`，JSON `{"USD":4.72,"CNY":0.65}` → **「保存汇率」**（1 外币 = 多少 MYR）。
+
+---
+
+## 1. 客户线上付款（几乎不用点）
+
+支付成功会自动尽量写 `acctSale` 并发货。  
+若付了但账上没有：
+
+1. **网关结算** → **「回填已支付订单到会计账」**  
+2. 看：`扫描 / 新建 / 跳过 / 失败`
+
+---
+
+## 2. 银行转账手动开单
+
+1. **账本对账** → `/{adminPath}/accounting`  
+2. **「手动开单（银行转账）」**  
+3. 填 SKU ID、数量、邮箱（可 `-`）、金额元（可选）、币种、**备注（写清转账证据）**  
+4. **「确认开单并发货」**（2FA）  
+
+不要只改订单状态而不走此按钮。
+
+---
+
+## 3. 网关打款进银行（结算）
+
+1. **网关结算**  
+2. 必要时先 **回填**  
+3. 填：到账日期、**银行实收 MYR（块）**、**手续费 MYR（块）**  
+4. 在 **未结算会计订单** 勾选本批  
+5. 看预览 Gross / Realised FX → **「创建结算」**  
+
+一笔 payout = 一笔结算；不同网关分开。
+
+---
+
+## 4. 退款 / 作废（会计）
+
+1. 订单页可先退业务状态  
+2. **网关结算** → **「退款 / 作废（会计）」**  
+3. 填 Order_ID，可选冲减金额 → **退款** 或 **作废**  
+
+部分退款：会计可能仍全额 Success，直到这里冲减；关月导出 **退款调整 CSV**。
+
+---
+
+## 5. 广告 / 提款 / 利息（日记账）
+
+**日记账与P&L** → `/{adminPath}/accounting/pnl`
+
+| 用途 | 类型 | 金额 |
 |------|------|------|
-| GL 广告费 RM 200 | `-200` | `-20000` |
-| 订单金额 RM 50 | `5000` cent | `50` cent |
-| 供应商充值 RM 1000 | `1000`（块） | `100000` |
-| Top-up 手续费 RM 1.50 | `1.50`（块） | `150` 当分 |
+| 广告域名邮箱服务器 SST WHT | Expense | **负数**块，勾可抵扣 |
+| 利息等 | Other Income | **正数** |
+| 老板提款 | Owner Drawing | **负数**（不进 P&L） |
+| 注资 | Capital Injection | **正数** |
+| 预存充值 | Prepayment | **负数**（或用钱包页） |
 
-导出的 `Sparkpay-YYYY-MM-*.csv` 与 P&L **一律是块（RM 小数）**。
-
----
-
-## 1. 核心表与文件
-
-| 规范名 | 表/来源 | 用途 |
-|--------|---------|------|
-| 01 销售 | `acctSale` | 每笔成功销售：原币、FX、Revenue_MYR、COGS_MYR、状态 |
-| 02 结算 | `acctSettlement` | 网关一批打到银行的 MYR |
-| 03 结算明细 | `acctSettlementOrder` | 哪些订单属于哪笔结算 |
-| 04 调整 | `acctAdjustment` | 结算后的退款/作废等调整 |
-| 05 日记账 | `acctGeneralLedger` | 非订单：广告、提款、预存、利息等 |
-| 06 汇率 | `fxMonthlyRate` | 月度 BNM（或手补）底稿 |
-| 07 审计 | `auditLog` | 谁在何时改了什么 |
-| 08 P&L | 计算/快照 | 月度/年度损益 |
-| 业务订单 | `order` | 前台履约、支付状态、退款 cents、税务字段 |
-
-**一键归档：** `Sparkpay-YYYY-MM-*.csv` — 后台 `/{adminPath}/accounting/pnl`。
-
-**关月 COGS 检查：** `onListZeroCogsSales({ yearMonth: "2026-11" })` — 当月 Success 且 COGS=0 的清单。
+可点快捷标签自动填描述，改金额后 **「记一笔」**。
 
 ---
 
-## 2. 权限与安全
+## 6. 供应商预存（含 FPX 费）
 
-| 操作 | 要求 |
-|------|------|
-| 查看列表、导出 CSV | 管理员（+ IP 白名单若已配） |
-| 创建结算、记 GL、充值、手动开单、改汇率、退款、税批 | **管理员 + 2FA** |
-| 普通用户 | 不能调会计接口 |
+**预存款对账** → `/{adminPath}/accounting/wallet`
 
-未开 2FA 时写账会失败。
+1. 充值金额（块）+ 渠道手续费（块）+ Invoice # + 供应商下拉 → **保存充值**  
+2. 会员费 → **保存平台费**（不是 COGS）  
+3. 月份 + 期初 → **生成对账单** / **导出 COGS CSV**  
 
----
-
-## 3. 净利公式
-
-```text
-Gross Profit = Σ Revenue_MYR − Σ COGS_MYR     （当月 acctSale Status = Success）
-GL Expense SUM   = Σ Amount_MYR where Type=Expense AND Is_Tax_Deductible=true  （支出为负）
-Other Income SUM = Σ Amount_MYR where Type=Other_Income
-Gateway Fees     = Σ Gateway_Fee_MYR
-FX               = Σ Realised_FX_Gain_Loss
-Net Profit = Gross Profit + GL Expense SUM + Other Income SUM − Gateway Fees + FX
-```
-
-**不进 P&L：** `Owner_Drawing`、`Prepayment`、`Capital_Injection`。  
-**GL 正负号：** 正=流入，负=流出。
+Invoice PDF 自行从邮箱下载存档。
 
 ---
 
-## 4. 场景索引
+## 7. 淘宝人工发货补成本
 
-| # | 场景 | 节 |
-|---|------|----|
-| A | 线上支付成功 | 5.1 |
-| B | 银行直转 + 手动开单 | 5.2 |
-| C | 网关批量结算 | 5.3 |
-| D | 全额退款/作废 | 5.4 |
-| E | 部分退款（易漏） | 5.5 |
-| F | 广告/服务器/税务开支 | 5.6 |
-| G | 其他收入 | 5.7 |
-| H | 预存 Top-up + FPX 费 | 5.8 |
-| I | 钱包会员费 | 5.9 |
-| J | 提款/注资 | 5.10 |
-| K | **淘宝人工发货补 COGS** | 5.11 |
-| L | MooGold 自动 COGS | 5.12 |
-| M | 多币种/多网关 | 5.13 |
-| N | 月末关账 | 5.14 |
-| O | 填错怎么改 | 5.15 |
-| P | 税务分类 | 5.16 |
+1. 客户已付款（收入已有）  
+2. 淘宝下单，看 **银行实付 MYR**  
+3. **订单管理** 打开该单 → 补录 COGS（实付块为主）  
+4. 关月前保证没有「Success 且 COGS=0」的单  
+
+MooGold API 一般自动写 COGS；异常去 **供应商订单** 重试。
 
 ---
 
-## 5. 分场景 SOP
+## 8. 月末关账顺序
 
-### 5.1 线上支付成功
+1. 网关结算 → 同步上月 BNM  
+2. 回填已支付订单  
+3. 退款对齐（订单 + 会计）  
+4. 淘宝单补 COGS  
+5. 按银行结单创建结算  
+6. 预存款充值/平台费/对账单  
+7. 日记账补广告等  
+8. P&L 页：生成本月 P&L → **一键导出当月全表**  
+9. 文件夹放入：系统 CSV + BNM PDF + 银行结单 + 网关 Payout + 供应商发票  
 
-1. 下单 PENDING → 支付成功 PAID  
-2. 系统写入 `acctSale`（幂等）+ 税务  
-3. 发货（本地/供应商）  
-4. COGS：API 自动或人工补（5.11/5.12）  
+年底：同页 **年度 P&L 汇总**。
 
-**易漏：** 无 `acctSale` → 跑 Backfill。关月用 `onListZeroCogsSales`。
+---
 
-### 5.2 银行直转 + 手动开单
-
-1. 钱进**商业账户**  
-2. 手动开单（金额单位=**分**）；备注写清「谁转账、如何确认是本地客户」  
-3. 系统：PAID、Fee=0、**强制 acctSale**、税务与发货  
-
-**易漏：** 只改订单状态不走开单接口 → 无会计销售行。
-
-### 5.3 网关结算
-
-1. 对照银行/网关结单填：到账日、Bank_Received、Fee  
-2. 勾选本批订单 → Gross=Σ Revenue_MYR；FX=Bank+Fee−Gross  
-3. **一笔 payout = 一笔 Settlement**；不同网关分开  
-
-**禁止：** 原币直接相加当 MYR。
-
-### 5.4 全额退款/作废
-
-订单页退款（2FA）→ REFUNDED；全额时关 acctSale / 写 Adjustment。禁止物理删除。
-
-### 5.5 部分退款（易漏）
-
-- 订单层可有 PARTIAL_REFUNDED  
-- **会计 acctSale 可能仍按 Success 全额**，直到全额退或手工 mark 退款  
-- 关月前维护 Refund Log：Order_ID、退款额、原因、网关退款号  
-
-### 5.6 营业开支
-
-GL：`Expense`，金额**负块**，可抵税=true。例：`-500` Facebook ads 2026-11。
-
-### 5.7 其他收入
-
-`Other_Income`，金额**正块**。不要把客户订单记这里。
-
-### 5.8 供应商 Top-up + 渠道费
-
-| 字段 | 单位 | 含义 |
-|------|------|------|
-| 充值金额 | 块 | Invoice/到账 |
-| 手续费 | 块 | FPX 等，不进钱包 |
-
-分录：Prepayment −充值；Expense −手续费 `[Topup_Processing_Fee]`。  
-银行：充值+手续费=银行扣款。证据：Invoice、银行水单、COGS CSV、对账单。
-
-### 5.9 钱包会员费
-
-Expense + `[Platform_Fee]`，负块，可抵税。不是 COGS。
-
-### 5.10 提款/注资
-
-`Owner_Drawing` 负 / `Capital_Injection` 正。**不进 P&L。**
-
-### 5.11 淘宝/跨境人工发货补成本（SOP）
-
-1. 客户已付 → 已有 Revenue，COGS 可能为 0  
-2. 淘宝下单发货，保留订单号  
-3. 以**银行实付 MYR（块）**为主成本补录；`cogsSource=CROSS_BORDER`  
-4. 可选填 CNY + BNM 汇差分析  
-5. 关月前 `onListZeroCogsSales` 必须清零  
+## 9. 填分还是块
 
 | 位置 | 单位 |
 |------|------|
-| 补录表单实付 | **块** |
-| cogsAmountMyrCents | **分**（系统） |
-| acctSale.COGS_MYR | **块** |
-
-禁止：只按 CNY×随意汇率入账且与银行不符；同一单双记预存+银行。
-
-### 5.12 MooGold 预存 API
-
-发货成功按**实时报价**写 COGS（LOCAL_PREPAID）。充值阶段不进 COGS。
-
-### 5.13 多币种/多网关
-
-订单锁原币 → 月均汇率 → Revenue_MYR。结算只汇总 MYR；每笔 payout 单独 Settlement。
-
-### 5.14 月末关账清单
-
-**系统：** 退款处理完 → 零 COGS 检查 → 结算勾对 → GL 补齐 → 汇率齐全 → P&L → 一键导出 CSV。  
-**系统外同文件夹：** BNM PDF、银行结单、网关 Payout、供应商发票、Refund Log、税务分表 CSV。
-
-### 5.15 填错
-
-GL 用**反向分录**冲正，描述写原 Entry_ID。禁止静默改历史抵赖。漏手续费就补 Expense。
-
-### 5.16 税务
-
-| 分类 | MY SST 门槛 |
-|------|-------------|
-| Digital_Goods | 默认不计入服务门槛 |
-| Digital_Service | 仅 MY 消费地计入 |
-| Export | 不进 MY 应税池，留网关证据 |
-
-后台开单无 IP/BIN 时保守按 MY，备注写依据。报税分 Service/Goods/Export CSV，勿用全站流水当 MY SST 税基。
+| 手动开单「金额（元）」 | 块 |
+| 结算实收/手续费/冲减 | 块 |
+| 日记账金额 | 块（支出为负） |
+| 预存充值/手续费 | 块 |
+| 汇率 JSON 4.72 | 1 外币→MYR |
 
 ---
 
-## 6. 钱包公式
+## 10. 填错
 
-```text
-期末 = 期初 + 充值 − API COGS − 平台费
-```
-
-Top-up 渠道手续费不进上式（已在费用）。
+GL 用**反向分录**冲正；结算问题用会计调整；漏 acctSale 用**回填**。禁止物理删订单。
 
 ---
 
-## 7. 禁止事项
-
-1. 物理删除订单/会计行  
-2. 改数不留痕  
-3. 提款当 Expense  
-4. 充值当 COGS  
-5. 收入只记净额  
-6. 多币种原币相加  
-7. 未补淘宝 COGS 就关月  
-8. 假设部分退款已自动冲减 acctSale  
-9. 未开 2FA 强行写账  
-
----
-
-## 8. 一天示例
-
-```text
-客户付 RM100 → acctSale Revenue
-MooGold 扣 RM70 → COGS 70
-或淘宝银行付 RM65 → 人工补 COGS 65
-月末网关到账 980（费 20）→ Settlement + FX
-广告 -200 Expense
-充值 1000 + FPX 1.5 → Prepayment -1000 + Expense -1.5
-导出 Sparkpay-YYYY-MM-* + 银行/发票/BNM
-```
-
----
-
-*与「2FA 写账 + 强制 acctSale + 零 COGS 检查 + Top-up 手续费拆分」后的行为对齐。*
+*按钮文案以 `pages/@adminPath/accounting/*` 为准；侧栏缺项可直接打开上表 URL。*
