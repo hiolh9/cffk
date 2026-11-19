@@ -13,8 +13,8 @@ import {
   listAcctSettlements,
   listUnsettledAcctSales,
   markAcctSaleRefundOrVoid,
-  listZeroCogsSuccessSales,
 } from "./settlement";
+import { listZeroCogsSuccessSales } from "./zero-cogs";
 import { syncPreviousMonthBnmRates, upsertFxRates } from "./fx";
 import { writeAuditLog } from "./audit";
 
@@ -186,7 +186,7 @@ export const onExportAcctAdjustmentsCsv = telefuncAction(async (input: { startDa
   return { csv };
 });
 
-export const onListFxRates = telefuncAction(async () => {
+export const onListFxRates = telefuncAction(async (input?: never) => {
   const { db } = requireAdmin();
   const items = await db.select().from(fxMonthlyRate).orderBy(desc(fxMonthlyRate.yearMonth)).limit(200);
   return {
