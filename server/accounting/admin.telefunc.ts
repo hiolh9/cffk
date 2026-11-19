@@ -3,13 +3,14 @@ import { order, productSku, productV2 } from "@/database/drizzle/schema";
 import { auditLog } from "@/database/drizzle/schema-accounting";
 import { appError } from "@/lib/app-error";
 import { telefuncAction } from "@/server/telefunc-action";
-import { requireAdmin } from "@/server/telefunc-context";
+import { requireAdmin, requireAdminSecure } from "@/server/telefunc-context";
 import { createSupplierOrder } from "@/server/supplier/purchase";
 import { processSupplierOrder } from "@/server/supplier/process";
 import { deliverPaidOrder } from "@/server/order/service";
 import { generateOrderNo } from "@/server/order/order-number";
 import { notifyOrderEmailEvents } from "@/server/email/order-events";
 import { writeAuditLog } from "./audit";
+import { recordAcctSaleFromPaidOrder } from "./settlement";
 import { allocateInvoiceNo } from "./invoice";
 import { ledgerToCsv, listLedgerRows } from "./ledger";
 import { normalizeAdminContactEmail, assertAdminSupplierValidate } from "@/server/order/admin-validate";
@@ -22,6 +23,7 @@ import {
 } from "./supplier-wallet";
 import { applyTaxNexusToPaidOrder } from "@/server/tax/apply-tax-nexus";
 import { applyProductTaxCategoryToPaidOrder } from "@/server/tax/apply-tax-category";
+
 export const onListAccountingLedger = telefuncAction(async (input?: {
   startDate?: string;
   endDate?: string;
@@ -94,7 +96,7 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
   customerIpCountry?: string | null;
   cardIssuingCountry?: string | null;
 }) => {
-  const { database, db, user, runtime } = requireAdmin();
+  const { database, db, user, runtime } = await requireAdminSecure();
   if (!input?.productSkuId || !input?.quantity || input.quantity < 1) appError("ORDER_INPUT_INVALID");
   const email = normalizeAdminContactEmail(input.contactEmail);
   const [sku] = await db
@@ -175,6 +177,11 @@ export const onCreateManualBankOrder = telefuncAction(async (input: {
     after: { orderNo, invoiceNo, amount, email, productTaxCategory, ipCountry },
   });
   try {
+    await recordAcctSaleFromPaidOrder(database, created.id);
+  } catch (e) {
+    console.error("manual-bank-acct-sale", e);
+  }
+  try {
     await applyTaxNexusToPaidOrder(database, created.id, { ipCountry, cardCountry });
   } catch (e) {
     console.error("tax-nexus-manual", e);
@@ -211,7 +218,7 @@ export const onRecordSupplierTopup = telefuncAction(async (input: {
   processingFeeMyr?: number;
   paymentChannel?: string;
 }) => {
-  const { database, user } = requireAdmin();
+  const { database, user } = await requireAdminSecure();
   if (!input?.invoiceRef?.trim()) appError("VALIDATION_FAILED");
   if (!Number.isFinite(input.amountMyr) || input.amountMyr === 0) appError("VALIDATION_FAILED");
   const fee = Number(input.processingFeeMyr) || 0;
@@ -236,7 +243,7 @@ export const onRecordSupplierPlatformFee = telefuncAction(async (input: {
   supplierKey?: string;
   description?: string;
 }) => {
-  const { database, user } = requireAdmin();
+  const { database, user } = await requireAdminSecure();
   if (!Number.isFinite(input.amountMyr) || input.amountMyr === 0) appError("VALIDATION_FAILED");
   const entryDate = input.entryDate ? new Date(input.entryDate) : new Date();
   if (Number.isNaN(entryDate.getTime())) appError("DATE_INVALID");
