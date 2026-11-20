@@ -3,6 +3,9 @@
 export const STORE_CURRENCIES = ["MYR", "SGD", "AUD", "JPY", "USD"] as const;
 export type StoreCurrency = (typeof STORE_CURRENCIES)[number];
 
+/** Currencies shown in the header switcher by default (admin regions.enabledCurrencies overrides when wired). */
+export const DEFAULT_SWITCHER_CURRENCIES: StoreCurrency[] = ["MYR", "SGD", "AUD", "USD"];
+
 export const DEFAULT_STORE_CURRENCY: StoreCurrency = "MYR";
 
 export const CURRENCY_META: Record<
@@ -21,7 +24,7 @@ export const COUNTRY_CURRENCY: Record<string, StoreCurrency> = {
   MY: "MYR",
   SG: "SGD",
   AU: "AUD",
-  JP: "JPY",
+  JP: "USD",
   US: "USD",
 };
 
@@ -35,7 +38,7 @@ export function isStoreCurrency(value: string | null | undefined): value is Stor
 export function currencyFromCountry(countryCode: string | null | undefined): StoreCurrency {
   if (!countryCode) return DEFAULT_STORE_CURRENCY;
   const code = countryCode.trim().toUpperCase();
-  return COUNTRY_CURRENCY[code] ?? DEFAULT_STORE_CURRENCY;
+  return COUNTRY_CURRENCY[code] ?? "USD";
 }
 
 /** Parse optional regional minor-unit map. Keys must be store currencies; values integers >= 0. */
@@ -58,22 +61,12 @@ export function parseRegionalPricesJson(raw: string | null | undefined): Partial
 }
 
 export type ResolvedListPrice = {
-  /** Currency actually used for this SKU/product (may fall back to MYR). */
   currency: StoreCurrency;
-  /** Integer minor units in `currency`. */
   amountMinor: number;
-  /** Formatted major units, e.g. "12.90". */
   price: string;
-  /** True when preferred currency had no list price and MYR was used. */
   fellBackToDefault: boolean;
 };
 
-/**
- * Resolve display/charge amount.
- * - preferred currency has an optional list price → use it
- * - otherwise use baseMinor in defaultCurrency (MYR)
- * Never invent FX rates.
- */
 export function resolveListPrice(input: {
   preferredCurrency: StoreCurrency;
   baseMinor: number;
@@ -104,7 +97,6 @@ export function resolveListPrice(input: {
     };
   }
 
-  // No regional price for preferred → default MYR list price
   return {
     currency: defaultCurrency,
     amountMinor: input.baseMinor,
