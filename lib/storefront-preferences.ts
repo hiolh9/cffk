@@ -6,6 +6,7 @@ import {
   CURRENCY_META,
   DEFAULT_STORE_CURRENCY,
   STORE_CURRENCIES,
+  DEFAULT_SWITCHER_CURRENCIES,
   currencyFromCountry,
   isStoreCurrency,
   type StoreCurrency,
@@ -123,16 +124,33 @@ function replaceParams(value: string, params: Record<string, string | number>) {
   return value.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? ""));
 }
 
+/** Admin-controlled switcher list (from regions.enabledCurrencies). */
+const availableCurrencies = ref<StoreCurrency[]>([...(DEFAULT_SWITCHER_CURRENCIES as StoreCurrency[])]);
+
+export function setAvailableCurrencies(list: StoreCurrency[]) {
+  const cleaned = list.filter(isStoreCurrency);
+  availableCurrencies.value = cleaned.length ? cleaned : ([DEFAULT_STORE_CURRENCY] as StoreCurrency[]);
+  if (!availableCurrencies.value.includes(currency.value)) {
+    currency.value = availableCurrencies.value[0]!;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CURRENCY_STORAGE_KEY, currency.value);
+      writeCurrencyCookie(currency.value);
+      applyDocumentPreferences();
+    }
+  }
+}
+
 export function useStorefrontPreferences(): {
   locale: typeof locale;
   theme: typeof theme;
   currency: typeof currency;
   currencyMeta: ComputedRef<(typeof CURRENCY_META)[StoreCurrency]>;
-  currencies: typeof STORE_CURRENCIES;
+  currencies: typeof availableCurrencies;
   messages: ComputedRef<Messages>;
   setLocale: (nextLocale: StorefrontLocale) => void;
   setTheme: (nextTheme: StorefrontTheme) => void;
   setCurrency: (next: StoreCurrency) => void;
+  setAvailableCurrencies: typeof setAvailableCurrencies;
   t: (value: string, params?: Record<string, string | number>) => string;
 } {
   onMounted(initialize);
@@ -148,7 +166,6 @@ export function useStorefrontPreferences(): {
     writeLocaleCookie(nextLocale);
     applyDocumentPreferences();
 
-    // English uses /en prefix for SEO; other locales use unprefixed paths
     const target = withLocalePrefix(window.location.pathname + window.location.search, nextLocale);
     const current = window.location.pathname + window.location.search;
     if (target !== current || prev !== nextLocale) {
@@ -164,6 +181,7 @@ export function useStorefrontPreferences(): {
   }
 
   function setCurrency(next: StoreCurrency) {
+    if (!availableCurrencies.value.includes(next)) return;
     if (currency.value === next) return;
     currency.value = next;
     if (typeof window === "undefined") return;
@@ -182,11 +200,12 @@ export function useStorefrontPreferences(): {
     theme,
     currency,
     currencyMeta,
-    currencies: STORE_CURRENCIES,
+    currencies: availableCurrencies,
     messages,
     setLocale,
     setTheme,
     setCurrency,
+    setAvailableCurrencies,
     t,
   };
 }

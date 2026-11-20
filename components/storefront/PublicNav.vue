@@ -115,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { ClipboardListIcon, LanguagesIcon, LogOutIcon, MoonIcon, SunIcon, UserRoundCogIcon } from "@lucide/vue";
 
 import { usePageContext } from "vike-vue/usePageContext";
@@ -136,6 +136,9 @@ import enUS from "@/lib/i18n/en-US";
 import zhCN from "@/lib/i18n/zh-CN";
 import zhTW from "@/lib/i18n/zh-TW";
 import { useStorefrontPreferences } from "@/lib/storefront-preferences";
+import { runTelefunc } from "@/lib/telefunc-client";
+import { onGetStorefrontCurrencies } from "@/server/region/public.telefunc";
+import type { StoreCurrency } from "@/lib/currency";
 
 type PublicUser = { id: string; name?: string | null; email?: string | null };
 
@@ -144,7 +147,18 @@ const user = pageContext.user ?? null;
 const currentUserName = computed(() => user?.name?.trim() || user?.email || messages.value.nav.account);
 const userInitials = computed(() => currentUserName.value.slice(0, 1).toUpperCase());
 const signingOut = ref(false);
-const { messages, setLocale, setTheme, setCurrency, currency, currencies, t, theme } = useStorefrontPreferences();
+const { messages, setLocale, setTheme, setCurrency, setAvailableCurrencies, currency, currencies, t, theme } =
+  useStorefrontPreferences();
+
+onMounted(async () => {
+  try {
+    const data = await runTelefunc(() => onGetStorefrontCurrencies({}), { notifyError: false });
+    const list = (data?.enabledCurrencies || []) as StoreCurrency[];
+    if (list.length) setAvailableCurrencies(list);
+  } catch {
+    /* keep code defaults */
+  }
+});
 
 async function signOut() {
   if (signingOut.value) return;
