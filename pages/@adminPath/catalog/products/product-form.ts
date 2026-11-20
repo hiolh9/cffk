@@ -42,7 +42,7 @@ export const productFormSchema = z.object({
   reviewCount: z.number().int().min(0).max(1_000_000),
   status: z.enum(productStatuses),
   taxCategory: z.enum(["Digital_Goods", "Digital_Service"]),
-  
+
   sort: z.number().int().min(0),
 });
 
@@ -75,7 +75,7 @@ export function defaultProductForm(categoryId: number | null = null): ProductFor
     customSchemaJson: "",
     ratingValue: "",
     reviewCount: 0,
-   
+
     taxCategory: "Digital_Goods",
     status: "DRAFT",
     sort: 0,
@@ -123,6 +123,13 @@ export function productDetailToForm(item: ProductDetail["product"]): ProductForm
 
 export type ProductDeliveryType = (typeof deliveryTypes)[number];
 
+export type RegionalPriceForm = {
+  USD: string;
+  SGD: string;
+  AUD: string;
+  JPY: string;
+};
+
 export type ProductSkuDraftInput = {
   name: string;
   price: string;
@@ -133,6 +140,8 @@ export type ProductSkuDraftInput = {
   minBuy: number;
   maxBuy: number;
   sort: number;
+  /** Major units; empty means no regional override (storefront uses MYR base). */
+  regionalPrices?: RegionalPriceForm;
 };
 
 export function formToSaveInput(
