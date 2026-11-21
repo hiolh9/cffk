@@ -129,7 +129,7 @@
                 <thead class="border-b bg-muted/40 text-left">
                   <tr>
                     <th class="p-3">SKU 名称</th>
-                    <th class="p-3">价格</th>
+                    <th class="p-3 min-w-56">价格（MYR 主价 + 区域价）</th>
                     <th class="p-3">购买范围</th>
                     <th class="p-3">库存/内容</th>
                     <th class="p-3">状态</th>
@@ -139,7 +139,30 @@
                 <tbody>
                   <tr v-for="sku in skuDrafts" :key="sku.id ?? sku.clientKey" class="border-b last:border-0">
                     <td class="p-3"><Input v-model="sku.name" /></td>
-                    <td class="p-3"><Input v-model="sku.price" inputmode="decimal" /></td>
+                    <td class="p-3">
+                      <div class="flex min-w-52 flex-col gap-1.5">
+                        <div class="flex items-center gap-2">
+                          <span class="w-10 shrink-0 text-xs text-muted-foreground">MYR</span>
+                          <Input v-model="sku.price" inputmode="decimal" placeholder="主价" />
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <span class="w-10 shrink-0 text-xs text-muted-foreground">USD</span>
+                          <Input v-model="sku.regionalPrices.USD" inputmode="decimal" placeholder="可选" />
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <span class="w-10 shrink-0 text-xs text-muted-foreground">SGD</span>
+                          <Input v-model="sku.regionalPrices.SGD" inputmode="decimal" placeholder="可选" />
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <span class="w-10 shrink-0 text-xs text-muted-foreground">AUD</span>
+                          <Input v-model="sku.regionalPrices.AUD" inputmode="decimal" placeholder="可选" />
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <span class="w-10 shrink-0 text-xs text-muted-foreground">JPY</span>
+                          <Input v-model="sku.regionalPrices.JPY" inputmode="numeric" placeholder="整日元" />
+                        </div>
+                      </div>
+                    </td>
                     <td class="p-3">
                       <div v-if="!isSupplierProduct" class="flex min-w-36 items-center gap-2">
                         <Input v-model.number="sku.minBuy" type="number" min="1" :disabled="deliveryType === 'FIXED_CARD'" />
@@ -352,6 +375,28 @@ const selectedTaxTypeIds = ref<number[]>([]);
 const categories = ref<Array<{ id: number; name: string; status: string }>>([]);
 const cardInventory = ref<{ available: number } | null>(null);
 
+type RegionalPriceForm = {
+  USD: string;
+  SGD: string;
+  AUD: string;
+  JPY: string;
+};
+
+function emptyRegionalPrices(): RegionalPriceForm {
+  return { USD: "", SGD: "", AUD: "", JPY: "" };
+}
+
+function normalizeRegionalForm(raw: unknown): RegionalPriceForm {
+  const base = emptyRegionalPrices();
+  if (!raw || typeof raw !== "object") return base;
+  const o = raw as Record<string, unknown>;
+  for (const code of ["USD", "SGD", "AUD", "JPY"] as const) {
+    const v = o[code];
+    if (v != null && String(v).trim()) base[code] = String(v).trim();
+  }
+  return base;
+}
+
 type ProductSkuSaveInput = {
   id?: number;
   productId: number;
@@ -364,6 +409,7 @@ type ProductSkuSaveInput = {
   minBuy: number;
   maxBuy: number;
   sort: number;
+  regionalPrices?: RegionalPriceForm;
 };
 
 type SkuDraft = Omit<ProductSkuSaveInput, "deliveryType"> & {
@@ -371,6 +417,7 @@ type SkuDraft = Omit<ProductSkuSaveInput, "deliveryType"> & {
   deliveryType: ProductDeliveryType | "SUPPLIER";
   clientKey: string;
   fixedDeliveryContent: string;
+  regionalPrices: RegionalPriceForm;
 };
 
 const skuDrafts = ref<SkuDraft[]>([]);
@@ -446,6 +493,7 @@ function addSku() {
     minBuy: 1,
     maxBuy: 1,
     sort: skuDrafts.value.length,
+    regionalPrices: emptyRegionalPrices(),
   });
 }
 
@@ -493,6 +541,7 @@ function confirmDeliveryTypeChange() {
       sku.status = "ACTIVE";
       sku.deliveryType = next;
       sku.fixedDeliveryContent = "";
+      sku.regionalPrices = emptyRegionalPrices();
       sku.physicalStock = next === "MANUAL" || next === "EXPRESS" ? 1 : null;
       sku.minBuy = 1;
       sku.maxBuy = 1;
@@ -522,6 +571,8 @@ async function saveSku(sku: SkuDraft) {
       minBuy: sku.minBuy,
       maxBuy: sku.maxBuy,
       sort: sku.sort,
+    ,
+      regionalPrices: sku.regionalPrices,
     };
     const saved = await runTelefunc(() => onSaveProductSku(input), {
       successMessage: sku.id ? "SKU 已保存。" : "SKU 已创建。",
@@ -590,6 +641,7 @@ async function load() {
         productId: props.productId!,
         clientKey: `sku-${sku.id}`,
         fixedDeliveryContent: sku.fixedDeliveryContent ?? "",
+        regionalPrices: normalizeRegionalForm((sku as { regionalPrices?: unknown }).regionalPrices),
       }));
     } else {
       resetForm({ values: defaultProductForm(activeCategories.value[0]?.id ?? null) });
