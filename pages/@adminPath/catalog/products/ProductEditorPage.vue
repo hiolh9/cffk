@@ -191,21 +191,6 @@
                           <SelectItem value="INACTIVE">停用</SelectItem>
                         </SelectContent>
                       </Select>
-                  <label class="text-sm font-medium">税务分类（SST）</label>
-<VeeField name="taxCategory">
-  <Select v-model="taxCategory">
-    <SelectTrigger class="w-full">
-      <SelectValue placeholder="选择税务分类" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="Digital_Goods">Digital_Goods（数字商品，如钻石充值，不进 SST 服务门槛）</SelectItem>
-      <SelectItem value="Digital_Service">Digital_Service（数字服务，如剪映会员，MY 计入 SST 门槛）</SelectItem>
-    </SelectContent>
-  </Select>
-</VeeField>
-<p class="text-xs text-muted-foreground">
-  钻石等选 Goods；软件会员选 Service。仅影响马来西亚 SST 口径，所得税收入仍按订单记账。
-</p>
                     </td>
                     <td class="whitespace-nowrap p-3">
                       <div class="flex gap-2">
@@ -294,6 +279,21 @@
                   </Select>
                 </Field>
               </VeeField>
+              <VeeField name="taxCategory">
+                <Field>
+                  <FieldLabel>税务分类（SST）</FieldLabel>
+                  <Select v-model="taxCategory">
+                    <SelectTrigger class="w-full">
+                      <SelectValue placeholder="选择税务分类" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Digital_Goods">Digital_Goods（数字商品）</SelectItem>
+                      <SelectItem value="Digital_Service">Digital_Service（数字服务）</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>钻石等选 Goods；软件会员选 Service。仅影响马来西亚 SST 口径。</FieldDescription>
+                </Field>
+              </VeeField>
             </FieldSet>
           </FieldGroup>
         </aside>
@@ -368,12 +368,16 @@ const ProductRichTextEditor = defineAsyncComponent(() => import("./ProductRichTe
 
 const props = defineProps<{ productId?: number }>();
 const pageContext = usePageContext();
-const basePath = `/${pageContext.routeParams.adminPath}`;
-const listPath = `${basePath}/catalog/products`;
-const taxTypeOptions = ref<Array<{ id: number; code: string; name: string; defaultRatePercent: number }>>([]);
-const selectedTaxTypeIds = ref<number[]>([]);
-const categories = ref<Array<{ id: number; name: string; status: string }>>([]);
-const cardInventory = ref<{ available: number } | null>(null);
+const adminPath = (pageContext.routeParams as { adminPath?: string }).adminPath || "admin";
+
+const editing = computed(() => Boolean(props.productId));
+const loading = ref(false);
+const saving = ref(false);
+const skuSaving = ref(false);
+const mediaPickerOpen = ref(false);
+const deliveryChanging = ref(false);
+const deliveryChangeDialogOpen = ref(false);
+const pendingDeliveryType = ref<ProductDeliveryType | null>(null);
 
 type RegionalPriceForm = {
   USD: string;
@@ -421,65 +425,44 @@ type SkuDraft = Omit<ProductSkuSaveInput, "deliveryType"> & {
 };
 
 const skuDrafts = ref<SkuDraft[]>([]);
-const skuSaving = ref(false);
-const saving = ref(false);
-const loading = ref(false);
-const mediaPickerOpen = ref(false);
-const slugTouched = ref(Boolean(props.productId));
+const deliveryType = ref<ProductDeliveryType>("CARD_AUTO");
+const categories = ref<Array<{ id: number; name: string; status: string }>>([]);
+const taxTypeOptions = ref<Array<{ id: number; code: string; name: string; defaultRatePercent: number }>>([]);
+const selectedTaxTypeIds = ref<number[]>([]);
 
-const { values, handleSubmit, resetForm, setFieldValue } = useForm<ProductForm>({
-  validationSchema: toTypedSchema(productFormSchema),
-  initialValues: defaultProductForm(),
-  keepValuesOnUnmount: true,
-});
-
-const activeCategories = computed(() => categories.value.filter((item) => item.status === "ACTIVE"));
-const editing = computed(() => Boolean(props.productId));
+const activeCategories = computed(() => categories.value.filter((c) => c.status === "ACTIVE"));
 const isSupplierProduct = computed(
   () => skuDrafts.value.length > 0 && skuDrafts.value.every((sku) => sku.fulfillmentSource === "SUPPLIER"),
 );
-const taxCategory = computed({
-  get: () => values.taxCategory,
-  set: (value) => setFieldValue("taxCategory", value as ProductForm["taxCategory"]),
-});
-const status = computed({
-  get: () => values.status,
-  set: (value) => setFieldValue("status", value as ProductForm["status"]),
-});
-
-const deliveryType = ref<ProductDeliveryType>("CARD_AUTO");
-const deliveryChangeDialogOpen = ref(false);
-const deliveryChanging = ref(false);
-const pendingDeliveryType = ref<ProductDeliveryType | null>(null);
 
 const deliveryOptions = [
-  { value: "CARD_AUTO", label: "自动发货卡密", description: "从卡密库存中自动分配未售卡密。" },
-  { value: "FIXED_CARD", label: "固定内容自动发货", description: "每次支付后发送同一份固定内容。" },
-  { value: "MANUAL", label: "手动发货", description: "支付后等待管理员填写发货内容。" },
-  { value: "EXPRESS", label: "快递发货", description: "买家填写收货信息，管理员安排快递。" },
-] as const;
+  { value: "CARD_AUTO" as const, label: "卡密自动", description: "自动发码" },
+  { value: "FIXED_CARD" as const, label: "固定内容", description: "固定文案发货" },
+  { value: "MANUAL" as const, label: "人工发货", description: "后台手动处理" },
+  { value: "EXPRESS" as const, label: "快递/实物", description: "需库存数量" },
+];
 
-function onSlug() {
-  slugTouched.value = true;
-}
-
-watch(
-  () => values.name,
-  (name) => {
-    if (!slugTouched.value && !props.productId) setFieldValue("slug", slugifyProductName(name));
-  },
-);
+const { handleSubmit, resetForm, setFieldValue, values, defineField } = useForm({
+  validationSchema: toTypedSchema(productFormSchema),
+  initialValues: defaultProductForm(),
+});
+const [status] = defineField("status");
+const [taxCategory] = defineField("taxCategory");
 
 function goBack() {
-  void navigate(listPath);
+  navigate(`/${adminPath}/catalog/products`);
 }
+
+function onSlug(v: string | number) {
+  const s = String(v ?? "");
+  setFieldValue("slug", s.trim() ? slugifyProductName(s) : "");
+}
+
 function toggleTaxType(id: number, checked: boolean) {
-  if (checked) {
-    if (!selectedTaxTypeIds.value.includes(id)) selectedTaxTypeIds.value = [...selectedTaxTypeIds.value, id];
-  } else {
-    selectedTaxTypeIds.value = selectedTaxTypeIds.value.filter((x) => x !== id);
-  }
+  if (checked) selectedTaxTypeIds.value = [...new Set([...selectedTaxTypeIds.value, id])];
+  else selectedTaxTypeIds.value = selectedTaxTypeIds.value.filter((x) => x !== id);
 }
+
 function addSku() {
   skuDrafts.value.push({
     clientKey: crypto.randomUUID(),
@@ -497,62 +480,8 @@ function addSku() {
   });
 }
 
-function hasConfiguredSku() {
-  return skuDrafts.value.some(
-    (sku) =>
-      Boolean(sku.id) ||
-      !/^新规格\d*$/.test(sku.name.trim()) ||
-      sku.price !== "0.01" ||
-      sku.fixedDeliveryContent.trim() !== "" ||
-      sku.physicalStock !== null ||
-      sku.minBuy !== 1 ||
-      sku.maxBuy !== 1,
-  );
-}
-
-function changeDeliveryType(next: unknown) {
-  if (typeof next !== "string") return;
-  const target = next as ProductDeliveryType;
-  if (target === deliveryType.value) return;
-  if (hasConfiguredSku()) {
-    pendingDeliveryType.value = target;
-    deliveryChangeDialogOpen.value = true;
-    return;
-  }
-  applyDeliveryType(target);
-}
-
-function applyDeliveryType(next: ProductDeliveryType) {
-  deliveryType.value = next;
-  skuDrafts.value.forEach((sku) => {
-    sku.deliveryType = next;
-  });
-  if (!skuDrafts.value.length) addSku();
-}
-
-function confirmDeliveryTypeChange() {
-  const next = pendingDeliveryType.value;
-  if (!next) return;
-  deliveryChanging.value = true;
-  try {
-    skuDrafts.value.forEach((sku, index) => {
-      sku.name = `新规格${index + 1}`;
-      sku.price = "0.01";
-      sku.status = "ACTIVE";
-      sku.deliveryType = next;
-      sku.fixedDeliveryContent = "";
-      sku.regionalPrices = emptyRegionalPrices();
-      sku.physicalStock = next === "MANUAL" || next === "EXPRESS" ? 1 : null;
-      sku.minBuy = 1;
-      sku.maxBuy = 1;
-    });
-    applyDeliveryType(next);
-    pendingDeliveryType.value = null;
-    deliveryChangeDialogOpen.value = false;
-    toast.success("SKU 配置已清空，请重新填写。");
-  } finally {
-    deliveryChanging.value = false;
-  }
+function discardSku(sku: SkuDraft) {
+  skuDrafts.value = skuDrafts.value.filter((item) => item !== sku);
 }
 
 async function saveSku(sku: SkuDraft) {
@@ -571,7 +500,6 @@ async function saveSku(sku: SkuDraft) {
       minBuy: sku.minBuy,
       maxBuy: sku.maxBuy,
       sort: sku.sort,
-    ,
       regionalPrices: sku.regionalPrices,
     };
     const saved = await runTelefunc(() => onSaveProductSku(input), {
@@ -582,9 +510,10 @@ async function saveSku(sku: SkuDraft) {
       clientKey: sku.clientKey,
       price: formatCentsAsYuan(saved.price),
       fixedDeliveryContent: saved.fixedDeliveryContent ?? "",
+      regionalPrices: normalizeRegionalForm((saved as { regionalPrices?: unknown }).regionalPrices ?? sku.regionalPrices),
     });
   } catch {
-    /* runTelefunc shows toast */
+    /* toast via runTelefunc */
   } finally {
     skuSaving.value = false;
   }
@@ -603,45 +532,74 @@ async function removeSku(sku: SkuDraft) {
   }
 }
 
-function discardSku(sku: SkuDraft) {
-  skuDrafts.value = skuDrafts.value.filter((item) => item !== sku);
+function changeDeliveryType(next: string) {
+  const value = next as ProductDeliveryType;
+  if (value === deliveryType.value) return;
+  if (editing.value) return;
+  if (skuDrafts.value.some((s) => s.name && s.price !== "0.01")) {
+    pendingDeliveryType.value = value;
+    deliveryChangeDialogOpen.value = true;
+    return;
+  }
+  deliveryType.value = value;
+  skuDrafts.value.forEach((sku) => {
+    sku.deliveryType = value;
+  });
+}
+
+function confirmDeliveryTypeChange() {
+  const next = pendingDeliveryType.value;
+  if (!next) return;
+  deliveryChanging.value = true;
+  deliveryType.value = next;
+  skuDrafts.value.forEach((sku, index) => {
+    sku.name = `新规格${index + 1}`;
+    sku.price = "0.01";
+    sku.status = "ACTIVE";
+    sku.deliveryType = next;
+    sku.fixedDeliveryContent = "";
+    sku.regionalPrices = emptyRegionalPrices();
+    sku.physicalStock = next === "MANUAL" || next === "EXPRESS" ? 1 : null;
+    sku.minBuy = 1;
+    sku.maxBuy = 1;
+  });
+  deliveryChangeDialogOpen.value = false;
+  pendingDeliveryType.value = null;
+  deliveryChanging.value = false;
+  toast.success("SKU 配置已清空，请重新填写。");
 }
 
 async function load() {
   loading.value = true;
   try {
-    const catalog = await runTelefunc(() => onGetCatalogAdminData());
-    categories.value = catalog.categories;
-    if (props.productId) {
-      const detail = await runTelefunc(() => onGetProductAdminDetail({ id: props.productId! }));
-          // 始终拉启用中的税种列表；有商品 id 再拉已勾选
+    const catalog = await runTelefunc(() => onGetCatalogAdminData({ page: 1, pageSize: 20 }), { notifyError: false });
+    categories.value = (catalog?.categories || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+    }));
     try {
-      const taxData = await runTelefunc(() =>
-        onGetProductTaxLinks({ productId: props.productId || 0 }),
-      );
-      taxTypeOptions.value = (taxData.types ?? []).map((t: any) => ({
-        id: t.id,
-        code: t.code,
-        name: t.name,
-        defaultRatePercent: t.defaultRatePercent,
-      }));
-      selectedTaxTypeIds.value = (taxData.links ?? []).map((l: any) => l.taxTypeId);
+      const tax = await runTelefunc(() => onGetProductTaxLinks({ productId: props.productId || 0 }), {
+        notifyError: false,
+      });
+      taxTypeOptions.value = (tax as any)?.types || (tax as any)?.taxTypes || [];
+      selectedTaxTypeIds.value = ((tax as any)?.linkedIds || (tax as any)?.productTaxTypeIds || []) as number[];
     } catch {
       taxTypeOptions.value = [];
-      selectedTaxTypeIds.value = [];
     }
+    if (props.productId) {
+      const detail = await runTelefunc(() => onGetProductAdminDetail({ id: props.productId! }));
       resetForm({ values: productDetailToForm(detail.product) });
-      cardInventory.value = detail.cardInventory;
-      deliveryType.value =
-        detail.skus[0]?.deliveryType === "SUPPLIER"
-          ? "CARD_AUTO"
-          : detail.skus[0]?.deliveryType ?? "CARD_AUTO";
-      skuDrafts.value = detail.skus.map((sku) => ({
+      const first = detail.skus?.[0];
+      if (first?.deliveryType && first.deliveryType !== "SUPPLIER") {
+        deliveryType.value = first.deliveryType as ProductDeliveryType;
+      }
+      skuDrafts.value = detail.skus.map((sku: any) => ({
         ...sku,
         productId: props.productId!,
         clientKey: `sku-${sku.id}`,
         fixedDeliveryContent: sku.fixedDeliveryContent ?? "",
-        regionalPrices: normalizeRegionalForm((sku as { regionalPrices?: unknown }).regionalPrices),
+        regionalPrices: normalizeRegionalForm(sku.regionalPrices),
       }));
     } else {
       resetForm({ values: defaultProductForm(activeCategories.value[0]?.id ?? null) });
@@ -656,67 +614,64 @@ async function load() {
   }
 }
 
-const submit = handleSubmit(
-  async (form) => {
-    saving.value = true;
-    try {
-      if (isSupplierProduct.value && props.productId) {
-        await runTelefunc(
-          () =>
-            onSaveSupplierProductPresentation({
-              id: props.productId!,
-              categoryId: form.categoryId || null,
-              name: form.name,
-              slug: form.slug,
-              subtitle: form.subtitle,
-              coverImage: form.coverImage,
-              description: form.description,
-              nameEn: form.nameEn || null,
-              subtitleEn: form.subtitleEn || null,
-              descriptionEn: form.descriptionEn || null,
-              seoTitleEn: form.seoTitleEn || null,
-              seoDescriptionEn: form.seoDescriptionEn || null,
-              purchaseNote: form.purchaseNote,
-              status: form.status,
-              sort: form.sort,
-              skus: skuDrafts.value.map((sku) => ({
-                id: sku.id!,
-                name: sku.name,
-                price: sku.price,
-                status: sku.status,
-                sort: sku.sort,
-              })),
-            }),
-          { successMessage: "供应商商品已保存。" },
-        );
-      }else {
-        const base = formToSaveInput(
-          form,
-          skuDrafts.value.map(({ id, productId: _pid, clientKey: _ck, fulfillmentSource: _fs, ...sku }) => ({
-            ...sku,
-            deliveryType: deliveryType.value,
-            ...(editing.value && id ? { id } : {}),
-          })),
-          deliveryType.value,
-        );
-        await runTelefunc(
-          () =>
-            onSaveProduct({
-              ...base,
-              taxLinks: selectedTaxTypeIds.value.map((taxTypeId) => ({ taxTypeId })),
-            }),
-          { successMessage: props.productId ? "商品已保存。" : "商品已创建。" },
-        );
-      }
-      goBack();
-    } catch {
-      /* */
-    } finally {
-      saving.value = false;
+const submit = handleSubmit(async (form) => {
+  saving.value = true;
+  try {
+    if (isSupplierProduct.value && props.productId) {
+      await runTelefunc(
+        () =>
+          onSaveSupplierProductPresentation({
+            id: props.productId!,
+            categoryId: form.categoryId || null,
+            name: form.name,
+            slug: form.slug,
+            subtitle: form.subtitle,
+            coverImage: form.coverImage,
+            description: form.description,
+            nameEn: form.nameEn || null,
+            subtitleEn: form.subtitleEn || null,
+            descriptionEn: form.descriptionEn || null,
+            seoTitleEn: form.seoTitleEn || null,
+            seoDescriptionEn: form.seoDescriptionEn || null,
+            purchaseNote: form.purchaseNote,
+            status: form.status,
+            sort: form.sort,
+            skus: skuDrafts.value.map((sku) => ({
+              id: sku.id!,
+              name: sku.name,
+              price: sku.price,
+              status: sku.status,
+              sort: sku.sort,
+            })),
+          }),
+        { successMessage: "供应商商品已保存。" },
+      );
+    } else {
+      const base = formToSaveInput(
+        form,
+        skuDrafts.value.map(({ id, productId: _pid, clientKey: _ck, fulfillmentSource: _fs, ...sku }) => ({
+          ...sku,
+          deliveryType: deliveryType.value,
+          ...(editing.value && id ? { id } : {}),
+        })),
+        deliveryType.value,
+      );
+      await runTelefunc(
+        () =>
+          onSaveProduct({
+            ...base,
+            taxLinks: selectedTaxTypeIds.value.map((taxTypeId) => ({ taxTypeId })),
+          }),
+        { successMessage: props.productId ? "商品已保存。" : "商品已创建。" },
+      );
     }
-  },
-  () => toast.error("请检查标记的必填项和输入格式。"),
-);
+    goBack();
+  } catch {
+    /* */
+  } finally {
+    saving.value = false;
+  }
+});
 
 onMounted(load);
 </script>
